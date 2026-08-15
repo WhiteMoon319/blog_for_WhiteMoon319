@@ -3,15 +3,16 @@
   "name": "blog",
   "compatibility_date": "2025-08-01",
   "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": "./dist",
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "blog-db",
-      // ⚠️ 占位 ID：尚未取得真实资源。上线前必须执行 `wrangler login`，
-      // 然后 `wrangler d1 create blog-db` 创建数据库并用返回的真实 ID 替换此处。
-      // 未替换前禁止宣称远程部署完成。
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "77b3c654-3293-49b1-8aa7-a327de1f3af6",
       "migrations_dir": "./db/migrations"
     }
   ],
@@ -24,14 +25,11 @@
   "kv_namespaces": [
     {
       "binding": "SESSION",
-      // 预留：会话续期/失效名单（当前会话为无状态 HMAC，暂未使用）
-      "id": "00000000-0000-0000-0000-000000000000"
+      "id": "da2e3f08c7534b67b53ebc2fda0be30e"
     },
     {
       "binding": "RATE_LIMIT",
-      // ⚠️ 占位 ID：登录限流计数器。上线前执行 `wrangler kv namespace create RATE_LIMIT`
-      // 并用返回的真实 ID 替换此处，未替换前禁止宣称远程部署完成。
-      "id": "00000000-0000-0000-0000-000000000000"
+      "id": "17f1ee7a8dbe4ad8a02caf465a27c0d6"
     }
   ],
   "vars": {

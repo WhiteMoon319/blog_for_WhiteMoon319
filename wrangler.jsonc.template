@@ -46,9 +46,9 @@
     }
   ],
   "vars": {
-    "SITE_NAME": "博客名",
-    "SITE_SLOGAN": "某人的一角书斋",
-    "SITE_POEM": "晨起摊书卷，夜来码字忙。",
+    "SITE_NAME": "月下独酌",
+    "SITE_SLOGAN": "长月夜下，对影成楼。",
+    "SITE_POEM": "月下少辞令，醉后自逍遥。",
     "LOGIN_RATE_LIMIT_MAX": 10,
     "LOGIN_RATE_LIMIT_WINDOW": 300
   }

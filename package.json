@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run build:admin && astro build && node scripts/merge-admin.mjs",
+    "build": "node scripts/cf-config.mjs && npm run build:admin && astro build && node scripts/merge-admin.mjs",
     "build:admin": "npm --prefix admin run build",
     "dev:admin": "npm --prefix admin run dev",
     "preview": "astro preview",
@@ -15,8 +15,10 @@
     "typecheck:admin": "npm --prefix admin run typecheck",
     "test": "node --test \"tests/**/*.test.ts\"",
     "cf:login": "wrangler login",
-    "cf:dev": "wrangler pages dev dist",
-    "cf:deploy": "wrangler pages deploy dist"
+    "cf:config": "node scripts/cf-config.mjs",
+    "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/migrations/0001_init.sql && wrangler d1 execute blog-db --local --file=db/seed.sql",
+    "cf:dev": "npm run build && wrangler dev",
+    "cf:deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.2.1",

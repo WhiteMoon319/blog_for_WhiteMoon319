@@ -9,5 +9,8 @@ admin/dist/
 # 环境变量
 .dev.vars
 .env
+
+# 本地生成的 Wrangler 配置（由 wrangler.jsonc.template + .env 经 scripts/cf-config.mjs 生成）
+wrangler.jsonc
 #计划文档
 PLAN.md

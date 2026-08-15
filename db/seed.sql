@@ -10,7 +10,7 @@ INSERT INTO posts (collection_id, title, slug, summary, content_md, status) VALU
 
 用了 Cloudflare 全家桶搭了这间小书斋。
 
-- 页面在 Cloudflare Pages
+- 页面在 Cloudflare Workers
 - 数据在 D1
 - 图片在 R2
 
@@ -24,7 +24,7 @@ INSERT INTO posts (collection_id, title, slug, summary, content_md, status) VALU
 
 1. 用 `@astrojs/cloudflare` 适配器，`output: server`
 2. `wrangler.jsonc` 里绑定 D1 与 R2
-3. `wrangler pages deploy` 一条龙上线
+3. `wrangler deploy` 一条龙上线
 
 代码：
 

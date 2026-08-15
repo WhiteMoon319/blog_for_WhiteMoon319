@@ -1,0 +1,55 @@
+{
+  // Cloudflare Workers 配置模板（真实资源 ID 不入库）。
+  //
+  // 使用方式：
+  //   1. 复制 .env.example 为根目录 .env，填入真实资源 ID
+  //      （BLOG_D1_ID / BLOG_SESSION_KV_ID / BLOG_RATE_LIMIT_KV_ID），
+  //      获取方式：npx wrangler d1 list、npx wrangler kv namespace list
+  //   2. 运行 npm run cf:config（或 npm run build / cf:dev / cf:deploy，
+  //      均会自动先生成配置），脚本会把下方 ${...} 占位符替换为 .env 中的真实值，
+  //      生成本地 wrangler.jsonc（该文件已被 .gitignore 忽略，不会入库）
+  //
+  // 未配置 .env 时，wrangler.jsonc 会保留 ${...} 占位符，
+  // 本地 miniflare 可用占位符启动；wrangler deploy 会因资源 ID 无效而明确失败，
+  // 不会误指向其他资源。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "blog",
+  "compatibility_date": "2025-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "blog-db",
+      "database_id": "${BLOG_D1_ID}",
+      "migrations_dir": "./db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "blog-images"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SESSION",
+      "id": "${BLOG_SESSION_KV_ID}"
+    },
+    {
+      "binding": "RATE_LIMIT",
+      "id": "${BLOG_RATE_LIMIT_KV_ID}"
+    }
+  ],
+  "vars": {
+    "SITE_NAME": "博客名",
+    "SITE_SLOGAN": "某人的一角书斋",
+    "SITE_POEM": "晨起摊书卷，夜来码字忙。",
+    "LOGIN_RATE_LIMIT_MAX": 10,
+    "LOGIN_RATE_LIMIT_WINDOW": 300
+  }
+}

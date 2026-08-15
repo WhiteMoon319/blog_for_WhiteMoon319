@@ -175,7 +175,7 @@ test('e2e：首页渲染文集与最新文章', async () => {
   assert.ok(html.includes('测试书斋'));
   assert.ok(html.includes('随笔'));
   assert.ok(html.includes('第一篇：博客开张'));
-  assert.ok(html.includes('/posts/first-post/'));
+  assert.ok(html.includes('/collections/essays/first-post/'));
 });
 
 test('e2e：草稿文章对游客 302 至 /404', async () => {
@@ -261,11 +261,15 @@ test('e2e：文章页 TOC 锚点与相邻导航', async () => {
   assert.ok(html.includes('href="#第一标题"'), '目录应链接到锚点');
   await del(`/api/posts/${(await created.json()).post.id}`);
 
-  const page = await get('/posts/astro-on-cloudflare/');
+  const page = await get('/collections/tech/astro-on-cloudflare/');
   assert.equal(page.status, 200);
   const html2 = await page.text();
   assert.ok(html2.includes('article-pagination'), '应渲染相邻导航');
-  assert.ok(html2.includes('/posts/first-post/'), '相邻链接应正确');
+  assert.ok(html2.includes('/collections/essays/first-post/'), '相邻链接应正确');
+
+  const legacy = await get('/posts/astro-on-cloudflare/');
+  assert.equal(legacy.status, 301, '旧路径应 301 到新结构');
+  assert.ok(String(legacy.headers.get('location')).includes('/collections/tech/astro-on-cloudflare/'));
 });
 
 test('e2e：slug 校验与重复 slug', async () => {
@@ -301,7 +305,11 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
   const postBody = await postRes.json();
   const postId = postBody.post.id as number;
 
-  const page = await get('/posts/e2e-post/');
+  const legacy = await get('/posts/e2e-post/');
+  assert.equal(legacy.status, 301, '旧路径应 301 到新结构');
+  assert.ok(String(legacy.headers.get('location')).includes('/collections/test-col/e2e-post/'));
+
+  const page = await get('/collections/test-col/e2e-post/');
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.ok(html.includes('e2e 文章'));

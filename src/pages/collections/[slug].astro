@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { envOf, getCollectionBySlug, listPublishedPosts, fmtDate } from '../../lib/db';
+import { postHref } from '../../lib/utils';
 
 const env = await envOf();
 const { slug } = Astro.params;
@@ -33,7 +34,7 @@ const posts = await listPublishedPosts(env.DB, { collectionId: collection.id });
       posts.length > 0 ? (
         <div class="posts-grid">
           {posts.map((p, i) => (
-            <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={`/posts/${encodeURI(p.slug)}/`} style={`--cc: ${collection.theme_color};`}>
+            <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, collection.slug)} style={`--cc: ${collection.theme_color};`}>
               {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
               <h3 class="post-title">{p.title}</h3>
               {p.summary && <p class="post-summary">{p.summary}</p>}

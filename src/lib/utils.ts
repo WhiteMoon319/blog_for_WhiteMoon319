@@ -24,3 +24,9 @@ export function isValidSlug(input: string): boolean {
 export function nowIso(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19);
 }
+
+export function postHref(slug: string, collectionSlug?: string | null): string {
+  return collectionSlug
+    ? `/collections/${encodeURI(collectionSlug)}/${encodeURI(slug)}/`
+    : `/posts/${encodeURI(slug)}/`;
+}

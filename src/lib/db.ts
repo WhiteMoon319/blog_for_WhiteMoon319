@@ -83,19 +83,21 @@ export async function listArchivedPosts(db: D1Database): Promise<PostRow[]> {
     .then((r) => r.results ?? []);
 }
 
+export type PostWithCollection = PostRow & { collection_slug: string | null };
+
 export async function getAdjacentPosts(
   db: D1Database,
   post: PostRow,
-): Promise<{ prev: PostRow | null; next: PostRow | null }> {
-  const base = `SELECT * FROM posts WHERE status = 'published'`;
+): Promise<{ prev: PostWithCollection | null; next: PostWithCollection | null }> {
+  const base = `SELECT p.*, c.slug AS collection_slug FROM posts p LEFT JOIN collections c ON c.id = p.collection_id WHERE p.status = 'published'`;
   const prev = await db
-    .prepare(`${base} AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT 1`)
+    .prepare(`${base} AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`)
     .bind(post.created_at, post.created_at, post.id)
-    .first<PostRow>();
+    .first<PostWithCollection>();
   const next = await db
-    .prepare(`${base} AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY created_at ASC, id ASC LIMIT 1`)
+    .prepare(`${base} AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`)
     .bind(post.created_at, post.created_at, post.id)
-    .first<PostRow>();
+    .first<PostWithCollection>();
   return { prev, next };
 }
 

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { envOf, listCollections, listPublishedPosts, fmtDate } from '../lib/db';
+import { postHref } from '../lib/utils';
 
 const env = await envOf();
 const collections = await listCollections(env.DB);
@@ -64,7 +65,7 @@ const heroSeal = Array.from(env.SITE_NAME)[0] ?? '书';
           {latestPosts.map((p, i) => {
             const col = collections.find((c) => c.id === p.collection_id);
             return (
-              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={`/posts/${encodeURI(p.slug)}/`} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
                 <h3 class="post-title">{p.title}</h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}

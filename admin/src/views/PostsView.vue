@@ -38,6 +38,11 @@ function colColor(id: number | null): string {
   return collections.value.find((c) => c.id === id)?.theme_color ?? '#8a6d3b';
 }
 
+function postUrl(p: Post): string {
+  const col = collections.value.find((c) => c.id === p.collection_id);
+  return col ? `/collections/${encodeURI(col.slug)}/${encodeURI(p.slug)}/` : `/posts/${encodeURI(p.slug)}/`;
+}
+
 function fmt(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '/');
 }
@@ -121,7 +126,7 @@ async function remove(p: Post) {
             </router-link>
             <a
               v-else
-              :href="`/posts/${encodeURI(p.slug)}/`"
+              :href="postUrl(p)"
               target="_blank"
               rel="noopener"
               style="color:var(--ink-deep);text-decoration:none;"

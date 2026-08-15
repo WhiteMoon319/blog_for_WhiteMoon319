@@ -6,6 +6,7 @@ declare global {
     interface Env {
       DB: D1Database;
       IMAGES: R2Bucket;
+      ASSETS: Fetcher;
       RATE_LIMIT: KVNamespace;
       SITE_NAME: string;
       SITE_SLOGAN: string;

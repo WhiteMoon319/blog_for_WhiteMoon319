@@ -76,6 +76,7 @@ async function boot(): Promise<void> {
             notFoundHandling: 'none',
           },
           env: {
+            ASSETS: { type: 'assets' },
             DB: { type: 'd1', id: 'e2e-db' },
             IMAGES: { type: 'r2', name: 'e2e-images' },
             SESSION: { type: 'kv', id: 'e2e-session' },
@@ -194,6 +195,21 @@ test('e2e：admin SPA 回退路由 200（含 no-store 与 noindex）', async () 
     assert.equal(res.headers.get('cache-control'), 'no-store');
     assert.equal(res.headers.get('x-robots-tag'), 'noindex');
   }
+});
+
+test('e2e：admin SPA 静态资源以正确 MIME 返回（防白屏）', async () => {
+  if (!HAS_BUILD) return;
+  const shell = await get('/admin/');
+  const html = await shell.text();
+  const src = html.match(/(?:src|href)="(\/admin\/assets\/[^"]+\.(?:js|css))"/)?.[1];
+  assert.ok(src, 'SPA 外壳应引用 admin 静态资源');
+  const asset = await get(src);
+  assert.equal(asset.status, 200, `${src} 应为 200`);
+  assert.ok(
+    String(asset.headers.get('content-type')).startsWith('text/javascript') ||
+      String(asset.headers.get('content-type')).startsWith('text/css'),
+    `${src} 不应返回 text/html`,
+  );
 });
 
 test('e2e：未登录无法读草稿列表、无法写数据', async () => {

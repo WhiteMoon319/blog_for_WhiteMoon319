@@ -1,0 +1,68 @@
+/* ===== 设计 Token（移植自 CXJC） ===== */
+
+:root {
+  /* 朱砂 / 强调色 */
+  --cinnabar: #c23a30;
+  --cinnabar-line: rgba(194, 58, 48, 0.15);
+
+  /* 四种常用色 */
+  --deep-blue: #2f4858;
+  --pine: #2d6a4f;
+  --amber: #8a6d3b;
+  --sky: #6baed6;
+
+  /* 墨色阶 */
+  --ink-black: #1a1a2e;
+  --ink-deep: #2a2a3e;
+  --ink-mid: #5b5b6e;
+  --ink-light: #6f6f7d;
+  --hairline: rgba(0, 0, 0, 0.06);
+
+  /* 纸色 */
+  --paper-warm: #faf7f2;
+  --paper-card: #fffef9;
+
+  /* 字体 */
+  --font-brush: "Ma Shan Zheng", cursive;
+  --font-serif: "Noto Serif SC", serif;
+  --font-sans: "Noto Sans SC", sans-serif;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 20px;
+
+  /* 阴影 */
+  --shadow-card: 0 4px 20px rgba(26, 26, 46, 0.06);
+  --shadow-float: 0 12px 36px rgba(26, 26, 46, 0.12);
+
+  /* 动效 */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration: 0.2s;
+  --duration-slow: 0.3s;
+  --transition: var(--duration) var(--ease);
+  --transition-slow: var(--duration-slow) var(--ease);
+}
+
+/* ===== 深色模式：夜纸主题 ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --cinnabar: #e06b61;
+    --cinnabar-line: rgba(224, 107, 97, 0.3);
+    --deep-blue: #7fa3b8;
+    --pine: #70b28d;
+    --amber: #c7a76d;
+    --sky: #8fc8eb;
+    --ink-deep: #eee8e1;
+    --ink-mid: #bcb3ab;
+    --ink-light: #948e89;
+    --hairline: rgba(255, 255, 255, 0.11);
+    --paper-warm: #141316;
+    --paper-card: #1d1b20;
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-float: 0 12px 36px rgba(0, 0, 0, 0.44);
+  }
+}

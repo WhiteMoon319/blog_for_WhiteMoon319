@@ -1,0 +1,36 @@
+{
+  "name": "blog",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run build:admin && astro build && node scripts/merge-admin.mjs",
+    "build:admin": "npm --prefix admin run build",
+    "dev:admin": "npm --prefix admin run dev",
+    "preview": "astro preview",
+    "astro": "astro",
+    "typecheck": "npm run typecheck:astro && npm run typecheck:admin",
+    "typecheck:astro": "astro check",
+    "typecheck:admin": "npm --prefix admin run typecheck",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "cf:login": "wrangler login",
+    "cf:dev": "wrangler pages dev dist",
+    "cf:deploy": "wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.2.1",
+    "astro": "^7.2.2",
+    "marked": "^18.0.9",
+    "sanitize-html": "^2.17.0"
+  },
+"devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@cloudflare/workers-types": "^5.20260815.1",
+    "@types/node": "^24.0.0",
+    "@types/sanitize-html": "^2.16.0",
+    "miniflare": "5.20260811.1-alpha",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.60.0"
+  }
+}

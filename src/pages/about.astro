@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { envOf } from '../lib/db';
+
+const env = await envOf();
+---
+
+<BaseLayout title="关于" description={`关于「${env.SITE_NAME}」`}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">← 回到卷首</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">跋</p>
+      <h1>关于此间</h1>
+      <p class="lead">{env.SITE_SLOGAN}</p>
+    </div>
+  </div>
+
+  <article class="article">
+    <div class="article-body reveal in">
+      <p>
+        这里是一座架在 Cloudflare 上的小书斋——页面托管于 <strong>Cloudflare Pages</strong>，文章存于 <strong>D1</strong>，图片收于 <strong>R2</strong>。
+      </p>
+      <p>
+        前台供访客展卷，后台供主人落笔。集可分类，篇可长可短，皆以 Markdown 写就。
+      </p>
+      <blockquote>朝暮有书声，案头无闲墨。</blockquote>
+      <p>
+        若欲投稿或相谈，可循页脚之印寻主人。
+      </p>
+    </div>
+  </article>
+</BaseLayout>

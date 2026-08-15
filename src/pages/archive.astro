@@ -1,0 +1,54 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { envOf, listArchivedPosts, getCollectionById, yearOf, fmtDate } from '../lib/db';
+
+const env = await envOf();
+const posts = await listArchivedPosts(env.DB);
+
+const groups: { year: string; posts: { post: typeof posts[number]; collectionTitle: string | null }[] }[] = [];
+for (const post of posts) {
+  const year = yearOf(post.created_at);
+  const collection = post.collection_id ? await getCollectionById(env.DB, post.collection_id) : null;
+  const last = groups[groups.length - 1];
+  if (last && last.year === year) {
+    last.posts.push({ post, collectionTitle: collection?.title ?? null });
+  } else {
+    groups.push({ year, posts: [{ post, collectionTitle: collection?.title ?? null }] });
+  }
+}
+---
+
+<BaseLayout title="归档" description="全部文章按时间铺陈。">
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">← 回到卷首</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">档 案</p>
+      <h1>文章归档</h1>
+      <p class="lead">共 {posts.length} 篇，按落笔先后铺陈。</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    {
+      groups.length > 0 ? (
+        <div class="timeline">
+          {groups.map((g) => (
+            <>
+              <div class="tl-era">{g.year} 年 <small>共 {g.posts.length} 篇</small></div>
+              {g.posts.map(({ post, collectionTitle }) => (
+                <div class="tl-item">
+                  <a href={`/posts/${encodeURI(post.slug)}/`}>
+                    <div class="tl-event">{post.title}</div>
+                    <div class="tl-desc">{collectionTitle ?? '未分类'} · {fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
+                  </a>
+                </div>
+              ))}
+            </>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead reveal in" style="text-align:center;">尚无文章。</p>
+      )
+    }
+  </section>
+</BaseLayout>

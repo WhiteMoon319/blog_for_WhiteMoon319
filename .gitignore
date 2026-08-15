@@ -1,0 +1,13 @@
+# 构建产物
+dist/
+.wrangler/
+.astro/
+node_modules/
+admin/node_modules/
+admin/dist/
+
+# 环境变量
+.dev.vars
+.env
+#计划文档
+PLAN.md

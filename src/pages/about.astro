@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { envOf } from '../lib/db';
 
 const env = await envOf();
+const sealChar = Array.from('江')[0] ?? '江';
 ---
 
 <BaseLayout title="关于" description={`关于「${env.SITE_NAME}」`}>
@@ -17,13 +18,114 @@ const env = await envOf();
 
   <article class="article">
     <div class="article-body reveal in">
-      <p>
-        吾名江逐月，亦可称吾江榫。闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
-      </p>
-      <blockquote>希君生羽翼，一化北溟鱼。</blockquote>
-      <p>
-        如若相谈，可联系 <a href="mailto:3287047638@qq.com">3287047638@qq.com</a>。
-      </p>
+      <div class="profile">
+        <div class="profile-head">
+          <div class="seal profile-seal">{sealChar}</div>
+          <div class="profile-title">
+            <p class="profile-name">江逐月</p>
+            <p class="profile-alias">亦号 江榫</p>
+          </div>
+        </div>
+
+        <p class="intro">
+          闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
+        </p>
+
+        <blockquote class="profile-quote">希君生羽翼，一化北溟鱼。</blockquote>
+
+        <div class="contact-row">
+          <a class="btn btn-primary" href="mailto:3287047638@qq.com">与我说句话 →</a>
+          <span class="contact-hint">3287047638@qq.com</span>
+        </div>
+      </div>
     </div>
   </article>
 </BaseLayout>
+
+<style>
+  .profile {
+    padding: 40px 44px;
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .profile-head {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-bottom: 28px;
+  }
+
+  .profile-seal {
+    flex: none;
+    width: 68px;
+    height: 68px;
+    font-size: 2rem;
+    border-radius: 8px;
+    transform: rotate(-4deg);
+  }
+
+  .profile-title {
+    min-width: 0;
+  }
+
+  .profile-name {
+    font-family: var(--font-brush);
+    font-size: clamp(1.9rem, 4vw, 2.4rem);
+    letter-spacing: 0.14em;
+    color: var(--ink-deep);
+    margin: 0;
+  }
+
+  .profile-alias {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.22em;
+    color: var(--ink-light);
+    margin: 8px 0 0;
+  }
+
+  .intro {
+    font-size: 1.08rem;
+    line-height: 2.1;
+    color: var(--ink-mid);
+    margin: 0;
+  }
+
+  .profile-quote {
+    margin: 28px 0 0;
+    padding: 14px 20px;
+    border: none;
+    border-left: 3px solid var(--cinnabar);
+    background: var(--cinnabar-line);
+    font-size: 1.02rem;
+    line-height: 1.9;
+  }
+
+  .contact-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  .contact-hint {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    color: var(--ink-light);
+  }
+
+  @media (max-width: 560px) {
+    .profile {
+      padding: 28px 22px;
+    }
+
+    .profile-head {
+      gap: 16px;
+    }
+  }
+</style>

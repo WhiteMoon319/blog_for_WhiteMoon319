@@ -580,6 +580,68 @@ test('e2e：草稿预览——未登录 302，登录后可见草稿且 noindex',
   await del(`/api/posts/${id}`);
 });
 
+test('e2e：批量创建——一次导入多篇、slug 自动避让、逐条报错', async () => {
+  if (!HAS_BUILD) return;
+  const res = await post('/api/posts/batch', {
+    action: 'create',
+    collection_id: 1,
+    posts: [
+      { title: '导入甲', slug: 'import-a', content_md: '甲文。', status: 'published' },
+      { title: '导入乙', slug: '', content_md: '乙文。', status: 'draft' },
+      { title: '', slug: 'no-title', content_md: '' },
+      { title: '导入甲重名', slug: 'import-a', content_md: '应避让为 import-a-2。' },
+    ],
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.results.length, 4);
+  assert.equal(body.results[0].ok, true);
+  assert.equal(body.results[0].post.slug, 'import-a');
+  assert.equal(body.results[1].ok, true, '空 slug 应从标题生成');
+  assert.equal(body.results[1].post.slug, '导入乙');
+  assert.equal(body.results[2].ok, false, '空标题应逐条报错');
+  assert.ok(body.results[2].error);
+  assert.equal(body.results[3].ok, true, 'slug 冲突应自动避让');
+  assert.equal(body.results[3].post.slug, 'import-a-2');
+
+  const list = await get('/api/posts?status=all');
+  const lbody = await list.json();
+  const created = (lbody.posts as Array<{ id: number; slug: string }>).filter((p) =>
+    ['import-a', '导入乙', 'import-a-2'].includes(p.slug),
+  );
+  assert.equal(created.length, 3);
+  for (const p of created) await del(`/api/posts/${p.id}`);
+
+  const tooMany = await post('/api/posts/batch', {
+    action: 'create',
+    posts: Array.from({ length: 51 }, (_, i) => ({ title: `超限${i}` })),
+  });
+  assert.equal(tooMany.status, 400, '超过 50 篇应拒绝');
+
+  const badCol = await post('/api/posts/batch', {
+    action: 'create',
+    collection_id: 99999,
+    posts: [{ title: '甲' }],
+  });
+  assert.equal(badCol.status, 404, '不存在的文集应 404');
+
+  const dup = await post('/api/posts/batch', {
+    action: 'create',
+    collection_id: 1,
+    posts: [{ title: '重名甲', slug: 'dup-slug' }, { title: '重名乙', slug: 'dup-slug' }],
+  });
+  assert.equal(dup.status, 200);
+  const dupBody = await dup.json();
+  assert.equal(dupBody.results[0].ok, true);
+  assert.equal(dupBody.results[1].ok, true);
+  assert.equal(dupBody.results[1].post.slug, 'dup-slug-2', '同批内冲突也要自动避让');
+  const l2 = await get('/api/posts?status=all');
+  const l2body = await l2.json();
+  for (const p of (l2body.posts as Array<{ id: number; slug: string }>).filter((p) => p.slug.startsWith('dup-slug'))) {
+    await del(`/api/posts/${p.id}`);
+  }
+});
+
 test('e2e：媒体库——未登录 401，列表含已传文件，删除后文件 404', async () => {
   if (!HAS_BUILD) return;
   const anon = await mf.dispatchFetch(BASE + '/api/media', { redirect: 'manual' });

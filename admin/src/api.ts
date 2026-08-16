@@ -61,14 +61,31 @@ export const api = {
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
 
-  batchPosts: (payload: {
-    action: 'publish' | 'draft' | 'delete' | 'move';
-    ids: number[];
-    collection_id?: number | null;
-  }) => request<{ ok: boolean; count: number }>('/api/posts/batch', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }),
+  batchPosts: (payload:
+    | {
+        action: 'publish' | 'draft' | 'delete' | 'move';
+        ids: number[];
+        collection_id?: number | null;
+      }
+    | {
+        action: 'create';
+        collection_id?: number | null;
+        posts: Array<{
+          title: string;
+          slug?: string;
+          summary?: string;
+          content_md?: string;
+          collection_id?: number | null;
+          status?: 'draft' | 'published';
+        }>;
+      }) =>
+    request<{ ok: boolean; count: number; results?: Array<{ ok: boolean; error?: string; post?: Post }> }>(
+      '/api/posts/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
 
   postVersions: (id: number) => request<{ versions: PostVersion[] }>(`/api/posts/${id}/versions`),
 

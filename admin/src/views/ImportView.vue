@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue';
 import mammoth from 'mammoth';
 import TurndownService from 'turndown';
-import { api, ApiError } from '../api';
+import { api } from '../api';
 import type { Collection } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
@@ -209,46 +209,45 @@ async function submitAll() {
   importing.value = true;
   let ok = 0;
   let fail = 0;
-  for (const item of pending) {
-    item.state = 'importing';
-    item.error = '';
+  const CHUNK = 50;
+  for (let start = 0; start < pending.length; start += CHUNK) {
+    const chunk = pending.slice(start, start + CHUNK);
     try {
-      await createWithSlugFallback(item);
-      item.state = 'done';
-      ok++;
-    } catch (err) {
-      item.state = 'failed';
-      item.error = (err as Error).message;
-      fail++;
+      const results = await api.batchPosts({
+        action: 'create',
+        collection_id: collectionId.value,
+        posts: chunk.map((it) => ({
+          title: it.title.trim(),
+          slug: it.slug.trim() || undefined,
+          summary: it.summary.trim(),
+          content_md: it.contentMd,
+          collection_id: collectionId.value,
+          status: status.value,
+        })),
+      });
+      results.results.forEach((r, i) => {
+        const item = chunk[i];
+        if (!item) return;
+        if (r.ok && r.post) {
+          item.state = 'done';
+          item.slug = r.post.slug;
+          ok++;
+        } else {
+          item.state = 'failed';
+          item.error = r.error ?? '导入失败';
+          fail++;
+        }
+      });
+    } catch (e) {
+      for (const item of chunk) {
+        item.state = 'failed';
+        item.error = (e as Error).message;
+        fail++;
+      }
     }
   }
   importing.value = false;
   emit('notify', `导入完成：成功 ${ok} 篇，失败 ${fail} 篇`, fail > 0);
-}
-
-async function createWithSlugFallback(item: ImportItem) {
-  const base = item.slug.trim() || slugify(item.title);
-  const title = item.title.trim();
-  if (!title) throw new Error('标题不能为空');
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
-    try {
-      await api.createPost({
-        title,
-        slug,
-        summary: item.summary.trim(),
-        content_md: item.contentMd,
-        collection_id: collectionId.value,
-        status: status.value,
-      });
-      item.slug = slug;
-      return;
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409) continue;
-      throw e;
-    }
-  }
-  throw new Error('slug 冲突过多，无法自动避开');
 }
 </script>
 

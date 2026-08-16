@@ -1,10 +1,19 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { envOf, listArchivedPosts, getCollectionById, yearOf, fmtDate } from '../lib/db';
+import Pagination from '../components/Pagination.astro';
+import { envOf, listArchivedPosts, countArchivedPosts, getCollectionById, yearOf, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
+export const prerender = false;
+
+const PAGE_SIZE = 20;
 const env = await envOf();
-const posts = await listArchivedPosts(env.DB);
+const pageRaw = Number(Astro.url.searchParams.get('page') ?? '1');
+const safeRaw = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+const total = await countArchivedPosts(env.DB);
+const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+const page = Math.min(safeRaw, totalPages);
+const posts = await listArchivedPosts(env.DB, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
 
 const groups: {
   year: string;
@@ -28,7 +37,7 @@ for (const post of posts) {
     <div class="page-hero-card reveal in">
       <p class="character-kicker">档 案</p>
       <h1>文章归档</h1>
-      <p class="lead">共 {posts.length} 篇，按落笔先后铺陈。</p>
+      <p class="lead">共 {total} 篇，按落笔先后铺陈。</p>
     </div>
   </div>
 
@@ -54,5 +63,6 @@ for (const post of posts) {
         <p class="section-lead reveal in" style="text-align:center;">尚无文章。</p>
       )
     }
+    <Pagination current={page} totalPages={totalPages} base="/archive/" query="" />
   </section>
 </BaseLayout>

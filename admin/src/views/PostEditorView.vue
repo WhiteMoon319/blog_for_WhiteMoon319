@@ -9,7 +9,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { api } from '../api';
-import type { Collection } from '../types';
+import type { Collection, MediaFile } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -214,6 +214,35 @@ function setLink() {
   }
   editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
 }
+
+const showPicker = ref(false);
+const pickerFiles = ref<MediaFile[]>([]);
+const pickerCursor = ref<string | undefined>(undefined);
+const pickerBusy = ref(false);
+
+async function pickerLoad() {
+  if (pickerBusy.value) return;
+  pickerBusy.value = true;
+  try {
+    const res = await api.media(pickerCursor.value);
+    pickerFiles.value.push(...res.files);
+    pickerCursor.value = res.cursor;
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    pickerBusy.value = false;
+  }
+}
+
+function openPicker() {
+  if (pickerFiles.value.length === 0) void pickerLoad();
+  showPicker.value = true;
+}
+
+function insertMedia(url: string) {
+  editor.value?.chain().focus().setImage({ src: url }).run();
+  showPicker.value = false;
+}
 </script>
 
 <template>
@@ -293,6 +322,7 @@ function setLink() {
             <button type="button" :class="{ 'is-active': editor?.isActive('link') }" @click="setLink">链</button>
             <button type="button" @click="imageFileInput?.click()" :disabled="uploading">{{ uploading ? '…' : '图' }}</button>
             <input ref="imageFileInput" type="file" accept="image/*" hidden @change="onImagePick" />
+            <button type="button" @click="openPicker" title="从媒体库选择">库</button>
             <button type="button" @click="editor?.chain().focus().setHorizontalRule().run()">—</button>
             <span class="sep"></span>
             <button type="button" @click="editor?.chain().focus().undo().run()">↩</button>
@@ -306,8 +336,101 @@ function setLink() {
         <button class="btn btn-primary" type="submit" :disabled="saving">
           {{ saving ? '落印中…' : isEdit ? '存 篇' : '成 篇' }}
         </button>
+        <a
+          v-if="loadedId !== null"
+          class="btn btn-ghost"
+          :href="`/preview/${loadedId}`"
+          target="_blank"
+          rel="noopener"
+        >
+          预览
+        </a>
         <router-link class="btn btn-ghost" to="/posts">回篇目</router-link>
       </div>
     </form>
   </div>
+
+  <div v-if="showPicker" class="media-mask" @click.self="showPicker = false">
+    <div class="media-modal">
+      <div class="media-modal-head">
+        <span>从相册取图</span>
+        <button class="btn btn-ghost mini" @click="showPicker = false">关</button>
+      </div>
+      <div class="media-modal-body">
+        <div v-if="pickerFiles.length" class="media-modal-grid">
+          <button
+            v-for="f in pickerFiles"
+            :key="f.key"
+            class="media-thumb"
+            :title="f.key"
+            @click="insertMedia(f.url)"
+          >
+            <img :src="f.url" :alt="f.key" loading="lazy" />
+          </button>
+        </div>
+        <div v-else class="empty">相册空空…</div>
+        <div v-if="pickerCursor" style="text-align:center;padding-top:12px;">
+          <button class="btn btn-ghost mini" :disabled="pickerBusy" @click="pickerLoad">
+            {{ pickerBusy ? '载入中…' : '加载更多' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.media-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 16, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+}
+.media-modal {
+  width: min(760px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.media-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-serif);
+  color: var(--ink-deep);
+}
+.media-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+.media-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.media-thumb {
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+}
+.media-thumb img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  display: block;
+}
+.media-thumb:hover {
+  border-color: var(--cinnabar);
+}
+</style>

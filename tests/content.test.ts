@@ -1,6 +1,15 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { searchPublishedPosts, incrementViewCount, createPost, getPostById } from '../src/lib/db.ts';
+import {
+  searchPublishedPosts,
+  incrementViewCount,
+  createPost,
+  getPostById,
+  countPublishedPosts,
+  listPublishedPosts,
+  countArchivedPosts,
+  listArchivedPosts,
+} from '../src/lib/db.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
 const handle = await makeTestDb();
@@ -58,4 +67,56 @@ test('阅读量：自增并返回最新值', async () => {
 
   const row = await getPostById(db, created.id);
   assert.equal(row?.view_count, 2);
+});
+
+test('分页：count 与 limit/offset 正确，含/不含文集过滤', async () => {
+  const col = await db
+    .prepare(`INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('甲集', 'jia', '', '#c23a30', 1) RETURNING id`)
+    .first<{ id: number }>();
+  assert.ok(col);
+  for (let i = 0; i < 5; i++) {
+    const created = await createPost(db, {
+      title: `甲集第${i}篇`,
+      slug: `jia-${i}`,
+      content_md: `正文 ${i}`,
+      status: 'published',
+      collection_id: col.id,
+    });
+    assert.ok(created);
+    await db
+      .prepare(`UPDATE posts SET created_at = datetime('2026-02-01 00:00:00', '+' || ? || ' seconds') WHERE id = ?`)
+      .bind(i, created.id)
+      .run();
+  }
+  const san = await createPost(db, {
+    title: '散篇',
+    slug: 'san',
+    content_md: '无文集。',
+    status: 'published',
+  });
+  assert.ok(san);
+  await db
+    .prepare(`UPDATE posts SET created_at = '2027-01-01 00:00:00' WHERE id = ?`)
+    .bind(san.id)
+    .run();
+
+  const total = await countArchivedPosts(db);
+  assert.equal(total, 8);
+
+  const inCol = await countPublishedPosts(db, { collectionId: col.id });
+  assert.equal(inCol, 5);
+  const unclassified = await countPublishedPosts(db, { collectionId: null });
+  assert.equal(unclassified, 3, '散篇与先前无文集文章合计 3');
+
+  const page1 = await listPublishedPosts(db, { collectionId: col.id, limit: 2, offset: 0 });
+  const page2 = await listPublishedPosts(db, { collectionId: col.id, limit: 2, offset: 2 });
+  assert.equal(page1.length, 2);
+  assert.equal(page2.length, 2);
+  assert.notEqual(page1[0].id, page2[0].id, '两页不应重叠');
+
+  const archivePage1 = await listArchivedPosts(db, { limit: 3, offset: 0 });
+  const archivePage3 = await listArchivedPosts(db, { limit: 3, offset: 6 });
+  assert.equal(archivePage1.length, 3);
+  assert.equal(archivePage3.length, 2, '末页应剩 2 条');
+  assert.ok(archivePage3.some((p) => p.slug === 'san'), '末页应包含散篇');
 });

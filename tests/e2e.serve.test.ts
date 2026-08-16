@@ -490,3 +490,116 @@ test('e2e：slug 文集内唯一——跨文集可同名，旧路径 302 至 /40
   await del(`/api/posts/${(await a.json()).post.id}`);
   await del(`/api/posts/${(await b.json()).post.id}`);
 });
+
+test('e2e：文集与归档分页——页 1 满页、页 2 余量、页码越界回页 1', async () => {
+  if (!HAS_BUILD) return;
+  const colRes = await post('/api/collections', { title: '分页集', slug: 'page-col', sort_order: 8 });
+  assert.equal(colRes.status, 201);
+  const colId = (await colRes.json()).collection.id as number;
+  const db = await mf.getD1Database('DB');
+  const ids: number[] = [];
+  for (let i = 0; i < 13; i++) {
+    const r = await post('/api/posts', {
+      title: `分页文${String(i).padStart(2, '0')}`,
+      slug: `page-${String(i).padStart(2, '0')}`,
+      collection_id: colId,
+      status: 'published',
+    });
+    assert.equal(r.status, 201);
+    const pid = (await r.json()).post.id as number;
+    ids.push(pid);
+    await db
+      .prepare(`UPDATE posts SET created_at = datetime('2026-01-01 00:00:00', '+' || ? || ' seconds') WHERE id = ?`)
+      .bind(i, pid)
+      .run();
+  }
+
+  const p1 = await get('/collections/page-col/');
+  assert.equal(p1.status, 200);
+  const h1 = await p1.text();
+  assert.ok(h1.includes('分页文12'), '页 1 应含最新一篇');
+  assert.ok(h1.includes('pagination'), '应渲染分页导航');
+  assert.ok(h1.includes('?page=2'), '应有下一页链接');
+  assert.ok(!h1.includes('分页文00'), '页 1 不应含最旧一篇');
+
+  const p2 = await get('/collections/page-col/?page=2');
+  assert.equal(p2.status, 200);
+  const h2 = await p2.text();
+  assert.ok(h2.includes('分页文00'), '页 2 应含最旧一篇');
+  assert.ok(h2.includes('href="/collections/page-col/"'), '应有回页 1 链接');
+
+  const pBad = await get('/collections/page-col/?page=999');
+  assert.equal(pBad.status, 200);
+  assert.ok((await pBad.text()).includes('分页文00'), '越界页码应回落末页');
+
+  const a1 = await get('/archive/?page=1');
+  assert.equal(a1.status, 200);
+  const ah1 = await a1.text();
+  assert.ok(ah1.includes('pagination'), '归档应渲染分页导航');
+  assert.ok(ah1.includes('分页文00'), '归档页 1 应含最旧文章（升序）');
+
+  for (const id of ids) await del(`/api/posts/${id}`);
+  await del(`/api/collections/${colId}`);
+});
+
+test('e2e：草稿预览——未登录 302，登录后可见草稿且 noindex', async () => {
+  if (!HAS_BUILD) return;
+  const created = await post('/api/posts', {
+    title: '预览试炼',
+    slug: 'preview-probe',
+    content_md: '## 只给主人看\n\n草稿正文。',
+    status: 'draft',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const anon = await mf.dispatchFetch(BASE + `/preview/${id}`, { redirect: 'manual' });
+  assert.equal(anon.status, 302);
+  assert.ok(String(anon.headers.get('location')).includes('/admin/login'));
+
+  const res = await get(`/preview/${id}`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.ok(html.includes('草稿预览'), '应有预览提示条');
+  assert.ok(html.includes('只给主人看'), '应渲染草稿正文');
+  assert.ok(html.includes('name="robots" content="noindex, nofollow"'), '预览页应 noindex');
+  assert.ok(html.includes('（未刊发）'), '应标明未刊发状态');
+
+  const unknown = await get('/preview/999999');
+  assert.equal(unknown.status, 302);
+  assert.ok(String(unknown.headers.get('location')).includes('/404'));
+
+  await del(`/api/posts/${id}`);
+});
+
+test('e2e：媒体库——未登录 401，列表含已传文件，删除后文件 404', async () => {
+  if (!HAS_BUILD) return;
+  const anon = await mf.dispatchFetch(BASE + '/api/media', { redirect: 'manual' });
+  assert.equal(anon.status, 401);
+
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 1, 2, 3, 4]);
+  const form = multipartBody([{ name: 'file', filename: 'm.png', type: 'image/png', bytes: png }]);
+  const up = await mf.dispatchFetch(BASE + '/api/upload', {
+    method: 'POST',
+    headers: { cookie, ...originHeaders, 'Content-Type': form.contentType },
+    body: form.body,
+  });
+  assert.equal(up.status, 201);
+  const key = (await up.json()).key as string;
+  assert.ok(key.startsWith('uploads/'), '上传 key 应有 uploads/ 前缀');
+
+  const list = await get('/api/media');
+  assert.equal(list.status, 200);
+  const listBody = await list.json();
+  const found = (listBody.files as Array<{ key: string; url: string }>).some((f) => f.key === key);
+  assert.ok(found, '媒体列表应包含刚上传的文件');
+  assert.ok(String((listBody.files as Array<{ url: string }>)[0].url).includes('/api/files/'), '无 R2_PUBLIC_URL 时用站内路径');
+
+  const bad = await del(`/api/media?key=${encodeURIComponent('etc/passwd')}`);
+  assert.equal(bad.status, 400, '非 uploads/ 前缀应拒绝');
+
+  const delRes = await del(`/api/media?key=${encodeURIComponent(key)}`);
+  assert.equal(delRes.status, 200);
+  const gone = await get(`/api/files/${key}`);
+  assert.equal(gone.status, 404, '删除后文件应不可再取');
+});

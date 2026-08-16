@@ -22,3 +22,10 @@ export interface Post {
   created_at: string;
   updated_at: string;
 }
+
+export interface MediaFile {
+  key: string;
+  size: number;
+  uploaded: string;
+  url: string;
+}

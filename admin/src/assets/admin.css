@@ -197,13 +197,23 @@ textarea {
 }
 
 .card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--hairline);
-}
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--hairline);
+    background: color-mix(in srgb, var(--cinnabar) 5%, transparent);
+  }
 
 .card-head h2 {
   font-family: var(--font-brush);

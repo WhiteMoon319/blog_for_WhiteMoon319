@@ -1,0 +1,63 @@
+---
+export interface Props {
+  current: number;
+  totalPages: number;
+  base: string;
+  query?: string;
+}
+const { current, totalPages, base, query = '' } = Astro.props;
+const pageHref = (n: number) => {
+  if (n === 1) return `${base}${query}`;
+  return `${base}?page=${n}${query ? `&${query}` : ''}`;
+};
+---
+
+{
+  totalPages > 1 && (
+    <nav class="pagination" aria-label="分页">
+      {current > 1 && <a class="pgn" href={pageHref(current - 1)}>上一页</a>}
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+        <a class={`pgn${n === current ? ' on' : ''}`} href={pageHref(n)} aria-current={n === current ? 'page' : undefined}>
+          {n}
+        </a>
+      ))}
+      {current < totalPages && <a class="pgn" href={pageHref(current + 1)}>下一页</a>}
+    </nav>
+  )
+}
+
+<style>
+  .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    padding: 40px 0 8px;
+  }
+  .pgn {
+    min-width: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--ink-faint);
+    border-radius: 8px;
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+  }
+  .pgn:hover {
+    border-color: var(--cinnabar);
+    color: var(--cinnabar);
+    background: color-mix(in srgb, var(--cinnabar) 8%, transparent);
+  }
+  .pgn.on {
+    border-color: var(--cinnabar);
+    background: var(--cinnabar);
+    color: var(--paper-warm);
+  }
+  @media (prefers-color-scheme: dark) {
+    .pgn {
+      border-color: rgba(240, 233, 226, 0.18);
+      color: var(--ink-soft);
+    }
+  }
+</style>

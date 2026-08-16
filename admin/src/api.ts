@@ -1,4 +1,4 @@
-import type { Collection, Post } from './types';
+import type { Collection, MediaFile, Post } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -76,4 +76,12 @@ export const api = {
     }
     return body as { url: string; key: string };
   },
+
+  media: (cursor?: string) =>
+    request<{ files: MediaFile[]; cursor?: string }>(
+      `/api/media${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
+
+  deleteMedia: (key: string) =>
+    request<{ ok: boolean }>(`/api/media?key=${encodeURIComponent(key)}`, { method: 'DELETE' }),
 };

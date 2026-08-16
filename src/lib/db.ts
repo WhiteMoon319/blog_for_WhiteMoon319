@@ -54,20 +54,46 @@ export async function getCollectionById(db: D1Database, id: number): Promise<Col
 
 export async function listPublishedPosts(
   db: D1Database,
-  opts: { collectionId?: number | null; limit?: number } = {},
+  opts: { collectionId?: number | null; limit?: number; offset?: number } = {},
 ): Promise<PostRow[]> {
   let sql = `SELECT * FROM posts WHERE status = 'published'`;
   const args: (number | string | null)[] = [];
   if (opts.collectionId !== undefined) {
-    sql += ` AND collection_id = ?`;
-    args.push(opts.collectionId);
+    if (opts.collectionId === null) {
+      sql += ` AND collection_id IS NULL`;
+    } else {
+      sql += ` AND collection_id = ?`;
+      args.push(opts.collectionId);
+    }
   }
   sql += ` ORDER BY created_at DESC`;
   if (opts.limit) {
     sql += ` LIMIT ?`;
     args.push(opts.limit);
+    if (opts.offset) {
+      sql += ` OFFSET ?`;
+      args.push(opts.offset);
+    }
   }
   return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+}
+
+export async function countPublishedPosts(
+  db: D1Database,
+  opts: { collectionId?: number | null } = {},
+): Promise<number> {
+  let sql = `SELECT COUNT(*) AS n FROM posts WHERE status = 'published'`;
+  const args: (number | null)[] = [];
+  if (opts.collectionId !== undefined) {
+    if (opts.collectionId === null) {
+      sql += ` AND collection_id IS NULL`;
+    } else {
+      sql += ` AND collection_id = ?`;
+      args.push(opts.collectionId);
+    }
+  }
+  const row = await db.prepare(sql).bind(...args).first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export async function getPublishedPostBySlug(db: D1Database, slug: string): Promise<PostRow | null> {
@@ -119,11 +145,28 @@ export async function incrementViewCount(db: D1Database, id: number): Promise<nu
   return row?.view_count ?? 0;
 }
 
-export async function listArchivedPosts(db: D1Database): Promise<PostRow[]> {
-  return db
-    .prepare(`SELECT * FROM posts WHERE status = 'published' ORDER BY created_at ASC`)
-    .all<PostRow>()
-    .then((r) => r.results ?? []);
+export async function listArchivedPosts(
+  db: D1Database,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<PostRow[]> {
+  let sql = `SELECT * FROM posts WHERE status = 'published' ORDER BY created_at ASC`;
+  if (opts.limit) {
+    sql += ` LIMIT ?`;
+    if (opts.offset) sql += ` OFFSET ?`;
+  }
+  const args = opts.limit
+    ? opts.offset
+      ? [opts.limit, opts.offset]
+      : [opts.limit]
+    : [];
+  return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+}
+
+export async function countArchivedPosts(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'published'`)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export type PostWithCollection = PostRow & { collection_slug: string | null };

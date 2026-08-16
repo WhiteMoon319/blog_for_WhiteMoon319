@@ -7,13 +7,15 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  noindex?: boolean;
 }
 
-const { title, description = '一座写在 Cloudflare 上的小书斋。', image } = Astro.props;
+const { title, description = '一座写在 Cloudflare 上的小书斋。', image, noindex = false } = Astro.props;
 const env = await envOf();
 const siteName = env.SITE_NAME;
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
-const canonical = `${siteUrl}${Astro.url.pathname}`;
+const pageQuery = Astro.url.searchParams.get('page') ? Astro.url.search : '';
+const canonical = `${siteUrl}${Astro.url.pathname}${pageQuery}`;
 const ogImage = image ? `${siteUrl}${image}` : `${siteUrl}/og-default.png`;
 const navLinks = [
   { href: '/', label: '卷首' },
@@ -31,6 +33,7 @@ const navLinks = [
     <title>{title ? `${title}｜${siteName}` : siteName}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#faf7f2" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />

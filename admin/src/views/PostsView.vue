@@ -76,6 +76,49 @@ async function remove(p: Post) {
     emit('notify', (e as Error).message, true);
   }
 }
+
+const selected = ref<Set<number>>(new Set());
+const busy = ref(false);
+const moveCol = ref<number | ''>('');
+
+function toggleAll() {
+  const all = shown.value.map((p) => p.id);
+  selected.value =
+    shown.value.length > 0 && shown.value.every((p) => selected.value.has(p.id))
+      ? new Set()
+      : new Set(all);
+}
+
+async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
+  const ids = [...selected.value];
+  if (ids.length === 0) return;
+  if (action === 'delete' && !confirm(`确要焚毁选中的 ${ids.length} 篇？不可复原。`)) return;
+  if (action === 'move' && moveCol.value === '') {
+    emit('notify', '请先选择目标文集', true);
+    return;
+  }
+  busy.value = true;
+  try {
+    let n = 0;
+    for (const id of ids) {
+      if (action === 'delete') {
+        await api.deletePost(id);
+      } else if (action === 'move') {
+        await api.updatePost(id, { collection_id: moveCol.value });
+      } else {
+        await api.updatePost(id, { status: action === 'publish' ? 'published' : 'draft' });
+      }
+      n++;
+    }
+    selected.value = new Set();
+    emit('notify', `已处理 ${n} 篇`);
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    busy.value = false;
+  }
+}
 </script>
 
 <template>
@@ -104,9 +147,29 @@ async function remove(p: Post) {
       <button class="btn btn-primary" @click="create">写新篇</button>
     </div>
 
+    <div class="bulk-bar" v-if="selected.size > 0">
+      <span style="color:var(--ink-light);font-size:0.85rem;">已选 {{ selected.size }} 篇</span>
+      <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('publish')">批量刊发</button>
+      <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('draft')">批量撤稿</button>
+      <select v-model="moveCol" class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;">
+        <option :value="''">移入文集…</option>
+        <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
+      </select>
+      <button class="btn btn-ghost mini" :disabled="busy || moveCol === ''" @click="bulk('move')">移动</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-danger mini" :disabled="busy" @click="bulk('delete')">批量删除</button>
+    </div>
+
     <table class="table" v-if="shown.length">
       <thead>
         <tr>
+          <th style="width:32px;">
+            <input
+              type="checkbox"
+              :checked="shown.length > 0 && shown.every((p) => selected.has(p.id))"
+              @change="toggleAll"
+            />
+          </th>
           <th>篇名</th>
           <th>文集</th>
           <th>状态</th>
@@ -117,6 +180,13 @@ async function remove(p: Post) {
       </thead>
       <tbody>
         <tr v-for="p in shown" :key="p.id">
+          <td>
+            <input
+              type="checkbox"
+              :checked="selected.has(p.id)"
+              @change="selected.has(p.id) ? selected.delete(p.id) : selected.add(p.id)"
+            />
+          </td>
           <td class="title-cell">
             <router-link
               v-if="p.status === 'draft'"

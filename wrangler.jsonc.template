@@ -49,6 +49,7 @@
     "SITE_NAME": "月下独酌",
     "SITE_SLOGAN": "长月夜下，对影成楼。",
     "SITE_POEM": "月下少辞令，醉后自逍遥。",
+    "SITE_URL": "https://blog.whitemoon319.xyz",
     "LOGIN_RATE_LIMIT_MAX": 10,
     "LOGIN_RATE_LIMIT_WINDOW": 300
   }

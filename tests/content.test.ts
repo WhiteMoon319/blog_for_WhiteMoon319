@@ -1,0 +1,61 @@
+import { after, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { searchPublishedPosts, incrementViewCount, createPost, getPostById } from '../src/lib/db.ts';
+import { makeTestDb } from './helpers/d1.ts';
+
+const handle = await makeTestDb();
+after(() => handle.dispose());
+const db = handle.db;
+
+test('搜索：命中标题/摘要/正文，草稿不出现', async () => {
+  await createPost(db, {
+    title: '字诀：墨分五色',
+    slug: 'ink-probe',
+    summary: '研墨心得',
+    content_md: '淡墨写疏影，浓墨书重山。',
+    status: 'published',
+  });
+  await createPost(db, {
+    title: '草稿：未成篇',
+    slug: 'draft-probe',
+    summary: '藏而不发',
+    content_md: '密语藏锋。',
+    status: 'draft',
+  });
+
+  const byTitle = await searchPublishedPosts(db, '墨分五色');
+  assert.equal(byTitle.length, 1);
+  assert.equal(byTitle[0].slug, 'ink-probe');
+
+  const byBody = await searchPublishedPosts(db, '疏影');
+  assert.equal(byBody.length, 1);
+  assert.equal(byBody[0].slug, 'ink-probe');
+
+  const bySummary = await searchPublishedPosts(db, '研墨');
+  assert.equal(bySummary.length, 1);
+
+  const noDraft = await searchPublishedPosts(db, '草稿');
+  assert.equal(noDraft.length, 0, '草稿不应被搜到');
+
+  const miss = await searchPublishedPosts(db, '绝无此词');
+  assert.equal(miss.length, 0);
+});
+
+test('阅读量：自增并返回最新值', async () => {
+  const created = await createPost(db, {
+    title: '计数试炼',
+    slug: 'count-probe',
+    content_md: '数数看。',
+    status: 'published',
+  });
+  assert.ok(created);
+  assert.equal(created.view_count, 0);
+
+  const v1 = await incrementViewCount(db, created.id);
+  const v2 = await incrementViewCount(db, created.id);
+  assert.equal(v1, 1);
+  assert.equal(v2, 2);
+
+  const row = await getPostById(db, created.id);
+  assert.equal(row?.view_count, 2);
+});

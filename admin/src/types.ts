@@ -18,6 +18,7 @@ export interface Post {
   content_md: string;
   cover_url: string;
   status: 'draft' | 'published';
+  view_count?: number;
   created_at: string;
   updated_at: string;
 }

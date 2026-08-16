@@ -84,6 +84,7 @@ async function boot(): Promise<void> {
             SITE_NAME: { type: 'json', value: '测试书斋' },
             SITE_SLOGAN: { type: 'json', value: '一角书斋' },
             SITE_POEM: { type: 'json', value: '晨起摊书卷。' },
+            SITE_URL: { type: 'json', value: 'http://e2e.test' },
             BLOG_ADMIN_PASSWORD: { type: 'json', value: 'admin123' },
             BLOG_SESSION_SECRET: { type: 'json', value: 'e2e-secret-0123456789abcdef0123456789abcdef' },
             R2_PUBLIC_URL: { type: 'json', value: '' },
@@ -95,8 +96,10 @@ async function boot(): Promise<void> {
     ],
   });
   const db = await mf.getD1Database('DB');
-  for (const stmt of readStatements('db/migrations/0001_init.sql')) {
-    await db.prepare(stmt).run();
+  for (const file of ['0001_init.sql', '0002_view_count.sql']) {
+    for (const stmt of readStatements(`db/migrations/${file}`)) {
+      await db.prepare(stmt).run();
+    }
   }
   for (const stmt of readStatements('db/seed.sql')) {
     await db.prepare(stmt).run();
@@ -396,4 +399,68 @@ test('e2e：同秒文章的相邻排序按 id 决胜', async () => {
   assert.ok(htmlA.includes('/posts/same-b/'), '同秒时 next 应按 id 决胜为 B');
   await del(`/api/posts/${aBody.post.id}`);
   await del(`/api/posts/${bBody.post.id}`);
+});
+
+test('e2e：搜索页按关键字命中已刊文章', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/search/?q=Cloudflare');
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.ok(html.includes('把 Astro 架到 Cloudflare 上'), '应命中标题含关键字的文章');
+  assert.ok(html.includes('/collections/tech/astro-on-cloudflare/'));
+
+  const miss = await get('/search/?q=不存在的关键字XYZ');
+  assert.equal(miss.status, 200);
+  assert.ok((await miss.text()).includes('未寻得'));
+});
+
+test('e2e：RSS 输出已刊文章与规范头', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/rss.xml');
+  assert.equal(res.status, 200);
+  assert.ok(String(res.headers.get('content-type')).includes('application/rss+xml'));
+  const xml = await res.text();
+  assert.ok(xml.includes('<rss version="2.0"'));
+  assert.ok(xml.includes('<item>'));
+  assert.ok(xml.includes('<link>http://e2e.test/collections/essays/first-post/</link>'));
+  assert.ok(!xml.includes('draft-post'), '草稿不应出现在 RSS');
+});
+
+test('e2e：sitemap 覆盖静态页、文集与文章', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/sitemap.xml');
+  assert.equal(res.status, 200);
+  const xml = await res.text();
+  assert.ok(xml.includes('<loc>http://e2e.test/archive/</loc>'));
+  assert.ok(xml.includes('<loc>http://e2e.test/collections/essays/</loc>'));
+  assert.ok(xml.includes('<loc>http://e2e.test/collections/tech/astro-on-cloudflare/</loc>'));
+  assert.ok(!xml.includes('draft-post'));
+});
+
+test('e2e：404 页带站点样式，静态资源可达', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/404');
+  assert.equal(res.status, 404);
+  const html = await res.text();
+  assert.ok(html.includes('此页不存'), '404 页应渲染站点文案');
+  assert.ok(html.includes('/archive/'), '404 页应提供归档出口');
+
+  const robots = await get('/robots.txt');
+  assert.equal(robots.status, 200);
+  assert.ok((await robots.text()).includes('sitemap.xml'));
+  const og = await get('/og-default.png');
+  assert.equal(og.status, 200);
+  assert.ok(String(og.headers.get('content-type')).includes('image/png'));
+});
+
+test('e2e：文章页阅读量递增并展示', async () => {
+  if (!HAS_BUILD) return;
+  const first = await get('/collections/essays/first-post/');
+  assert.equal(first.status, 200);
+  const m1 = (await first.text()).match(/阅 (\d+)/);
+  assert.ok(m1, '文章页应展示阅读数');
+  const second = await get('/collections/essays/first-post/');
+  const m2 = (await second.text()).match(/阅 (\d+)/);
+  assert.ok(m2);
+  assert.ok(Number(m2[1]) > Number(m1[1]), '再次访问阅读数应递增');
 });

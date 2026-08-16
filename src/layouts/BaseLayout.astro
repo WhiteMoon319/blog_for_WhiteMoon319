@@ -6,14 +6,19 @@ import { envOf } from '../lib/db';
 interface Props {
   title?: string;
   description?: string;
+  image?: string;
 }
 
-const { title, description = '一座写在 Cloudflare 上的小书斋。' } = Astro.props;
+const { title, description = '一座写在 Cloudflare 上的小书斋。', image } = Astro.props;
 const env = await envOf();
 const siteName = env.SITE_NAME;
+const siteUrl = env.SITE_URL.replace(/\/$/, '');
+const canonical = `${siteUrl}${Astro.url.pathname}`;
+const ogImage = image ? `${siteUrl}${image}` : `${siteUrl}/og-default.png`;
 const navLinks = [
   { href: '/', label: '卷首' },
   { href: '/archive/', label: '归档' },
+  { href: '/search/', label: '寻章' },
   { href: '/about/', label: '关于' },
 ];
 ---
@@ -26,6 +31,19 @@ const navLinks = [
     <title>{title ? `${title}｜${siteName}` : siteName}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#faf7f2" />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={title ? `${title}｜${siteName}` : siteName} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title ? `${title}｜${siteName}` : siteName} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <link rel="alternate" type="application/rss+xml" title={`${siteName} 订阅`} href={`${siteUrl}/rss.xml`} />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='4' y='4' width='40' height='40' rx='6' fill='%23c23a30'/%3E%3Ctext x='24' y='34' font-family='serif' font-size='26' fill='white' text-anchor='middle'%3E%E7%AD%BE%3C/text%3E%3C/svg%3E"
@@ -56,6 +74,10 @@ const navLinks = [
             ))
           }
         </ul>
+
+        <form class="nav-search" action="/search/" method="get" role="search">
+          <input class="nav-search-input" type="search" name="q" placeholder="寻章……" aria-label="站内搜索" />
+        </form>
       </div>
     </nav>
 

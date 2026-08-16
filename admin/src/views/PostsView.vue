@@ -110,6 +110,7 @@ async function remove(p: Post) {
           <th>篇名</th>
           <th>文集</th>
           <th>状态</th>
+          <th>阅读</th>
           <th>日期</th>
           <th style="text-align:right;">操作</th>
         </tr>
@@ -143,6 +144,7 @@ async function remove(p: Post) {
               {{ p.status === 'published' ? '已刊' : '草稿' }}
             </span>
           </td>
+          <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
           <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmt(p.created_at) }}</td>
           <td>
             <div class="actions">

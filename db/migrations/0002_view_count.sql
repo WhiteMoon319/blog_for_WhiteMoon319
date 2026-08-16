@@ -1,0 +1,2 @@
+-- 文章阅读量
+ALTER TABLE posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0;

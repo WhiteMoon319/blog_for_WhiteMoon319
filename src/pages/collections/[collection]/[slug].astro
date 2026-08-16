@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { envOf, getCollectionBySlug, getPublishedPostBySlug, getAdjacentPosts, fmtDate } from '../../../lib/db';
+import { envOf, getCollectionBySlug, getPublishedPostBySlug, getAdjacentPosts, incrementViewCount, fmtDate } from '../../../lib/db';
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
 
@@ -13,12 +13,13 @@ if (!collection || !post || post.collection_id !== collection.id) {
   return Astro.redirect('/404');
 }
 
+const viewCount = await incrementViewCount(env.DB, post.id);
 const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);
 const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
 ---
 
-<BaseLayout title={post.title} description={post.summary}>
+<BaseLayout title={post.title} description={post.summary} image={post.cover_url ? post.cover_url : undefined}>
   <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
     <a class="page-back reveal in" href={collectionHref}>
       ← {collection.title}
@@ -31,6 +32,7 @@ const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
       <div class="facts">
         <span>成于 {fmtDate(post.created_at)}</span>
         {post.updated_at !== post.created_at && <span>改于 {fmtDate(post.updated_at)}</span>}
+        <span>阅 {viewCount}</span>
       </div>
     </div>
   </div>

@@ -11,6 +11,7 @@ declare global {
       SITE_NAME: string;
       SITE_SLOGAN: string;
       SITE_POEM: string;
+      SITE_URL: string;
       BLOG_ADMIN_PASSWORD: string;
       BLOG_SESSION_SECRET: string;
       R2_PUBLIC_URL: string;

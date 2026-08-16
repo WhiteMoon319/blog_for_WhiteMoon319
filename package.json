@@ -16,7 +16,7 @@
     "test": "node --test \"tests/**/*.test.ts\"",
     "cf:login": "wrangler login",
     "cf:config": "node scripts/cf-config.mjs",
-    "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/migrations/0001_init.sql && wrangler d1 execute blog-db --local --file=db/seed.sql",
+    "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 migrations apply blog-db --local && wrangler d1 execute blog-db --local --file=db/seed.sql",
     "cf:dev": "npm run build && wrangler dev",
     "cf:deploy": "npm run build && wrangler deploy"
   },

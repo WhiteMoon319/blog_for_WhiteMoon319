@@ -1,14 +1,19 @@
 import { Miniflare } from 'miniflare';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const MIGRATION_STATEMENTS = readFileSync(resolve('db/migrations/0001_init.sql'), 'utf8')
-  .split('\n')
-  .filter((line) => !/^\s*--/.test(line) && line.trim() !== '')
-  .join('\n')
-  .split(';')
-  .map((s) => s.trim())
-  .filter((s) => s.length > 0);
+const MIGRATION_STATEMENTS = readdirSync(resolve('db/migrations'))
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .flatMap((file) =>
+    readFileSync(resolve('db/migrations', file), 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*--/.test(line) && line.trim() !== '')
+      .join('\n')
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
 
 export interface TestDbHandle {
   db: D1Database;

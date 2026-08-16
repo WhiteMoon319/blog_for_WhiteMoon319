@@ -148,6 +148,29 @@ body {
   display: none !important;
 }
 
+.nav-search {
+  margin-left: 4px;
+}
+
+.nav-search-input {
+  width: 110px;
+  padding: 5px 10px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--ink-deep);
+  background: var(--paper-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  outline: none;
+  transition: width 0.25s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-search-input:focus {
+  width: 170px;
+  border-color: var(--cinnabar);
+  box-shadow: 0 0 0 3px var(--cinnabar-line);
+}
+
 /* ===== 页脚 ===== */
 .site-footer {
   padding: 48px 24px 32px;
@@ -1165,6 +1188,7 @@ section[id],
     background: rgba(194, 58, 48, 0.06);
     border-left-color: var(--cinnabar);
   }
+  .nav-search { display: none; }
   .page-hero-card { padding: 30px 22px; text-align: center; }
   .page-hero-card .lead { text-align: left; }
   .page-hero-card .facts { justify-content: center; }

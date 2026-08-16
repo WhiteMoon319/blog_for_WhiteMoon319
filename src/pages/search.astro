@@ -1,0 +1,90 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { envOf, searchPublishedPosts, getCollectionById, fmtDate } from '../lib/db';
+import { postHref } from '../lib/utils';
+
+export const prerender = false;
+
+const env = await envOf();
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+const posts = q ? await searchPublishedPosts(env.DB, q) : [];
+const results: { post: (typeof posts)[number]; collection: { slug: string; title: string; theme_color: string } | null }[] = [];
+for (const post of posts) {
+  const collection = post.collection_id ? await getCollectionById(env.DB, post.collection_id) : null;
+  results.push({ post, collection });
+}
+---
+
+<BaseLayout title="寻章" description="站内搜索">
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">← 回到卷首</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">寻</p>
+      <h1>寻章摘句</h1>
+      <p class="lead">于卷帙之间，觅得一言。</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    <form class="search-form reveal in" action="/search/" method="get" role="search">
+      <input
+        class="search-input"
+        type="search"
+        name="q"
+        value={q}
+        placeholder="搜索篇名、摘要与正文……"
+        aria-label="站内搜索"
+      />
+      <button class="btn btn-primary" type="submit">寻</button>
+    </form>
+
+    {
+      q ? (
+        results.length > 0 ? (
+          <div class="posts-grid" style="margin-top:32px;">
+            {results.map(({ post, collection }, i) => (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(post.slug, collection?.slug)} style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}>
+                <h3 class="post-title">{post.title}</h3>
+                {post.summary && <p class="post-summary">{post.summary}</p>}
+                <div class="post-meta">
+                  {collection && <span class="post-tag">{collection.title}</span>}
+                  <span>{fmtDate(post.created_at)}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p class="section-lead reveal in" style="text-align:center;">未寻得「{q}」相关篇章。</p>
+        )
+      ) : (
+        <p class="section-lead reveal in" style="text-align:center;">输入关键字，遍寻全卷。</p>
+      )
+    }
+  </section>
+</BaseLayout>
+
+<style>
+  .search-form {
+    display: flex;
+    gap: 12px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    color: var(--ink-deep);
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .search-input:focus {
+    border-color: var(--cinnabar);
+    box-shadow: 0 0 0 3px var(--cinnabar-line);
+  }
+</style>

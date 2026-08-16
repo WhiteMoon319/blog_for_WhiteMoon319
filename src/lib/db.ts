@@ -29,6 +29,7 @@ export interface PostRow {
   content_md: string;
   cover_url: string;
   status: 'draft' | 'published';
+  view_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +75,34 @@ export async function getPublishedPostBySlug(db: D1Database, slug: string): Prom
     .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published'`)
     .bind(slug)
     .first<PostRow>();
+}
+
+export async function searchPublishedPosts(
+  db: D1Database,
+  q: string,
+  limit = 50,
+): Promise<PostRow[]> {
+  return db
+    .prepare(
+      `SELECT * FROM posts
+       WHERE status = 'published' AND (title LIKE ? OR summary LIKE ? OR content_md LIKE ?)
+       ORDER BY created_at DESC LIMIT ?`,
+    )
+    .bind(`%${q}%`, `%${q}%`, `%${q}%`, limit)
+    .all<PostRow>()
+    .then((r) => r.results ?? []);
+}
+
+export async function incrementViewCount(db: D1Database, id: number): Promise<number> {
+  await db
+    .prepare(`UPDATE posts SET view_count = view_count + 1 WHERE id = ?`)
+    .bind(id)
+    .run();
+  const row = await db
+    .prepare(`SELECT view_count FROM posts WHERE id = ?`)
+    .bind(id)
+    .first<{ view_count: number }>();
+  return row?.view_count ?? 0;
 }
 
 export async function listArchivedPosts(db: D1Database): Promise<PostRow[]> {

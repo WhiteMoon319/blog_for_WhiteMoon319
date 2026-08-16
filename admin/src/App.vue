@@ -56,6 +56,7 @@ async function logout() {
         <router-link to="/">工作台</router-link>
         <router-link to="/collections">文集</router-link>
         <router-link to="/posts">文章</router-link>
+        <router-link to="/import">导入</router-link>
         <router-link to="/editor">写新篇</router-link>
       </div>
       <span class="spacer"></span>

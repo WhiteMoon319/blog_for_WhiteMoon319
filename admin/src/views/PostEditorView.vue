@@ -252,6 +252,7 @@ function insertMedia(url: string) {
 
 interface DiffSeg {
   kind: 'add' | 'del' | 'ctx';
+  paired: boolean;
   line: string;
   words: Array<{ kind: 'add' | 'del' | 'keep'; text: string }>;
 }
@@ -287,11 +288,11 @@ function computeDiff(a: string, b: string): DiffSeg[] {
         kind: w.removed ? ('del' as const) : w.added ? ('add' as const) : ('keep' as const),
         text: w.value,
       }));
-      segs.push({ kind: 'del', line: d, words });
-      segs.push({ kind: 'add', line: ad, words });
+      segs.push({ kind: 'del', line: d, words, paired: true });
+      segs.push({ kind: 'add', line: ad, words, paired: true });
     }
-    for (const d of dels) segs.push({ kind: 'del', line: d, words: [] });
-    for (const ad of adds) segs.push({ kind: 'add', line: ad, words: [] });
+    for (const d of dels) segs.push({ kind: 'del', line: d, words: [], paired: false });
+    for (const ad of adds) segs.push({ kind: 'add', line: ad, words: [], paired: false });
     dels = [];
     adds = [];
   };
@@ -300,7 +301,7 @@ function computeDiff(a: string, b: string): DiffSeg[] {
     else if (p.added) adds.push(...splitLines(p.value));
     else {
       flushPair();
-      for (const l of splitLines(p.value)) segs.push({ kind: 'ctx', line: l, words: [] });
+      for (const l of splitLines(p.value)) segs.push({ kind: 'ctx', line: l, words: [], paired: false });
     }
   }
   flushPair();
@@ -564,7 +565,7 @@ async function restoreVersion(v: PostVersion) {
             </span>
           </div>
           <pre class="diff-view" v-if="diffSegs">
-<template v-for="(seg, i) in diffSegs" :key="i"><span class="diff-line" :class="seg.kind"><span class="diff-mark">{{ seg.kind === 'add' ? '+' : seg.kind === 'del' ? '-' : ' ' }}</span><span v-if="seg.words.length" class="diff-words"><template v-for="(w, j) in seg.words" :key="j"><span :class="'dw ' + w.kind">{{ w.text }}</span></template></span><template v-else>{{ seg.line }}</template></span>
+<template v-for="(seg, i) in diffSegs" :key="i"><span class="diff-line" :class="[seg.kind, seg.paired ? 'pair' : 'full']"><span class="diff-mark">{{ seg.kind === 'add' ? '+' : seg.kind === 'del' ? '-' : ' ' }}</span><span v-if="seg.words.length" class="diff-words"><template v-for="(w, j) in seg.words" :key="j"><span :class="'dw ' + w.kind">{{ w.text }}</span></template></span><template v-else>{{ seg.line }}</template></span>
 </template>
 </pre>
           <div v-else class="empty">选择基线后显示差异。</div>
@@ -742,13 +743,16 @@ async function restoreVersion(v: PostVersion) {
 .diff-line {
   display: block;
 }
-.diff-line.del {
+.diff-line.del.full {
   background: rgba(194, 58, 48, 0.12);
   color: #9c2f26;
 }
-.diff-line.add {
+.diff-line.add.full {
   background: rgba(45, 106, 79, 0.12);
   color: #1f5c40;
+}
+.diff-line.pair {
+  background: transparent;
 }
 .diff-line.ctx {
   color: var(--ink-soft);

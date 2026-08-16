@@ -42,8 +42,8 @@ for (const post of posts) {
               {g.posts.map(({ post, collection }) => (
                 <div class="tl-item">
                   <a href={postHref(post.slug, collection?.slug)}>
-                    <div class="tl-event">{post.title}</div>
-                    <div class="tl-desc">{collection?.title ?? '未分类'} · {fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
+<div class="tl-event">{collection?.title ?? '未分类'} · {post.title}</div>
+                <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
                   </a>
                 </div>
               ))}

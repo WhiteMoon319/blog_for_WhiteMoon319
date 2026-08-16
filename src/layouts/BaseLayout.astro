@@ -119,9 +119,17 @@ const navLinks = [
             }
           });
         },
-        { threshold: 0.12, rootMargin: '0px 0px -40px 0px' },
+        { threshold: 0.01, rootMargin: '0px 0px -20px 0px' },
       );
-      document.querySelectorAll('.reveal:not(.in)').forEach((el) => io.observe(el));
+      document.querySelectorAll('.reveal:not(.in)').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        if (r.top < vh - 20 && r.bottom > 0) {
+          el.classList.add('in');
+        } else {
+          io.observe(el);
+        }
+      });
     </script>
   </body>
 </html>

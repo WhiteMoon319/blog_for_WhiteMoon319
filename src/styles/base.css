@@ -1088,6 +1088,8 @@ body {
 .reveal[data-delay="2"] { transition-delay: 0.16s; }
 .reveal[data-delay="3"] { transition-delay: 0.24s; }
 .reveal[data-delay="4"] { transition-delay: 0.32s; }
+.reveal[data-delay="5"] { transition-delay: 0.4s; }
+.reveal[data-delay="6"] { transition-delay: 0.48s; }
 
 /* 让固定导航锚点定位不被遮挡 */
 section[id],

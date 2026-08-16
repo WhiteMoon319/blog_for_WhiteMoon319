@@ -135,7 +135,7 @@ onMounted(loadMore);
   border: 1px solid var(--hairline);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--paper-card);
   display: flex;
   flex-direction: column;
 }

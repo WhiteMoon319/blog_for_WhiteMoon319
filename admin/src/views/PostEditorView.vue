@@ -589,7 +589,7 @@ async function restoreVersion(v: PostVersion) {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--paper-card);
   border: 1px solid var(--hairline);
   border-radius: 12px;
   overflow: hidden;
@@ -650,11 +650,11 @@ async function restoreVersion(v: PostVersion) {
   border-radius: 8px;
   padding: 10px 12px;
   cursor: pointer;
-  background: var(--bg);
+  background: var(--paper-card);
 }
 .ver-item.on {
   border-color: var(--cinnabar);
-  background: color-mix(in srgb, var(--cinnabar) 6%, var(--bg));
+  background: color-mix(in srgb, var(--cinnabar) 6%, var(--paper-card));
 }
 .ver-head {
   display: flex;

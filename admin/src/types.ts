@@ -29,3 +29,18 @@ export interface MediaFile {
   uploaded: string;
   url: string;
 }
+
+export interface PostVersion {
+  id: number;
+  post_id: number;
+  version: number;
+  title: string;
+  slug: string;
+  collection_id: number | null;
+  summary: string;
+  content_md: string;
+  cover_url: string;
+  status: 'draft' | 'published';
+  message: string;
+  created_at: string;
+}

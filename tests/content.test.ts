@@ -4,11 +4,14 @@ import {
   searchPublishedPosts,
   incrementViewCount,
   createPost,
+  updatePost,
   getPostById,
   countPublishedPosts,
   listPublishedPosts,
   countArchivedPosts,
   listArchivedPosts,
+  listPostVersions,
+  getPostVersion,
 } from '../src/lib/db.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
@@ -119,4 +122,44 @@ test('分页：count 与 limit/offset 正确，含/不含文集过滤', async ()
   assert.equal(archivePage1.length, 3);
   assert.equal(archivePage3.length, 2, '末页应剩 2 条');
   assert.ok(archivePage3.some((p) => p.slug === 'san'), '末页应包含散篇');
+});
+
+test('版本史：创建即 v1，仅实质变更留档，可读取指定版本', async () => {
+  const created = await createPost(db, {
+    title: '版本试炼',
+    slug: 'ver-probe',
+    summary: '初版',
+    content_md: '第一稿。',
+    status: 'draft',
+  });
+  assert.ok(created);
+
+  const v1 = await listPostVersions(db, created.id);
+  assert.equal(v1.length, 1, '创建即留 v1');
+  assert.equal(v1[0].version, 1);
+  assert.equal(v1[0].message, '创建');
+  assert.equal(v1[0].content_md, '第一稿。');
+
+  const unchanged = await updatePost(db, created.id, { content_md: '第一稿。' });
+  assert.ok(unchanged);
+  assert.equal((await listPostVersions(db, created.id)).length, 1, '内容未变不应留档');
+
+  await updatePost(db, created.id, { content_md: '第二稿，改了。' }, '重写正文');
+  await updatePost(db, created.id, { title: '版本试炼改' }, '改题');
+  const v3 = await listPostVersions(db, created.id);
+  assert.equal(v3.length, 3, '两次实质修改应留 v2/v3');
+  assert.equal(v3[0].version, 3, '列表按版本倒序');
+  assert.equal(v3[0].message, '改题');
+  assert.equal(v3[0].title, '版本试炼改');
+
+  const old = await getPostVersion(db, created.id, 1);
+  assert.ok(old);
+  assert.equal(old.content_md, '第一稿。');
+  assert.equal(old.title, '版本试炼');
+
+  const missing = await getPostVersion(db, created.id, 99);
+  assert.equal(missing, null);
+
+  await updatePost(db, created.id, { summary: '' });
+  assert.equal((await listPostVersions(db, created.id)).length, 4, '清空摘要也是实质变更');
 });

@@ -40,6 +40,7 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   }
 
   const patch: Record<string, string | number | null> = {};
+  let versionMessage: string | undefined;
   if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim();
   if (typeof body.slug === 'string' && body.slug.trim()) {
     if (!isValidSlug(body.slug.trim())) {
@@ -57,10 +58,13 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.content_md === 'string') patch.content_md = body.content_md;
   if (typeof body.cover_url === 'string') patch.cover_url = body.cover_url;
   if (body.status === 'published' || body.status === 'draft') patch.status = body.status;
+  if (typeof body.version_message === 'string' && body.version_message.trim()) {
+    versionMessage = body.version_message.trim();
+  }
 
   try {
     const env = await envOf();
-    const updated = await updatePost(env.DB, id, patch);
+    const updated = await updatePost(env.DB, id, patch, versionMessage);
     if (!updated) return json({ error: 'not found' }, 404);
     return json({ post: updated });
   } catch (e) {

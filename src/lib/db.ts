@@ -251,23 +251,24 @@ export interface PostInput {
 }
 
 export async function createPost(db: D1Database, data: PostInput): Promise<PostRow | null> {
-  const res = await db
-    .prepare(
-      `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-    )
-    .bind(
-      data.collection_id ?? null,
-      data.title,
-      data.slug,
-      data.summary ?? '',
-      data.content_md ?? '',
-      data.cover_url ?? '',
-      data.status ?? 'draft',
-    )
-    .first<PostRow>();
-  return res ?? null;
-}
+    const res = await db
+      .prepare(
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      )
+      .bind(
+        data.collection_id ?? null,
+        data.title,
+        data.slug,
+        data.summary ?? '',
+        data.content_md ?? '',
+        data.cover_url ?? '',
+        data.status ?? 'draft',
+      )
+      .first<PostRow>();
+    if (res) await insertPostVersion(db, res.id, res, '创建');
+    return res ?? null;
+  }
 
 const POST_FIELDS = [
   'title',
@@ -280,22 +281,106 @@ const POST_FIELDS = [
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 
-export async function updatePost(db: D1Database, id: number, patch: PostPatch): Promise<PostRow | null> {
-  const keys = Object.keys(patch).filter((k) => POST_FIELDS.includes(k as (typeof POST_FIELDS)[number]));
-  if (keys.length === 0) return getPostById(db, id);
-  const sets = keys.map((k) => `${k} = ?`).join(', ');
-  const values = keys.map((k) => patch[k as keyof PostPatch]);
-  const res = await db
-    .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? RETURNING *`)
-    .bind(...values, id)
-    .first<PostRow>();
-  return res ?? null;
-}
+export async function updatePost(
+    db: D1Database,
+    id: number,
+    patch: PostPatch,
+    versionMessage?: string,
+  ): Promise<PostRow | null> {
+    const current = await getPostById(db, id);
+    if (!current) return null;
+    const keys = Object.keys(patch).filter((k) => POST_FIELDS.includes(k as (typeof POST_FIELDS)[number]));
+    if (keys.length === 0) return current;
+    const changed = keys.filter((k) => {
+      const pv = patch[k as keyof PostPatch];
+      const cv = current[k as keyof PostRow];
+      return String(pv ?? null) !== String(cv ?? null);
+    });
+    if (changed.length === 0) return current;
+    const sets = changed.map((k) => `${k} = ?`).join(', ');
+    const values = changed.map((k) => patch[k as keyof PostPatch]);
+    const res = await db
+      .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? RETURNING *`)
+      .bind(...values, id)
+      .first<PostRow>();
+    if (res) await insertPostVersion(db, id, res, versionMessage ?? '自动保存');
+    return res ?? null;
+  }
 
 export async function deletePost(db: D1Database, id: number): Promise<boolean> {
-  const res = await db.prepare(`DELETE FROM posts WHERE id = ?`).bind(id).run();
-  return (res.meta.changes ?? 0) > 0;
-}
+    const res = await db.prepare(`DELETE FROM posts WHERE id = ?`).bind(id).run();
+    return (res.meta.changes ?? 0) > 0;
+  }
+
+  /* ===== 版本历史 ===== */
+
+  export interface PostVersionRow {
+    id: number;
+    post_id: number;
+    version: number;
+    title: string;
+    slug: string;
+    collection_id: number | null;
+    summary: string;
+    content_md: string;
+    cover_url: string;
+    status: 'draft' | 'published';
+    message: string;
+    created_at: string;
+  }
+
+  async function insertPostVersion(
+    db: D1Database,
+    postId: number,
+    row: PostRow,
+    message: string,
+  ): Promise<void> {
+    const next = await db
+      .prepare(`SELECT COALESCE(MAX(version), 0) + 1 AS v FROM post_versions WHERE post_id = ?`)
+      .bind(postId)
+      .first<{ v: number }>();
+    await db
+      .prepare(
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        postId,
+        next?.v ?? 1,
+        row.title,
+        row.slug,
+        row.collection_id,
+        row.summary,
+        row.content_md,
+        row.cover_url,
+        row.status,
+        message,
+      )
+      .run();
+  }
+
+  export async function listPostVersions(
+    db: D1Database,
+    postId: number,
+    limit = 100,
+  ): Promise<PostVersionRow[]> {
+    return db
+      .prepare(`SELECT * FROM post_versions WHERE post_id = ? ORDER BY version DESC LIMIT ?`)
+      .bind(postId, limit)
+      .all<PostVersionRow>()
+      .then((r) => r.results ?? []);
+  }
+
+  export async function getPostVersion(
+    db: D1Database,
+    postId: number,
+    version: number,
+  ): Promise<PostVersionRow | null> {
+    return db
+      .prepare(`SELECT * FROM post_versions WHERE post_id = ? AND version = ?`)
+      .bind(postId, version)
+      .first<PostVersionRow>();
+  }
 
 export async function getPostById(db: D1Database, id: number): Promise<PostRow | null> {
   return db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>();

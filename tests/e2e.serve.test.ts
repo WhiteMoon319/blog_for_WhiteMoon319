@@ -158,6 +158,14 @@ async function post(path: string, body: unknown): Promise<Response> {
   });
 }
 
+async function put(path: string, body: unknown): Promise<Response> {
+  return mf.dispatchFetch(BASE + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+
 before(async () => {
   if (!HAS_BUILD) return;
   await boot();
@@ -655,4 +663,73 @@ test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () =>
     const gone = await get(`/api/posts/${id}`);
     assert.equal(gone.status, 404, '批量删除后文章应不存在');
   }
+});
+
+test('e2e：版本史——留档、读取、回滚，未登录 401', async () => {
+  if (!HAS_BUILD) return;
+  const created = await post('/api/posts', {
+    title: '版本史篇',
+    slug: 'ver-e2e',
+    content_md: '第一稿。',
+    status: 'draft',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const anon = await mf.dispatchFetch(BASE + `/api/posts/${id}/versions`, { redirect: 'manual' });
+  assert.equal(anon.status, 401, '版本接口应需登录');
+
+  const list1 = await get(`/api/posts/${id}/versions`);
+  assert.equal(list1.status, 200);
+  let vb = await list1.json();
+  assert.equal(vb.versions.length, 1, '创建即 v1');
+  assert.equal(vb.versions[0].message, '创建');
+
+  const upd = await put(`/api/posts/${id}`, {
+    title: '版本史篇',
+    slug: 'ver-e2e',
+    content_md: '第二稿，改了不少。',
+    status: 'draft',
+    version_message: '重写第二稿',
+  });
+  assert.equal(upd.status, 200);
+
+  const noop = await put(`/api/posts/${id}`, {
+    content_md: '第二稿，改了不少。',
+    version_message: '不应留档',
+  });
+  assert.equal(noop.status, 200);
+
+  const list2 = await get(`/api/posts/${id}/versions`);
+  vb = await list2.json();
+  assert.equal(vb.versions.length, 2, '无实质变化的保存不应留档');
+  assert.equal(vb.versions[0].version, 2);
+  assert.equal(vb.versions[0].message, '重写第二稿');
+
+  const single = await get(`/api/posts/${id}/versions/1`);
+  assert.equal(single.status, 200);
+  const sv = (await single.json()).version;
+  assert.equal(sv.content_md, '第一稿。');
+
+  const badVer = await get(`/api/posts/${id}/versions/999`);
+  assert.equal(badVer.status, 404);
+
+  const restore = await post(`/api/posts/${id}/versions/1/restore`, {});
+  assert.equal(restore.status, 200);
+  const rb = await restore.json();
+  assert.equal(rb.post.content_md, '第一稿。', '回滚后内容应恢复为 v1');
+
+  const list3 = await get(`/api/posts/${id}/versions`);
+  vb = await list3.json();
+  assert.equal(vb.versions.length, 3, '回滚应生成 v3 而非覆盖历史');
+  assert.equal(vb.versions[0].version, 3);
+  assert.equal(vb.versions[0].message, '回滚至 v1');
+
+  const page = await get(`/api/posts/${id}`);
+  const postBody = await page.json();
+  assert.equal(postBody.post.title, '版本史篇');
+
+  await del(`/api/posts/${id}`);
+  const goneVersions = await get(`/api/posts/${id}/versions`);
+  assert.equal(goneVersions.status, 404, '文章删除后版本接口应 404');
 });

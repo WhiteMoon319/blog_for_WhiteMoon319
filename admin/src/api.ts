@@ -1,4 +1,4 @@
-import type { Collection, MediaFile, Post } from './types';
+import type { Collection, MediaFile, Post, PostVersion } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -69,6 +69,17 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+
+  postVersions: (id: number) => request<{ versions: PostVersion[] }>(`/api/posts/${id}/versions`),
+
+  postVersion: (id: number, version: number) =>
+    request<{ version: PostVersion }>(`/api/posts/${id}/versions/${version}`),
+
+  restorePostVersion: (id: number, version: number) =>
+    request<{ ok: boolean; post: Post }>(`/api/posts/${id}/versions/${version}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 
   upload: async (file: File): Promise<{ url: string; key: string }> => {
     const fd = new FormData();

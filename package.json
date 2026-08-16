@@ -23,12 +23,14 @@
   "dependencies": {
     "@astrojs/cloudflare": "^14.2.1",
     "astro": "^7.2.2",
+    "diff": "^9.0.0",
     "marked": "^18.0.9",
     "sanitize-html": "^2.17.0"
   },
-"devDependencies": {
+  "devDependencies": {
     "@astrojs/check": "^0.9.4",
     "@cloudflare/workers-types": "^5.20260815.1",
+    "@types/diff": "^7.0.2",
     "@types/node": "^24.0.0",
     "@types/sanitize-html": "^2.16.0",
     "miniflare": "5.20260811.1-alpha",

@@ -603,3 +603,56 @@ test('e2e：媒体库——未登录 401，列表含已传文件，删除后文�
   const gone = await get(`/api/files/${key}`);
   assert.equal(gone.status, 404, '删除后文件应不可再取');
 });
+
+test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () => {
+  if (!HAS_BUILD) return;
+  const ids: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await post('/api/posts', {
+      title: `批量文${i}`,
+      slug: `bulk-${i}`,
+      status: 'draft',
+    });
+    assert.equal(r.status, 201);
+    ids.push((await r.json()).post.id as number);
+  }
+
+  const bad = await post('/api/posts/batch', { action: 'nuke', ids: [1] });
+  assert.equal(bad.status, 400, '未知动作应拒绝');
+
+  const empty = await post('/api/posts/batch', { action: 'publish', ids: [] });
+  assert.equal(empty.status, 400, '空 ids 应拒绝');
+
+  const dup = await post('/api/posts/batch', { action: 'publish', ids: [ids[0], ids[0]] });
+  assert.equal(dup.status, 200);
+  assert.equal((await dup.json()).count, 1, '重复 id 应去重');
+
+  const pub = await post('/api/posts/batch', { action: 'publish', ids });
+  assert.equal(pub.status, 200);
+  assert.equal((await pub.json()).count, 3);
+
+  const list = await get('/api/posts?status=all');
+  const body = await list.json();
+  const published = (body.posts as Array<{ id: number; status: string }>).filter((p) => ids.includes(p.id));
+  assert.equal(published.length, 3);
+  assert.ok(published.every((p) => p.status === 'published'), '三篇应全部刊发');
+
+  const move = await post('/api/posts/batch', { action: 'move', ids, collection_id: 1 });
+  assert.equal(move.status, 200);
+  assert.equal((await move.json()).count, 3);
+
+  const badCol = await post('/api/posts/batch', { action: 'move', ids, collection_id: 99999 });
+  assert.equal(badCol.status, 404, '不存在的文集应 404');
+
+  const draft = await post('/api/posts/batch', { action: 'draft', ids });
+  assert.equal(draft.status, 200);
+
+  const delBatch = await post('/api/posts/batch', { action: 'delete', ids });
+  assert.equal(delBatch.status, 200);
+  assert.equal((await delBatch.json()).count, 3);
+
+  for (const id of ids) {
+    const gone = await get(`/api/posts/${id}`);
+    assert.equal(gone.status, 404, '批量删除后文章应不存在');
+  }
+});

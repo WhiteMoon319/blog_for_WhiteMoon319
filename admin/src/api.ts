@@ -61,6 +61,15 @@ export const api = {
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
 
+  batchPosts: (payload: {
+    action: 'publish' | 'draft' | 'delete' | 'move';
+    ids: number[];
+    collection_id?: number | null;
+  }) => request<{ ok: boolean; count: number }>('/api/posts/batch', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
   upload: async (file: File): Promise<{ url: string; key: string }> => {
     const fd = new FormData();
     fd.append('file', file);

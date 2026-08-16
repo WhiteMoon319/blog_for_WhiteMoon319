@@ -99,19 +99,13 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
   }
   busy.value = true;
   try {
-    let n = 0;
-    for (const id of ids) {
-      if (action === 'delete') {
-        await api.deletePost(id);
-      } else if (action === 'move') {
-        await api.updatePost(id, { collection_id: moveCol.value });
-      } else {
-        await api.updatePost(id, { status: action === 'publish' ? 'published' : 'draft' });
-      }
-      n++;
-    }
+    const { count } = await api.batchPosts({
+      action,
+      ids,
+      collection_id: action === 'move' ? moveCol.value : undefined,
+    });
     selected.value = new Set();
-    emit('notify', `已处理 ${n} 篇`);
+    emit('notify', `已处理 ${count} 篇`);
     await load();
   } catch (e) {
     emit('notify', (e as Error).message, true);

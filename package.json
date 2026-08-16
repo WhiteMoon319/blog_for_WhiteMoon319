@@ -3,6 +3,9 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "admin"
+  ],
   "scripts": {
     "dev": "astro dev",
     "build": "node scripts/cf-config.mjs && npm run build:admin && astro build && node scripts/merge-admin.mjs",
@@ -33,6 +36,7 @@
     "@types/diff": "^7.0.2",
     "@types/node": "^24.0.0",
     "@types/sanitize-html": "^2.16.0",
+    "fast-xml-parser": "^5.11.0",
     "miniflare": "5.20260811.1-alpha",
     "typescript": "^5.7.0",
     "wrangler": "^4.60.0"

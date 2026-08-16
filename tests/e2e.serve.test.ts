@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Miniflare } from 'miniflare';
+import { XMLValidator, XMLParser } from 'fast-xml-parser';
 
 const SERVER_DIR = resolve('dist/server');
 
@@ -80,7 +81,6 @@ async function boot(): Promise<void> {
             DB: { type: 'd1', id: 'e2e-db' },
             IMAGES: { type: 'r2', name: 'e2e-images' },
             SESSION: { type: 'kv', id: 'e2e-session' },
-            RATE_LIMIT: { type: 'kv', id: 'e2e-ratelimit' },
             SITE_NAME: { type: 'json', value: '测试书斋' },
             SITE_SLOGAN: { type: 'json', value: '一角书斋' },
             SITE_POEM: { type: 'json', value: '晨起摊书卷。' },
@@ -535,6 +535,7 @@ test('e2e：文集与归档分页——页 1 满页、页 2 余量、页码越�
   const h2 = await p2.text();
   assert.ok(h2.includes('分页文00'), '页 2 应含最旧一篇');
   assert.ok(h2.includes('href="/collections/page-col/"'), '应有回页 1 链接');
+  assert.ok(h2.includes('13 篇'), '页头应显示文集文章总数而非当前页条数');
 
   const pBad = await get('/collections/page-col/?page=999');
   assert.equal(pBad.status, 200);
@@ -794,4 +795,216 @@ test('e2e：版本史——留档、读取、回滚，未登录 401', async () =
   await del(`/api/posts/${id}`);
   const goneVersions = await get(`/api/posts/${id}/versions`);
   assert.equal(goneVersions.status, 404, '文章删除后版本接口应 404');
+});
+
+test('e2e：未分类重复 slug 返回 409，公开 URL 唯一', async () => {
+  if (!HAS_BUILD) return;
+  const a = await post('/api/posts', { title: '未分类甲', slug: 'uc-dup-e2e', status: 'published' });
+  assert.equal(a.status, 201);
+  const dup = await post('/api/posts', { title: '未分类乙', slug: 'uc-dup-e2e', status: 'published' });
+  assert.equal(dup.status, 409, '未分类重复 slug 应 409 而非 500');
+  const page = await get('/posts/uc-dup-e2e/');
+  assert.equal(page.status, 200);
+  assert.ok((await page.text()).includes('未分类甲'), 'URL 应稳定指向唯一一篇');
+  await del(`/api/posts/${(await a.json()).post.id}`);
+});
+
+test('e2e：删除文集后冲突文章确定性改 slug 并保持可访问', async () => {
+  if (!HAS_BUILD) return;
+  const col = await post('/api/collections', { title: '散集', slug: 'scatter-col' });
+  assert.equal(col.status, 201);
+  const colId = (await col.json()).collection.id as number;
+  const inCol = await post('/api/posts', { title: '入集篇', slug: 'shared-x', collection_id: colId, status: 'published' });
+  assert.equal(inCol.status, 201);
+  const uncat = await post('/api/posts', { title: '散落篇', slug: 'shared-x', status: 'published' });
+  assert.equal(uncat.status, 201);
+
+  const delCol = await del(`/api/collections/${colId}`);
+  assert.equal(delCol.status, 200, '删除文集不应因冲突而 500');
+
+  const list = await get('/api/posts?status=all');
+  const body = await list.json();
+  const posts = body.posts as Array<{ id: number; slug: string; collection_id: number | null }>;
+  const inColId = (await inCol.json()).post.id as number;
+  const moved = posts.find((p) => p.id === inColId);
+  assert.ok(moved, '集内文章应保留');
+  assert.equal(moved.collection_id, null, '文集删除后转未分类');
+  assert.equal(moved.slug, 'shared-x-2', '冲突者获得确定性后缀 -2');
+
+  const uncatId = (await uncat.json()).post.id as number;
+  const keeper = posts.find((p) => p.id === uncatId);
+  assert.equal(keeper?.slug, 'shared-x', '较新一篇保留原 slug');
+
+  const p1 = await get('/posts/shared-x/');
+  assert.equal(p1.status, 200);
+  assert.ok((await p1.text()).includes('散落篇'));
+  const p2 = await get('/posts/shared-x-2/');
+  assert.equal(p2.status, 200);
+  assert.ok((await p2.text()).includes('入集篇'));
+
+  await del(`/api/posts/${moved.id}`);
+  await del(`/api/posts/${keeper!.id}`);
+});
+
+test('e2e：批量移动全成功或全失败——冲突时零提交', async () => {
+  if (!HAS_BUILD) return;
+  const mk = async (title: string, slug: string) => {
+    const r = await post('/api/collections', { title, slug });
+    assert.equal(r.status, 201);
+    return (await r.json()).collection.id as number;
+  };
+  const colA = await mk('甲集', 'mcol-a');
+  const colB = await mk('乙集', 'mcol-b');
+  const colC = await mk('丙集', 'mcol-c');
+
+  const pa = await post('/api/posts', { title: '甲篇', slug: 'shared-m', collection_id: colA, status: 'published' });
+  const pb = await post('/api/posts', { title: '乙篇', slug: 'shared-m', collection_id: colB, status: 'published' });
+  assert.equal(pa.status, 201);
+  assert.equal(pb.status, 201);
+  const paId = (await pa.json()).post.id as number;
+  const pbId = (await pb.json()).post.id as number;
+
+  // 两篇同名 slug 同时移入丙集：互相冲突 → 409，且一篇都不移动
+  const both = await post('/api/posts/batch', { action: 'move', ids: [paId, pbId], collection_id: colC });
+  assert.equal(both.status, 409, '批内互相冲突应 409');
+  const bothBody = await both.json();
+  assert.ok(Array.isArray(bothBody.conflicts) && bothBody.conflicts.includes('shared-m'));
+  const after = await get(`/api/posts/${paId}`);
+  assert.equal((await after.json()).post.collection_id, colA, '失败后不得部分移动');
+
+  // 单篇移入空文集成功
+  const single = await post('/api/posts/batch', { action: 'move', ids: [paId], collection_id: colC });
+  assert.equal(single.status, 200);
+  assert.equal((await single.json()).count, 1);
+
+  // 目标已被占用 → 409 且乙篇仍在乙集
+  const conflict = await post('/api/posts/batch', { action: 'move', ids: [pbId], collection_id: colC });
+  assert.equal(conflict.status, 409, '目标文集已有同名 slug 应 409');
+  const pbAfter = await get(`/api/posts/${pbId}`);
+  assert.equal((await pbAfter.json()).post.collection_id, colB, '冲突时不得移动');
+
+  // 幂等：把已在丙集的 pa 再次移入丙集仍成功
+  const idem = await post('/api/posts/batch', { action: 'move', ids: [paId], collection_id: colC });
+  assert.equal(idem.status, 200);
+
+  // 超过单次上限 → 400
+  const tooMany = await post('/api/posts/batch', {
+    action: 'move',
+    ids: Array.from({ length: 51 }, (_, i) => 1000 + i),
+    collection_id: colC,
+  });
+  assert.equal(tooMany.status, 400, 'move 超过 50 篇应拒绝');
+
+  await del(`/api/posts/${paId}`);
+  await del(`/api/posts/${pbId}`);
+  await del(`/api/collections/${colA}`);
+  await del(`/api/collections/${colB}`);
+  await del(`/api/collections/${colC}`);
+});
+
+test('e2e：offset-only 文章列表查询正常返回', async () => {
+  if (!HAS_BUILD) return;
+  const ids: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await post('/api/posts', { title: `列表页${i}`, slug: `list-off-${i}`, status: 'published' });
+    assert.equal(r.status, 201);
+    ids.push((await r.json()).post.id as number);
+  }
+  const res = await get('/api/posts?offset=1');
+  assert.equal(res.status, 200, '无 limit 仅 offset 不应 500');
+  const body = await res.json();
+  assert.ok(Array.isArray(body.posts));
+  const limited = await get('/api/posts?limit=2&offset=1');
+  assert.equal(limited.status, 200);
+  assert.equal((await limited.json()).posts.length, 2);
+  for (const id of ids) await del(`/api/posts/${id}`);
+});
+
+test('e2e：版本恢复到已删除文集——降级为未分类', async () => {
+  if (!HAS_BUILD) return;
+  const col = await post('/api/collections', { title: '瞬逝集', slug: 'ephemeral-col' });
+  assert.equal(col.status, 201);
+  const colId = (await col.json()).collection.id as number;
+
+  const created = await post('/api/posts', {
+    title: '旧作',
+    slug: 'old-work',
+    collection_id: colId,
+    content_md: '初稿。',
+    status: 'published',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  await put(`/api/posts/${id}`, { content_md: '二稿。' });
+  await del(`/api/collections/${colId}`);
+  assert.equal((await get(`/api/posts/${id}`)).status, 200, '删文集后文章保留为未分类');
+
+  const restore = await post(`/api/posts/${id}/versions/1/restore`, {});
+  assert.equal(restore.status, 200, '文集已删时恢复旧版不应 500');
+  const rb = await restore.json();
+  assert.equal(rb.post.collection_id, null, '旧版指向的文集已删除应降级为未分类');
+  assert.equal(rb.post.content_md, '初稿。');
+  await del(`/api/posts/${id}`);
+});
+
+test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼接', async () => {
+  if (!HAS_BUILD) return;
+  const col = await post('/api/collections', { title: '图册', slug: 'og-col' });
+  assert.equal(col.status, 201);
+  const colId = (await col.json()).collection.id as number;
+
+  const abs = await post('/api/posts', {
+    title: '绝对封面',
+    slug: 'og-abs',
+    collection_id: colId,
+    cover_url: 'https://cdn.example/uploads/a.png',
+    status: 'published',
+  });
+  assert.equal(abs.status, 201);
+  const page = await get('/collections/og-col/og-abs/');
+  const html = await page.text();
+  assert.ok(html.includes('property="og:image" content="https://cdn.example/uploads/a.png"'), '绝对 URL 不得二次拼接');
+  assert.ok(!html.includes('http://e2e.testhttps://'), '不得出现拼接出的非法地址');
+  await del(`/api/posts/${(await abs.json()).post.id}`);
+
+  const rel = await post('/api/posts', {
+    title: '相对封面',
+    slug: 'og-rel',
+    collection_id: colId,
+    cover_url: '/api/files/uploads/rel.png',
+    status: 'published',
+  });
+  assert.equal(rel.status, 201);
+  const page2 = await get('/collections/og-col/og-rel/');
+  const html2 = await page2.text();
+  assert.ok(html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'), '相对 URL 应拼上站点基址');
+  await del(`/api/posts/${(await rel.json()).post.id}`);
+  await del(`/api/collections/${colId}`);
+});
+
+test('e2e：RSS 含 ]]>、&、< 等内容时仍是合法 XML', async () => {
+  if (!HAS_BUILD) return;
+  const tricky = await post('/api/posts', {
+    title: ']]> & <标签> 试炼',
+    slug: 'rss-tricky',
+    summary: '摘要包含 ]]> 与 & 与 <x>',
+    content_md: '正文包含 ]]> 与 & 与 <标记>。',
+    status: 'published',
+  });
+  assert.equal(tricky.status, 201);
+
+  const res = await get('/rss.xml');
+  assert.equal(res.status, 200);
+  const xml = await res.text();
+  const valid = XMLValidator.validate(xml);
+  assert.equal(valid, true, `RSS 必须是合法 XML：${typeof valid === 'object' ? valid.err?.msg : ''}`);
+
+  const parsed = new XMLParser().parse(xml);
+  const titles = Array.isArray(parsed.rss.channel.item)
+    ? parsed.rss.channel.item.map((i: { title?: string }) => i.title)
+    : [parsed.rss.channel.item.title];
+  assert.ok(titles.includes(']]> & <标签> 试炼'), 'CDATA 拆分后标题应完整还原');
+
+  await del(`/api/posts/${(await tricky.json()).post.id}`);
 });

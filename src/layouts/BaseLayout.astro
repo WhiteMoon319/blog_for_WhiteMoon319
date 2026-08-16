@@ -16,7 +16,12 @@ const siteName = env.SITE_NAME;
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
 const pageQuery = Astro.url.searchParams.get('page') ? Astro.url.search : '';
 const canonical = `${siteUrl}${Astro.url.pathname}${pageQuery}`;
-const ogImage = image ? `${siteUrl}${image}` : `${siteUrl}/og-default.png`;
+const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
+const ogImage = image
+  ? ABSOLUTE_URL_RE.test(image)
+    ? image
+    : `${siteUrl}/${image.replace(/^\//, '')}`
+  : `${siteUrl}/og-default.png`;
 const navLinks = [
   { href: '/', label: '卷首' },
   { href: '/archive/', label: '归档' },

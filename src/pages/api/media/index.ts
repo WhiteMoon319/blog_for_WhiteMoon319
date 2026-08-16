@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { json, requireAuth } from '../../../lib/auth';
 import { envOf } from '../../../lib/db';
+import { publicBase } from '../../../lib/utils';
 
 export const prerender = false;
 
@@ -19,7 +20,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const cursor = ctx.url.searchParams.get('cursor') ?? undefined;
   const listed = await env.IMAGES.list({ limit: parseLimit(ctx.url.searchParams.get('limit')), cursor });
 
-  const base = env.R2_PUBLIC_URL;
+  const base = publicBase(env.R2_PUBLIC_URL ?? '');
   const files = listed.objects.map((o) => ({
     key: o.key,
     size: o.size,

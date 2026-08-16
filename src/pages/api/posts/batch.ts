@@ -6,14 +6,16 @@ import {
   createPost,
   getCollectionById,
   isSlugConflict,
+  type PostRow,
 } from '../../../lib/db';
-import { slugify, ensureSlug, isValidSlug } from '../../../lib/utils';
+import { slugify, isValidSlug } from '../../../lib/utils';
 import { json, requireAuth } from '../../../lib/auth';
 
 export const prerender = false;
 
 const MAX_IDS = 200;
 const MAX_CREATE = 50;
+const MAX_MOVE = 50;
 
 type Action = 'publish' | 'draft' | 'delete' | 'move' | 'create';
 
@@ -104,7 +106,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       return json({ error: 'collection not found' }, 404);
     }
 
-    const results: Array<{ ok: boolean; error?: string; post?: Record<string, unknown> }> = [];
+    const results: Array<{ ok: boolean; error?: string; post?: PostRow }> = [];
     for (const raw of rawPosts) {
       const item = parseCreateItem(raw, fallbackCol);
       if (typeof item === 'string') {
@@ -128,7 +130,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
           break;
         }
       }
-      results.push(created ? { ok: true, post: created as Record<string, unknown> } : { ok: false, error: lastError });
+      results.push(created ? { ok: true, post: created } : { ok: false, error: lastError });
     }
     return json({ ok: true, results });
   }
@@ -137,30 +139,81 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!ids) return json({ error: 'invalid ids' }, 400);
 
   if (action === 'move') {
-    const cid = body.collection_id;
-    if (cid !== null && (typeof cid !== 'number' || !Number.isInteger(cid) || cid <= 0)) {
+    const target = body.collection_id === null ? null : body.collection_id;
+    if (target !== null && (typeof target !== 'number' || !Number.isInteger(target) || target <= 0)) {
       return json({ error: 'invalid collection_id' }, 400);
     }
-    if (cid !== null && !(await getCollectionById(env.DB, cid))) {
+    if (target !== null && !(await getCollectionById(env.DB, target))) {
       return json({ error: 'collection not found' }, 404);
     }
+    if (ids.length > MAX_MOVE) {
+      return json({ error: `move 单次最多 ${MAX_MOVE} 篇` }, 400);
+    }
+
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = await env.DB
+      .prepare(`SELECT id, slug FROM posts WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .all<{ id: number; slug: string }>();
+    const found = rows.results ?? [];
+    if (found.length !== ids.length) {
+      return json({ error: '部分文章不存在，本次移动未执行' }, 404);
+    }
+
+    // 预检目标范围内的 slug 冲突（含本批文章之间的互撞），全部通过才执行，
+    // 执行阶段用单个 D1 事务（batch）保证「全成功或全失败」。
+    const taken = new Set<string>();
+    const scope = target === null
+      ? env.DB.prepare('SELECT slug FROM posts WHERE collection_id IS NULL')
+      : env.DB.prepare('SELECT slug FROM posts WHERE collection_id = ?').bind(target);
+    const scopeRows = await scope.all<{ slug: string }>();
+    for (const r of scopeRows.results ?? []) taken.add(r.slug);
+    for (const r of found) taken.delete(r.slug); // 被移动的文章即将离开原范围
+
+    const seen = new Set<string>();
+    const conflicts: string[] = [];
+    for (const r of found) {
+      if (taken.has(r.slug) || seen.has(r.slug)) conflicts.push(r.slug);
+      seen.add(r.slug);
+      taken.add(r.slug);
+    }
+    if (conflicts.length > 0) {
+      return json({ error: `slug 冲突：${conflicts.join('、')}，本次移动未执行`, conflicts }, 409);
+    }
+
+    const stmts: D1PreparedStatement[] = [];
+    for (const r of found) {
+      stmts.push(
+        env.DB
+          .prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(target, r.id),
+      );
+      stmts.push(
+        env.DB
+          .prepare(
+            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+             SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+                    title, slug, ?, summary, content_md, cover_url, status, '自动保存'
+             FROM posts WHERE id = ?`,
+          )
+          .bind(r.id, r.id, target, r.id),
+      );
+    }
+    try {
+      await env.DB.batch(stmts);
+    } catch (e) {
+      if (isSlugConflict(e)) {
+        return json({ error: 'slug 冲突：目标文集并发变化，本次移动未执行' }, 409);
+      }
+      throw e;
+    }
+    return json({ ok: true, count: found.length });
   }
 
   let count = 0;
   for (const id of ids) {
     if (action === 'delete') {
       await deletePost(env.DB, id);
-    } else if (action === 'move') {
-      try {
-        await updatePost(env.DB, id, {
-          collection_id: body.collection_id === null ? null : (body.collection_id as number),
-        });
-      } catch (e) {
-        if (isSlugConflict(e)) {
-          return json({ error: `slug conflict: post #${id}`, processed: count }, 409);
-        }
-        throw e;
-      }
     } else {
       await updatePost(env.DB, id, { status: action === 'publish' ? 'published' : 'draft' });
     }

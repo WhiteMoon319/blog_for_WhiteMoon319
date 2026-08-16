@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import mammoth from 'mammoth';
 import TurndownService from 'turndown';
 import { api } from '../api';
+import { buildImportPayloads, slugify } from '../lib/import';
 import type { Collection } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
@@ -45,14 +46,6 @@ onMounted(async () => {
 
 function stem(name: string): string {
   return name.replace(/\.[^.]+$/, '').trim();
-}
-
-function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function titleFromMarkdown(md: string, fallback: string): string {
@@ -216,15 +209,11 @@ async function submitAll() {
       const results = await api.batchPosts({
         action: 'create',
         collection_id: collectionId.value,
-        posts: chunk.map((it) => ({
-          title: it.title.trim(),
-          slug: it.slug.trim() || undefined,
-          summary: it.summary.trim(),
-          content_md: it.contentMd,
-          collection_id: collectionId.value,
-          status: status.value,
-        })),
+        posts: buildImportPayloads(chunk, slugMode.value, collectionId.value, status.value),
       });
+      if (!results.results) {
+        throw new Error('批量导入接口返回异常');
+      }
       results.results.forEach((r, i) => {
         const item = chunk[i];
         if (!item) return;

@@ -7,7 +7,7 @@
 - **Astro 7**（`output: server`）+ **@astrojs/cloudflare** 适配器，SSR 运行在 **Cloudflare Workers**（非 Pages）
 - **Cloudflare D1**：文集与文章数据
 - **Cloudflare R2**：上传图片
-- **Cloudflare KV**：`SESSION`（会话）、`RATE_LIMIT`（登录限流）
+- **Cloudflare KV**：`SESSION`（会话）；登录限流基于 D1 `login_attempts` 表的原子计数 upsert
 - **Vue 3 + Vite**：`admin/` 管理端 SPA，构建后合并进 Worker 静态资源（`dist/client/admin`）
 - **marked + sanitize-html**：Markdown 渲染与 XSS 清洗
 - **miniflare + node:test**：本地 e2e 测试
@@ -47,7 +47,7 @@ wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 要求：Node.js ≥ 20，已登录 wrangler（`npm run cf:login`）。
 
 ```bash
-npm install          # 安装依赖（admin 依赖在其目录内自动安装）
+npm install          # npm workspaces：一次安装根目录与 admin 全部依赖
 ```
 
 **前台（astro dev）**
@@ -91,13 +91,12 @@ cp .env.example .env   # 填入真实 ID
 npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 ```
 
-`.env` 需要三个值：
+`.env` 需要两个值：
 
 | 变量 | 说明 | 获取方式 |
 | --- | --- | --- |
 | `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
 | `BLOG_SESSION_KV_ID` | 会话 KV 命名空间 ID | `npx wrangler kv namespace list` |
-| `BLOG_RATE_LIMIT_KV_ID` | 限流 KV 命名空间 ID | `npx wrangler kv namespace list` |
 
 `npm run build` / `cf:dev` / `cf:deploy` 都会先自动执行 `cf:config`。未配置 `.env` 时生成的文件保留占位符：本地 miniflare 可正常启动，`wrangler deploy` 会因资源 ID 无效而明确失败，不会误指向其他资源。
 
@@ -105,10 +104,9 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 
 | 绑定 | 类型 | 用途 |
 | --- | --- | --- |
-| `DB` | D1 | 文集/文章 |
+| `DB` | D1 | 文集/文章 + 登录限流（`login_attempts` 表原子计数） |
 | `IMAGES` | R2 | 上传图片 |
 | `SESSION` | KV | 登录会话 |
-| `RATE_LIMIT` | KV | 登录限流 |
 | `ASSETS` | Static Assets | `dist/client` 静态资源（含合并后的 admin SPA） |
 | vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
 
@@ -150,4 +148,4 @@ npx wrangler secret put BLOG_SESSION_SECRET
 
 - 迁移：`db/migrations/`，本地用 `npm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
 - 种子：`db/seed.sql`（仅本地演示用）
-- 文章 `slug` 全局唯一；删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径）
+- 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀

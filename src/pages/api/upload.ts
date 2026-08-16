@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { json, requireAuth } from '../../lib/auth';
 import { envOf } from '../../lib/db';
+import { publicBase } from '../../lib/utils';
 import { detectImageType, EXT_BY_TYPE, type AllowedImageType } from '../../lib/upload';
 
 export const prerender = false;
@@ -40,6 +41,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
     httpMetadata: { contentType: type },
   });
 
-  const base = env.R2_PUBLIC_URL;
+  const base = publicBase(env.R2_PUBLIC_URL ?? '');
   return json({ url: base ? `${base}/${key}` : `/api/files/${key}`, key }, 201);
 }

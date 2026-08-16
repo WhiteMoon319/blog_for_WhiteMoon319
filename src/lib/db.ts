@@ -233,9 +233,46 @@ export async function updateCollection(db: D1Database, id: number, patch: Collec
 }
 
 export async function deleteCollection(db: D1Database, id: number): Promise<boolean> {
-  await db.prepare(`UPDATE posts SET collection_id = NULL WHERE collection_id = ?`).bind(id).run();
-  const res = await db.prepare(`DELETE FROM collections WHERE id = ?`).bind(id).run();
-  return (res.meta.changes ?? 0) > 0;
+  const members = await db
+    .prepare('SELECT id, slug FROM posts WHERE collection_id = ? ORDER BY created_at DESC, id DESC')
+    .bind(id)
+    .all<{ id: number; slug: string }>();
+  const rows = members.results ?? [];
+
+  const stmts: D1PreparedStatement[] = [];
+  if (rows.length > 0) {
+    const taken = new Set(
+      (await db.prepare('SELECT slug FROM posts WHERE collection_id IS NULL').all<{ slug: string }>()).results?.map(
+        (r) => r.slug,
+      ) ?? [],
+    );
+    // 转未分类后 slug 必须保持全局唯一：按 (created_at DESC, id DESC) 依次分配最小空闲后缀，
+    // 与 URL 解析的「保留最新一篇」规则一致，冲突行获得 slug-2/slug-3…。
+    const assigned = new Map<number, string>();
+    for (const row of rows) {
+      let candidate = row.slug;
+      let n = 2;
+      while (taken.has(candidate)) {
+        candidate = `${row.slug}-${n}`;
+        n++;
+      }
+      taken.add(candidate);
+      assigned.set(row.id, candidate);
+    }
+    for (const row of rows) {
+      stmts.push(
+        db
+          .prepare(`UPDATE posts SET collection_id = NULL, slug = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(assigned.get(row.id)!, row.id),
+      );
+    }
+  } else {
+    stmts.push(db.prepare('UPDATE posts SET collection_id = NULL WHERE collection_id = ?').bind(id));
+  }
+  stmts.push(db.prepare('DELETE FROM collections WHERE id = ?').bind(id));
+  const results = await db.batch(stmts);
+  const last = results[results.length - 1];
+  return (last.meta.changes ?? 0) > 0;
 }
 
 /* ===== 文章 CRUD ===== */
@@ -251,23 +288,29 @@ export interface PostInput {
 }
 
 export async function createPost(db: D1Database, data: PostInput): Promise<PostRow | null> {
-    const res = await db
-      .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      )
-      .bind(
-        data.collection_id ?? null,
-        data.title,
-        data.slug,
-        data.summary ?? '',
-        data.content_md ?? '',
-        data.cover_url ?? '',
-        data.status ?? 'draft',
-      )
-      .first<PostRow>();
-    if (res) await insertPostVersion(db, res.id, res, '创建');
-    return res ?? null;
+    const results = await db.batch([
+      db
+        .prepare(
+          `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        )
+        .bind(
+          data.collection_id ?? null,
+          data.title,
+          data.slug,
+          data.summary ?? '',
+          data.content_md ?? '',
+          data.cover_url ?? '',
+          data.status ?? 'draft',
+        ),
+      db
+        .prepare(
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+           SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, '创建'
+           FROM posts WHERE id = (SELECT MAX(id) FROM posts)`,
+        ),
+    ]);
+    return results[0].results?.[0] as PostRow | undefined ?? null;
   }
 
 const POST_FIELDS = [
@@ -299,12 +342,22 @@ export async function updatePost(
     if (changed.length === 0) return current;
     const sets = changed.map((k) => `${k} = ?`).join(', ');
     const values = changed.map((k) => patch[k as keyof PostPatch]);
-    const res = await db
-      .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? RETURNING *`)
-      .bind(...values, id)
-      .first<PostRow>();
-    if (res) await insertPostVersion(db, id, res, versionMessage ?? '自动保存');
-    return res ?? null;
+    // 文章更新与版本留档放入同一个 D1 事务（batch 原子执行）：
+    // 版本写入失败时文章更新一并回滚；版本号由同一事务内 MAX(version)+1 计算，写事务串行化保证不冲突。
+    const results = await db.batch([
+      db
+        .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? RETURNING *`)
+        .bind(...values, id),
+      db
+        .prepare(
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+           SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+                  title, slug, collection_id, summary, content_md, cover_url, status, ?
+           FROM posts WHERE id = ?`,
+        )
+        .bind(id, id, versionMessage ?? '自动保存', id),
+    ]);
+    return results[0].results?.[0] as PostRow | undefined ?? null;
   }
 
 export async function deletePost(db: D1Database, id: number): Promise<boolean> {
@@ -327,36 +380,6 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
     status: 'draft' | 'published';
     message: string;
     created_at: string;
-  }
-
-  async function insertPostVersion(
-    db: D1Database,
-    postId: number,
-    row: PostRow,
-    message: string,
-  ): Promise<void> {
-    const next = await db
-      .prepare(`SELECT COALESCE(MAX(version), 0) + 1 AS v FROM post_versions WHERE post_id = ?`)
-      .bind(postId)
-      .first<{ v: number }>();
-    await db
-      .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        postId,
-        next?.v ?? 1,
-        row.title,
-        row.slug,
-        row.collection_id,
-        row.summary,
-        row.content_md,
-        row.cover_url,
-        row.status,
-        message,
-      )
-      .run();
   }
 
   export async function listPostVersions(
@@ -408,7 +431,8 @@ export async function listPosts(
     args.push(opts.limit);
   }
   if (opts.offset) {
-    sql += ' OFFSET ?';
+    // SQLite 不允许无 LIMIT 的 OFFSET：无 limit 时用 LIMIT -1（表示不限条数）
+    sql += opts.limit ? ' OFFSET ?' : ' LIMIT -1 OFFSET ?';
     args.push(opts.offset);
   }
   return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);

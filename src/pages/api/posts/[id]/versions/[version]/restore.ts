@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getPostVersion, updatePost, isSlugConflict } from '../../../../../../lib/db';
+import { envOf, getPostById, getPostVersion, getCollectionById, updatePost, isSlugConflict } from '../../../../../../lib/db';
 import { json, requireAuth } from '../../../../../../lib/auth';
 
 export const prerender = false;
@@ -21,6 +21,14 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const ver = await getPostVersion(env.DB, id, version);
   if (!ver) return json({ error: 'version not found' }, 404);
 
+  // 历史版本指向的文集可能已被删除：降级为未分类（collection_id = NULL），
+  // 避免外键错误冒泡成 500。
+  let targetCollection = ver.collection_id;
+  if (targetCollection !== null) {
+    const col = await getCollectionById(env.DB, targetCollection);
+    if (!col) targetCollection = null;
+  }
+
   try {
     const updated = await updatePost(
       env.DB,
@@ -28,7 +36,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       {
         title: ver.title,
         slug: ver.slug,
-        collection_id: ver.collection_id,
+        collection_id: targetCollection,
         summary: ver.summary,
         content_md: ver.content_md,
         cover_url: ver.cover_url,

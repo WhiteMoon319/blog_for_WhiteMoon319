@@ -17,7 +17,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const env = await envOf();
-  const attempt = await consumeLoginAttempt(env, clientIp(ctx.request));
+  const attempt = await consumeLoginAttempt(env.DB, clientIp(ctx.request), {
+    max: env.LOGIN_RATE_LIMIT_MAX,
+    windowSec: env.LOGIN_RATE_LIMIT_WINDOW,
+  });
   if (!attempt.ok) {
     return new Response(JSON.stringify({ error: 'too many attempts, try again later' }), {
       status: 429,

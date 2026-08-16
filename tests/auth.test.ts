@@ -8,7 +8,6 @@ function mockEnv(): Env {
   return {
     DB: {} as D1Database,
     IMAGES: {} as R2Bucket,
-    RATE_LIMIT: {} as KVNamespace,
     SITE_NAME: '测试',
     SITE_SLOGAN: '',
     SITE_POEM: '',

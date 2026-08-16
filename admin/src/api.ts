@@ -79,7 +79,7 @@ export const api = {
           status?: 'draft' | 'published';
         }>;
       }) =>
-    request<{ ok: boolean; count: number; results?: Array<{ ok: boolean; error?: string; post?: Post }> }>(
+    request<{ ok: boolean; count?: number; results?: Array<{ ok: boolean; error?: string; post?: Post }> }>(
       '/api/posts/batch',
       {
         method: 'POST',

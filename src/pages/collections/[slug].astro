@@ -36,7 +36,7 @@ const posts = await listPublishedPosts(env.DB, {
       <h1>{collection.title}</h1>
       {collection.summary && <p class="lead">{collection.summary}</p>}
       <div class="facts">
-        <span>{posts.length} 篇</span>
+        <span>{total} 篇</span>
         <span>序 {collection.sort_order}</span>
       </div>
     </div>

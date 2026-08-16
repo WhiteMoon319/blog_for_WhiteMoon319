@@ -30,3 +30,8 @@ export function postHref(slug: string, collectionSlug?: string | null): string {
     ? `/collections/${encodeURI(collectionSlug)}/${encodeURI(slug)}/`
     : `/posts/${encodeURI(slug)}/`;
 }
+
+/** R2 公共访问基地址：去掉首尾空白与末尾斜杠，避免拼出双斜杠 URL */
+export function publicBase(raw: string): string {
+  return raw.trim().replace(/\/+$/, '');
+}

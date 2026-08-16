@@ -99,10 +99,10 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
   }
   busy.value = true;
   try {
-    const { count } = await api.batchPosts({
+    const { count = 0 } = await api.batchPosts({
       action,
       ids,
-      collection_id: action === 'move' ? moveCol.value : undefined,
+      collection_id: action === 'move' ? (moveCol.value === '' ? null : moveCol.value) : undefined,
     });
     selected.value = new Set();
     emit('notify', `已处理 ${count} 篇`);

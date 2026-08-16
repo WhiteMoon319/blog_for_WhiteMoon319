@@ -72,8 +72,22 @@ export async function listPublishedPosts(
 
 export async function getPublishedPostBySlug(db: D1Database, slug: string): Promise<PostRow | null> {
   return db
-    .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published'`)
+    .prepare(
+      `SELECT * FROM posts WHERE slug = ? AND status = 'published' AND collection_id IS NULL
+       ORDER BY created_at DESC, id DESC LIMIT 1`,
+    )
     .bind(slug)
+    .first<PostRow>();
+}
+
+export async function getPublishedPostInCollection(
+  db: D1Database,
+  collectionId: number,
+  slug: string,
+): Promise<PostRow | null> {
+  return db
+    .prepare(`SELECT * FROM posts WHERE collection_id = ? AND slug = ? AND status = 'published'`)
+    .bind(collectionId, slug)
     .first<PostRow>();
 }
 

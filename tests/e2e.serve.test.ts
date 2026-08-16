@@ -85,6 +85,7 @@ async function boot(): Promise<void> {
             SITE_SLOGAN: { type: 'json', value: '一角书斋' },
             SITE_POEM: { type: 'json', value: '晨起摊书卷。' },
             SITE_URL: { type: 'json', value: 'http://e2e.test' },
+            SITE_URL: { type: 'json', value: 'http://e2e.test' },
             BLOG_ADMIN_PASSWORD: { type: 'json', value: 'admin123' },
             BLOG_SESSION_SECRET: { type: 'json', value: 'e2e-secret-0123456789abcdef0123456789abcdef' },
             R2_PUBLIC_URL: { type: 'json', value: '' },
@@ -96,7 +97,7 @@ async function boot(): Promise<void> {
     ],
   });
   const db = await mf.getD1Database('DB');
-  for (const file of ['0001_init.sql', '0002_view_count.sql']) {
+  for (const file of readdirSync(resolve('db/migrations')).filter((f) => f.endsWith('.sql')).sort()) {
     for (const stmt of readStatements(`db/migrations/${file}`)) {
       await db.prepare(stmt).run();
     }
@@ -183,7 +184,7 @@ test('e2e：首页渲染文集与最新文章', async () => {
 
 test('e2e：草稿文章对游客 302 至 /404', async () => {
   if (!HAS_BUILD) return;
-  const res = await get('/posts/draft-post/');
+  const res = await get('/collections/essays/draft-post/');
   assert.equal(res.status, 302);
   assert.ok(String(res.headers.get('location')).includes('/404'));
 });
@@ -271,8 +272,8 @@ test('e2e：文章页 TOC 锚点与相邻导航', async () => {
   assert.ok(html2.includes('/collections/essays/first-post/'), '相邻链接应正确');
 
   const legacy = await get('/posts/astro-on-cloudflare/');
-  assert.equal(legacy.status, 301, '旧路径应 301 到新结构');
-  assert.ok(String(legacy.headers.get('location')).includes('/collections/tech/astro-on-cloudflare/'));
+  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
+  assert.ok(String(legacy.headers.get('location')).includes('/404'));
 });
 
 test('e2e：slug 校验与重复 slug', async () => {
@@ -309,8 +310,8 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
   const postId = postBody.post.id as number;
 
   const legacy = await get('/posts/e2e-post/');
-  assert.equal(legacy.status, 301, '旧路径应 301 到新结构');
-  assert.ok(String(legacy.headers.get('location')).includes('/collections/test-col/e2e-post/'));
+  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
+  assert.ok(String(legacy.headers.get('location')).includes('/404'));
 
   const page = await get('/collections/test-col/e2e-post/');
   assert.equal(page.status, 200);
@@ -463,4 +464,29 @@ test('e2e：文章页阅读量递增并展示', async () => {
   const m2 = (await second.text()).match(/阅 (\d+)/);
   assert.ok(m2);
   assert.ok(Number(m2[1]) > Number(m1[1]), '再次访问阅读数应递增');
+});
+
+test('e2e：slug 文集内唯一——跨文集可同名，旧路径 302 至 /404', async () => {
+  if (!HAS_BUILD) return;
+  const a = await post('/api/posts', { title: '同名甲', slug: 'same-name', collection_id: 1, status: 'published' });
+  const b = await post('/api/posts', { title: '同名乙', slug: 'same-name', collection_id: 2, status: 'published' });
+  assert.equal(a.status, 201, '文集 1 内可用 same-name');
+  assert.equal(b.status, 201, '文集 2 内可复用 same-name');
+
+  const pageA = await get('/collections/essays/same-name/');
+  assert.equal(pageA.status, 200);
+  assert.ok((await pageA.text()).includes('同名甲'), '文集 1 路径应指向自己的文章');
+
+  const pageB = await get('/collections/tech/same-name/');
+  assert.equal(pageB.status, 200);
+  assert.ok((await pageB.text()).includes('同名乙'), '文集 2 路径应指向自己的文章');
+
+  const legacy = await get('/posts/same-name/');
+  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
+  assert.ok(String(legacy.headers.get('location')).includes('/404'));
+
+  const dup = await post('/api/posts', { title: '同名丙', slug: 'same-name', collection_id: 1, status: 'published' });
+  assert.equal(dup.status, 409, '同一文集内重复 slug 应 409');
+  await del(`/api/posts/${(await a.json()).post.id}`);
+  await del(`/api/posts/${(await b.json()).post.id}`);
 });

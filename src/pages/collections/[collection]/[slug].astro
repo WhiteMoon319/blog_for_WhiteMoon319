@@ -1,15 +1,15 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { envOf, getCollectionBySlug, getPublishedPostBySlug, getAdjacentPosts, incrementViewCount, fmtDate } from '../../../lib/db';
+import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, fmtDate } from '../../../lib/db';
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
 const collection = collectionSlug ? await getCollectionBySlug(env.DB, collectionSlug) : null;
-const post = slug ? await getPublishedPostBySlug(env.DB, slug) : null;
+const post = collection && slug ? await getPublishedPostInCollection(env.DB, collection.id, slug) : null;
 
-if (!collection || !post || post.collection_id !== collection.id) {
+if (!collection || !post) {
   return Astro.redirect('/404');
 }
 

@@ -322,3 +322,31 @@ test('集内文章排序：post_order 控制旧在前（asc）或新在前（des
     '博客集应最新在前',
   );
 });
+
+test('并发创建：版本必须挂在各自文章上，不得错配', async () => {
+  const created = await Promise.all(
+    Array.from({ length: 5 }, (_, i) =>
+      createPost(db, { title: `并发-${i}`, slug: `conc-${i}`, content_md: '正文', status: 'draft' }),
+    ),
+  );
+  assert.ok(created.every((p) => p), '五篇都应创建成功');
+  const ids = created.map((p) => p!.id);
+  assert.equal(new Set(ids).size, 5, 'id 不得重复');
+
+  const versions = await db
+    .prepare(`SELECT post_id, title FROM post_versions ORDER BY post_id`)
+    .all<{ post_id: number; title: string }>();
+  const byPost = new Map<number, { title: string; count: number }>();
+  for (const v of versions.results ?? []) {
+    byPost.set(v.post_id, {
+      title: v.title,
+      count: (byPost.get(v.post_id)?.count ?? 0) + 1,
+    });
+  }
+  for (const p of created) {
+    const v = byPost.get(p!.id);
+    assert.ok(v, '每篇都应有初始版本');
+    assert.equal(v!.count, 1, '每篇恰好一个初始版本');
+    assert.equal(v!.title, p!.title, '版本必须挂在本篇自己名下');
+  }
+});

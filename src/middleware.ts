@@ -11,7 +11,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const response = await next();
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-    headers.set(name, value);
+    if (!headers.has(name)) headers.append(name, value);
   }
   return new Response(response.body, {
     status: response.status,

@@ -128,18 +128,37 @@ export async function getPublishedPostInCollection(
     .first<PostRow>();
 }
 
+function escapeFtsPhrase(query: string): string {
+  return `"${query.replace(/"/g, '""')}"`;
+}
+
 export async function searchPublishedPosts(
   db: D1Database,
   q: string,
   limit = 50,
 ): Promise<PostRow[]> {
+  const query = q.trim();
+  if (!query) return [];
+  // FTS5（trigram 分词）索引命中；仅支持 ≥3 字符的短语，短词回退 LIKE
+  if (query.length >= 3) {
+    const rows = await db
+      .prepare(
+        `SELECT p.* FROM posts_fts JOIN posts p ON p.id = posts_fts.rowid
+         WHERE posts_fts MATCH ? AND p.status = 'published'
+         ORDER BY bm25(posts_fts, 5, 2, 1), p.created_at DESC LIMIT ?`,
+      )
+      .bind(escapeFtsPhrase(query), limit)
+      .all<PostRow>()
+      .catch(() => null);
+    if (rows && (rows.results ?? []).length > 0) return rows.results ?? [];
+  }
   return db
     .prepare(
       `SELECT * FROM posts
        WHERE status = 'published' AND (title LIKE ? OR summary LIKE ? OR content_md LIKE ?)
        ORDER BY created_at DESC LIMIT ?`,
     )
-    .bind(`%${q}%`, `%${q}%`, `%${q}%`, limit)
+    .bind(`%${query}%`, `%${query}%`, `%${query}%`, limit)
     .all<PostRow>()
     .then((r) => r.results ?? []);
 }
@@ -336,7 +355,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         .prepare(
           `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
            SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, '创建'
-           FROM posts WHERE id = (SELECT MAX(id) FROM posts)`,
+           FROM posts WHERE id = last_insert_rowid()`,
         ),
     ]);
     return results[0].results?.[0] as PostRow | undefined ?? null;

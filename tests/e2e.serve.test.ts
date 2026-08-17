@@ -35,6 +35,13 @@ function readStatements(file: string): string[] {
       continue;
     }
     if (ch === ';' && !inStr) {
+      // 触发器 BEGIN…END 体内含分号，未闭合前不切分
+      const begins = (cur.match(/\bBEGIN\b/gi) ?? []).length;
+      const ends = (cur.match(/\bEND\b/gi) ?? []).length;
+      if (begins > ends) {
+        cur += ch;
+        continue;
+      }
       const s = cur
         .split('\n')
         .filter((l) => !/^\s*--/.test(l))

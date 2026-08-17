@@ -191,7 +191,8 @@ const active = names.length > 0;
 </style>
 
 <script>
-  // 文集卡开合动画：JS 生效时用高度过渡（无 JS 时 details 原生展开兜底）
+  // 文集卡开合动画：JS 生效时用高度过渡（无 JS 时 details 原生展开兜底）。
+  // 全程保持具体 px 值——一旦写成 auto，auto→px 不可过渡，后续开合会失效。
   for (const details of document.querySelectorAll<HTMLDetailsElement>('details.collection-block')) {
     const inner = details.querySelector<HTMLElement>('.collection-anim');
     if (!inner) continue;
@@ -209,7 +210,14 @@ const active = names.length > 0;
       }
     });
     inner.addEventListener('transitionend', () => {
-      if (details.open) inner.style.height = 'auto';
+      if (details.open) inner.style.height = `${inner.scrollHeight}px`;
     });
   }
+  // 窗口尺寸变化后重算已展开卡片的展开高度，避免内容被裁剪
+  window.addEventListener('resize', () => {
+    for (const details of document.querySelectorAll<HTMLDetailsElement>('details.collection-block[open]')) {
+      const inner = details.querySelector<HTMLElement>('.collection-anim');
+      if (inner) inner.style.height = `${inner.scrollHeight}px`;
+    }
+  });
 </script>

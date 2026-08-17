@@ -26,15 +26,11 @@ const active = names.length > 0;
         return (
           <details class="collection-block reveal" data-delay={String((i % 3) + 1)}>
             <summary>
-              <div class="collection-summary">
-                <span class="post-tag">{c.title}</span>
+              <div class="collection-title-row">
                 <h3 class="post-title">{c.title}</h3>
-                {c.summary && <p class="post-summary">{c.summary}</p>}
-                <div class="post-meta">
-                  <span>{c.post_count} 篇</span>
-                  {active && <span class="tag-chip-inline">{names.join(' / ')}</span>}
-                </div>
+                <span class="collection-meta">{c.post_count} 篇{active ? ` · ${names.join(' / ')}` : ''}</span>
               </div>
+              {c.summary && <p class="post-summary">{c.summary}</p>}
             </summary>
             {members.length > 0 && (
               <ul class="collection-members">
@@ -87,17 +83,17 @@ const active = names.length > 0;
 
 <style>
   .tag-collections {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    max-width: 720px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    max-width: 1080px;
     margin: 0 auto;
   }
   .collection-block {
     background: var(--paper-card);
     border: 1px solid var(--hairline);
     border-radius: var(--radius-lg);
-    padding: 20px 24px;
+    padding: 16px 20px;
     transition: border-color 0.2s ease;
   }
   .collection-block:hover {
@@ -107,6 +103,8 @@ const active = names.length > 0;
     cursor: pointer;
     list-style: none;
     user-select: none;
+    padding-left: 1.2em;
+    position: relative;
   }
   .collection-block summary::-webkit-details-marker {
     display: none;
@@ -114,7 +112,8 @@ const active = names.length > 0;
   .collection-block summary::before {
     content: '▸';
     position: absolute;
-    margin-left: -1.2em;
+    left: 0;
+    top: 0.15em;
     color: var(--cc, var(--cinnabar));
     transition: transform 0.2s ease;
   }
@@ -123,6 +122,31 @@ const active = names.length > 0;
   }
   .collection-block summary:hover .post-title {
     color: var(--cc, var(--cinnabar));
+  }
+  .collection-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .collection-title-row .post-title {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .collection-meta {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+  .collection-title-row + .post-summary {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--ink-mid);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .collection-members {
     margin: 14px 0 0;
@@ -156,9 +180,5 @@ const active = names.length > 0;
     font-size: 0.75rem;
     color: var(--ink-light);
     white-space: nowrap;
-  }
-  .tag-chip-inline {
-    font-size: 0.75rem;
-    opacity: 0.75;
   }
 </style>

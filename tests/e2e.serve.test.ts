@@ -589,6 +589,21 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   assert.equal(missingTag.status, 200);
   assert.ok((await missingTag.text()).includes('尚未建立'), '未创建的标签给出空态提示');
 
+  const halfMissing = await get(`/search/?q=${encodeURIComponent(`#不存在的标签XYZ #${tagName}`)}`);
+  assert.equal(halfMissing.status, 200, '任一标签不存在都不转跳');
+  assert.ok((await halfMissing.text()).includes('尚未建立'), '提示指向缺失的标签');
+
+  const missingNoSideEffect = await get(`/search/?q=${encodeURIComponent('#不存在的标签XYZ')}`);
+  assert.equal(missingNoSideEffect.status, 200);
+  assert.ok((await missingNoSideEffect.text()).includes('尚未建立'), '查询本身不转跳、不创建');
+  const cloudAfter = await get('/tags/');
+  assert.ok(!(await cloudAfter.text()).includes('不存在的标签XYZ'), '标签云未出现被查询过的空标签');
+  const ghostInline = await get(`/tags/?t=${encodeURIComponent('不存在的标签XYZ')}`);
+  assert.equal(ghostInline.status, 200);
+  const ghostHtml = await ghostInline.text();
+  assert.ok(ghostHtml.includes('尚无著作'), '直接访问未知标签内联页给空态，不落入全部浏览');
+  assert.ok(!ghostHtml.includes('<details class="collection-block'), '未知标签不渲染任何文集卡');
+
   const inTagSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName} 章甲`)}`);
   assert.equal(inTagSearch.status, 302, '「#标签 关键词」应转标签内联页');
   assert.ok(

@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { envOf, searchPublishedPosts, getCollectionsByIds, getTagPage, fmtDate } from '../lib/db';
+import { envOf, searchPublishedPosts, getCollectionsByIds, findTagIds, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -8,8 +8,8 @@ export const prerender = false;
 const env = await envOf();
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
 
-// 「#标签1 #标签2 关键词」为标签检索：# 前缀词均为标签（多标签并集），其余 token 为标签内关键词。
-// 例：#校园 → 校园；#校园 #恋爱 → 校园∪恋爱；#校园 庄桂清 → 校园内寻「庄桂清」。
+// 「#标签1 #标签2 关键词」为标签检索：# 前缀词均为标签（多标签交集），其余 token 为标签内关键词。
+// 例：#校园 → 校园；#校园 #恋爱 → 校园∩恋爱；#校园 庄桂清 → 校园内寻「庄桂清」。
 // 无任何 # 标签词时按普通全文检索处理。
 const tagNames: string[] = [];
 const keywordTokens: string[] = [];
@@ -26,14 +26,22 @@ let tagMode = false;
 let tagNotFound = '';
 if (tagNames.length > 0) {
   tagMode = true;
-  const page = await getTagPage(env.DB, tagNames[0]!, tagKeyword);
-  if (page) {
+  // 校验全部标签：任何一个不存在都不转跳（findTagIds 只读，不产生副作用）
+  let missing = '';
+  for (const n of tagNames) {
+    const ids = await findTagIds(env.DB, [n]);
+    if (ids.length === 0) {
+      missing = n;
+      break;
+    }
+  }
+  if (!missing) {
     const params = new URLSearchParams();
     tagNames.forEach((n) => params.append('t', n));
     if (tagKeyword) params.set('q', tagKeyword);
     return Astro.redirect(`/tags/?${params.toString()}`);
   }
-  tagNotFound = tagNames[0]!;
+  tagNotFound = missing;
 }
 
 const posts = q ? await searchPublishedPosts(env.DB, q) : [];

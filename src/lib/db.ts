@@ -528,10 +528,18 @@ function cleanTagNames(names: string[]): string[] {
   return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
 }
 
+// 写路径用：按名解析标签 id，不存在的直接创建（管理端打标签）
 async function resolveTagIds(db: D1Database, names: string[]): Promise<number[]> {
   const unique = cleanTagNames(names);
   if (unique.length === 0) return [];
   await db.batch(unique.map((n) => db.prepare('INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO NOTHING').bind(n)));
+  return findTagIds(db, unique);
+}
+
+// 读路径用：只查不写，未创建的标签不产生任何副作用
+export async function findTagIds(db: D1Database, names: string[]): Promise<number[]> {
+  const unique = cleanTagNames(names);
+  if (unique.length === 0) return [];
   const rows = await db
     .prepare(`SELECT id FROM tags WHERE name IN (${unique.map(() => '?').join(',')})`)
     .bind(...unique)
@@ -669,7 +677,11 @@ export async function getTagsUnion(
   keyword = '',
 ): Promise<TagsUnionResult> {
   const unique = cleanTagNames(names);
-  const tagIds = unique.length > 0 ? await resolveTagIds(db, unique) : [];
+  const tagIds = unique.length > 0 ? await findTagIds(db, unique) : [];
+  // 指定了标签但一个都解析不到 → 明确返回空，而非落入「全部浏览」
+  if (unique.length > 0 && tagIds.length === 0) {
+    return { collections: [], posts: [], collectionPosts: new Map() };
+  }
   const kw = keyword.trim();
   const inList = tagIds.map(() => '?').join(',');
   const inArgs = tagIds;

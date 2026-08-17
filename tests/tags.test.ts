@@ -12,6 +12,7 @@ import {
   listAllTagCounts,
   getTagPage,
   getTagsUnion,
+  findTagIds,
   deletePost,
   deleteCollection,
   getTagByName,
@@ -159,6 +160,23 @@ test('标签：文集标签变更后继承即时生效（不落地复制）', as
     (await listPostEffectiveTags(db, p.id)).map((t) => t.name),
     ['继承试乙'],
   );
+});
+
+test('标签：只读查询不产生副作用——findTagIds/getTagsUnion 不创建标签，写路径仍按需创建', async () => {
+  const ghost = '从未存在的标签XYZ';
+  assert.equal(await getTagByName(db, ghost), null);
+
+  assert.deepEqual(await findTagIds(db, [ghost]), [], 'findTagIds 只读，不创建');
+  const union = await getTagsUnion(db, [ghost]);
+  assert.deepEqual(union.collections, [], '未知标签不落入「全部浏览」');
+  assert.deepEqual(union.posts, []);
+  assert.deepEqual([...union.collectionPosts.keys()], []);
+  assert.equal(await getTagByName(db, ghost), null, '多标签查询后仍无该标签');
+
+  const p = await createPost(db, { title: '散篇庚', slug: 'tu-ghost', content_md: '', status: 'published' });
+  assert.ok(p);
+  await setPostOwnTags(db, p.id, [ghost]);
+  assert.ok(await getTagByName(db, ghost), '写路径（打标签）才会创建');
 });
 
 test('标签：多标签交集——同时具备全部选中标签才命中，覆盖规则不变', async () => {

@@ -33,16 +33,18 @@ const active = names.length > 0;
               {c.summary && <p class="post-summary">{c.summary}</p>}
             </summary>
             {members.length > 0 && (
-              <ul class="collection-members">
-                {members.map((p) => (
-                  <li>
-                    <a href={postHref(p.slug, p.collection_slug)}>
-                      {p.title}
-                      <span class="member-date">{fmtDate(p.created_at)}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <div class="collection-anim">
+                <ul class="collection-members">
+                  {members.map((p) => (
+                    <li>
+                      <a href={postHref(p.slug, p.collection_slug)}>
+                        {p.title}
+                        <span class="member-date">{fmtDate(p.created_at)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </details>
         );
@@ -148,6 +150,11 @@ const active = names.length > 0;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .collection-anim {
+    overflow: hidden;
+    height: 0;
+    transition: height 0.3s ease;
+  }
   .collection-members {
     margin: 14px 0 0;
     padding: 12px 0 0;
@@ -182,3 +189,27 @@ const active = names.length > 0;
     white-space: nowrap;
   }
 </style>
+
+<script>
+  // 文集卡开合动画：JS 生效时用高度过渡（无 JS 时 details 原生展开兜底）
+  for (const details of document.querySelectorAll<HTMLDetailsElement>('details.collection-block')) {
+    const inner = details.querySelector<HTMLElement>('.collection-anim');
+    if (!inner) continue;
+    if (!details.open) inner.style.height = '0px';
+    details.addEventListener('toggle', () => {
+      if (details.open) {
+        const target = inner.scrollHeight;
+        inner.style.height = '0px';
+        void inner.offsetHeight;
+        inner.style.height = `${target}px`;
+      } else {
+        inner.style.height = `${inner.scrollHeight}px`;
+        void inner.offsetHeight;
+        inner.style.height = '0px';
+      }
+    });
+    inner.addEventListener('transitionend', () => {
+      if (details.open) inner.style.height = 'auto';
+    });
+  }
+</script>

@@ -1,12 +1,33 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { envOf, searchPublishedPosts, getCollectionsByIds, fmtDate } from '../lib/db';
+import { envOf, searchPublishedPosts, getCollectionsByIds, getTagPage, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
 
 const env = await envOf();
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
+
+// 「#标签 [关键词]」为标签检索：#校园 → 转标签聚合页；#校园 庄桂清 → 在标签内按关键词寻章；
+// 仅带 #、无此标签或未指定标签时按普通检索处理
+let tagMode = false;
+let tagNotFound = '';
+if (q.startsWith('#') && q.length > 1) {
+  const rest = q.slice(1).trim();
+  const splitAt = rest.search(/\s/);
+  const tagName = (splitAt === -1 ? rest : rest.slice(0, splitAt)).trim();
+  const keyword = splitAt === -1 ? '' : rest.slice(splitAt + 1).trim();
+  if (tagName) {
+    tagMode = true;
+    const page = await getTagPage(env.DB, tagName, keyword);
+    if (page) {
+      const target = `/tags/${encodeURIComponent(tagName)}/${keyword ? `?q=${encodeURIComponent(keyword)}` : ''}`;
+      return Astro.redirect(target);
+    }
+    tagNotFound = tagName;
+  }
+}
+
 const posts = q ? await searchPublishedPosts(env.DB, q) : [];
 const collections = await getCollectionsByIds(env.DB, posts.map((p) => p.collection_id ?? 0));
 const results: { post: (typeof posts)[number]; collection: { slug: string; title: string; theme_color: string } | null }[] = [];
@@ -38,10 +59,17 @@ for (const post of posts) {
       />
       <button class="btn btn-primary" type="submit">寻</button>
     </form>
+    <p class="section-lead reveal in" style="text-align:center;font-size:0.8rem;margin-top:10px;opacity:0.65;">
+      以「#」开头的词检索标签：「#校园」览全标签，「#校园 庄桂清」在标签内寻章；其余照常寻章。
+    </p>
 
     {
       q ? (
-        results.length > 0 ? (
+        tagMode && tagNotFound ? (
+          <p class="section-lead reveal in" style="text-align:center;">
+            标签「{tagNotFound}」尚未建立。<a href="/tags/">览全部标签 →</a>
+          </p>
+        ) : results.length > 0 ? (
           <div class="posts-grid" style="margin-top:32px;">
             {results.map(({ post, collection }, i) => (
               <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(post.slug, collection?.slug)} style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}>

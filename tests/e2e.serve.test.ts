@@ -550,6 +550,35 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   assert.equal(chapter.status, 200);
   assert.ok((await chapter.text()).includes(tagName), '章节页展示继承的文集标签');
 
+  const tagSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName}`)}`);
+  assert.equal(tagSearch.status, 302, '「#标签」检索应转标签页');
+  assert.ok(
+    String(tagSearch.headers.get('location')).includes(`/tags/${encodeURIComponent(tagName)}/`),
+    '转跳到对应标签聚合页',
+  );
+
+  const plainSearch = await get(`/search/?q=${encodeURIComponent(tagName)}`);
+  assert.equal(plainSearch.status, 200, '不带 # 仍是普通全文检索');
+  assert.ok(!(await plainSearch.text()).includes('标引测试集'), '普通检索不出现标签页内容');
+
+  const missingTag = await get(`/search/?q=${encodeURIComponent('#不存在的标签XYZ')}`);
+  assert.equal(missingTag.status, 200);
+  assert.ok((await missingTag.text()).includes('尚未建立'), '未创建的标签给出空态提示');
+
+  const inTagSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName} 章甲`)}`);
+  assert.equal(inTagSearch.status, 302, '「#标签 关键词」应转标签页');
+  assert.ok(
+    String(inTagSearch.headers.get('location')).includes(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('章甲')}`),
+    '转跳地址携带标签内关键词',
+  );
+  const inTagPage = await get(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('章甲')}`);
+  assert.equal(inTagPage.status, 200);
+  const inTagHtml = await inTagPage.text();
+  assert.ok(inTagHtml.includes('标引章甲'), '标签内寻章能命中具体章节');
+  assert.ok(!inTagHtml.includes('标引散篇'), '不匹配的文章不出现');
+  const inTagMiss = await get(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('查无此词')}`);
+  assert.ok((await inTagMiss.text()).includes('未寻得'), '标签内无命中给出空态');
+
   const apiTags = await get('/api/tags');
   assert.equal(apiTags.status, 200);
   const apiTagsBody = await apiTags.json();

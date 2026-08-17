@@ -638,31 +638,61 @@ export interface TagPageResult {
   posts: PostWithCollection[];
 }
 
-// 标签页：带该标签的文集 + 自有该标签且未被文集卡覆盖的已发布文章
-export async function getTagPage(db: D1Database, name: string): Promise<TagPageResult | null> {
+// 标签页：带该标签的文集 + 自有该标签且未被文集卡覆盖的已发布文章。
+// 带 keyword 时按关键词过滤：文集按名/简介匹配；文章按名/摘要/正文匹配且放宽到章节级（含继承），
+// 以满足「在标签内寻章」（如 #校园 庄桂清、#校园 第01章）。
+export async function getTagPage(
+  db: D1Database,
+  name: string,
+  keyword = '',
+): Promise<TagPageResult | null> {
   const tag = await getTagByName(db, name);
   if (!tag) return null;
+  const kw = keyword.trim();
   const [collections, posts] = await Promise.all([
-    db
-      .prepare(
-        `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
-         FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
-         WHERE ct.tag_id = ? ORDER BY c.sort_order ASC, c.id ASC`,
-      )
-      .bind(tag.id)
-      .all<TagPageCollectionsRow>(),
-    db
-      .prepare(
-        `SELECT p.*, c.slug AS collection_slug FROM posts p JOIN post_tags pt ON pt.post_id = p.id
-         LEFT JOIN collections c ON c.id = p.collection_id
-         WHERE pt.tag_id = ? AND p.status = 'published'
-           AND NOT EXISTS (
-             SELECT 1 FROM collection_tags ct WHERE ct.tag_id = pt.tag_id AND ct.collection_id = p.collection_id
-           )
-         ORDER BY p.created_at DESC, p.id DESC`,
-      )
-      .bind(tag.id)
-      .all<PostWithCollection>(),
+    kw
+      ? db
+          .prepare(
+            `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
+             FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
+             WHERE ct.tag_id = ? AND (c.title LIKE ? OR c.summary LIKE ?)
+             ORDER BY c.sort_order ASC, c.id ASC`,
+          )
+          .bind(tag.id, `%${kw}%`, `%${kw}%`)
+          .all<TagPageCollectionsRow>()
+      : db
+          .prepare(
+            `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
+             FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
+             WHERE ct.tag_id = ? ORDER BY c.sort_order ASC, c.id ASC`,
+          )
+          .bind(tag.id)
+          .all<TagPageCollectionsRow>(),
+    kw
+      ? db
+          .prepare(
+            `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
+             LEFT JOIN collections c ON c.id = p.collection_id
+             LEFT JOIN post_tags pt ON pt.post_id = p.id
+             LEFT JOIN collection_tags ct ON ct.collection_id = p.collection_id
+             WHERE p.status = 'published' AND (pt.tag_id = ? OR ct.tag_id = ?)
+               AND (p.title LIKE ? OR p.summary LIKE ? OR p.content_md LIKE ?)
+             ORDER BY p.created_at DESC, p.id DESC`,
+          )
+          .bind(tag.id, tag.id, `%${kw}%`, `%${kw}%`, `%${kw}%`)
+          .all<PostWithCollection>()
+      : db
+          .prepare(
+            `SELECT p.*, c.slug AS collection_slug FROM posts p JOIN post_tags pt ON pt.post_id = p.id
+             LEFT JOIN collections c ON c.id = p.collection_id
+             WHERE pt.tag_id = ? AND p.status = 'published'
+               AND NOT EXISTS (
+                 SELECT 1 FROM collection_tags ct WHERE ct.tag_id = pt.tag_id AND ct.collection_id = p.collection_id
+               )
+             ORDER BY p.created_at DESC, p.id DESC`,
+          )
+          .bind(tag.id)
+          .all<PostWithCollection>(),
   ]);
   return { tag, collections: collections.results ?? [], posts: posts.results ?? [] };
 }

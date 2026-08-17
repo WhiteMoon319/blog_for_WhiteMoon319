@@ -284,6 +284,30 @@ test('e2e：文章页 TOC 锚点与相邻导航', async () => {
   assert.ok(String(legacy.headers.get('location')).includes('/404'));
 });
 
+test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', async () => {
+  if (!HAS_BUILD) return;
+  const colA = await post('/api/collections', { title: '邻集', slug: 'adj-col-a' });
+  assert.equal(colA.status, 201);
+  const colAId = (await colA.json()).collection.id as number;
+  for (const [title, slug] of [['邻一', 'adj-a-1'], ['邻二', 'adj-a-2'], ['邻三', 'adj-a-3']]) {
+    const r = await post('/api/posts', { collection_id: colAId, title, slug, content_md: '正文', status: 'published' });
+    assert.equal(r.status, 201);
+  }
+  const colB = await post('/api/collections', { title: '别集', slug: 'adj-col-b' });
+  assert.equal(colB.status, 201);
+  const colBId = (await colB.json()).collection.id as number;
+  const r = await post('/api/posts', { collection_id: colBId, title: '别一', slug: 'adj-b-1', content_md: '正文', status: 'published' });
+  assert.equal(r.status, 201);
+
+  const html = await (await get('/collections/adj-col-a/adj-a-2/')).text();
+  assert.ok(html.includes('/collections/adj-col-a/adj-a-1/'), '上一篇应为同文集邻一');
+  assert.ok(html.includes('/collections/adj-col-a/adj-a-3/'), '下一篇应为同文集邻三');
+  assert.ok(!html.includes('/collections/adj-col-b/'), '同文集存在时不应跨文集相邻');
+
+  const htmlB = await (await get('/collections/adj-col-b/adj-b-1/')).text();
+  assert.ok(htmlB.includes('/collections/adj-col-a/adj-a-3/'), '别集组内无文章，上一篇应回退为邻三');
+});
+
 test('e2e：slug 校验与重复 slug', async () => {
   if (!HAS_BUILD) return;
   const bad = await post('/api/collections', { title: '坏 slug', slug: '-bad-' });

@@ -1,13 +1,31 @@
-# 一角书斋 · blog
+# 月下独酌 · blog
 
-架在 Cloudflare 上的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写就，可分文集（合集），可发布/草稿切换。
+架在 Cloudflare 上的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写就，可分文集（合集），支持发布/草稿切换、版本历史与图片直传。
+
+## 功能
+
+**前台**
+
+- 首页：文集入口 + 最新文章（分页）
+- 文集页 / 文章页：按文集组织文章，旧路径自动 301 到新结构
+- 归档页（按时间轴）、关于页、站内搜索（`/search/`）
+- 阅读量统计、上一篇/下一篇相邻导航、`/rss.xml` 与 `/sitemap.xml` 动态生成
+- 古风水墨视觉风格：纸纹背景、印章、毛笔标题、朱砂强调色、深色模式
+
+**后台（`/admin`）**
+
+- 密码登录（HMAC 签名会话 Cookie + 登录限流）
+- 文集管理：新建/编辑/删除（名称、slug、简介、主题色）
+- 文章管理：Tiptap 富文本编辑器，Markdown ↔ HTML 双向转换，发布/草稿切换，版本历史与回滚
+- Word 文档（.docx）导入为 Markdown
+- 图片管理：拖拽直传 R2，媒体库浏览/删除，封面与正文插图
 
 ## 技术栈
 
-- **Astro 7**（`output: server`）+ **@astrojs/cloudflare** 适配器，SSR 运行在 **Cloudflare Workers**（非 Pages）
-- **Cloudflare D1**：文集与文章数据
+- **Astro 7**（`output: server`）+ **@astrojs/cloudflare** 适配器，SSR 运行在 **Cloudflare Workers**
+- **Cloudflare D1**：文集、文章、版本历史与登录限流数据
 - **Cloudflare R2**：上传图片
-- **Cloudflare KV**：`SESSION`（会话）；登录限流基于 D1 `login_attempts` 表的原子计数 upsert
+- **Cloudflare KV**：`SESSION` 登录会话
 - **Vue 3 + Vite**：`admin/` 管理端 SPA，构建后合并进 Worker 静态资源（`dist/client/admin`）
 - **marked + sanitize-html**：Markdown 渲染与 XSS 清洗
 - **miniflare + node:test**：本地 e2e 测试
@@ -15,16 +33,17 @@
 ## 目录结构
 
 ```
-admin/                  Vue 3 管理端 SPA（/admin/ 基路径）
+admin/                   Vue 3 管理端 SPA（/admin/ 基路径，Tiptap 编辑器）
+  src/views/             Login / Dashboard / Collections / Posts / Editor / Import / Media
 db/
-  migrations/            D1 迁移（0001_init.sql）
+  migrations/            D1 迁移（0001_init ~ 0007_login_attempts）
   seed.sql               本地演示种子数据
 scripts/
   cf-config.mjs          由模板 + .env 生成本地 wrangler.jsonc
   merge-admin.mjs        把 admin/dist 合并进 dist/client/admin
 src/
   pages/                 页面与 API 路由（见下方「路由」）
-  lib/                   db 访问、认证、Markdown、工具函数
+  lib/                   db 访问、认证、Markdown、限流、上传、工具函数
 tests/                   node:test 单测与 e2e（miniflare 跑构建产物）
 wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 .env.example             真实资源 ID 的填法示例（占位符，可提交）
@@ -37,10 +56,26 @@ wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 | `/` | 首页：文集与最新文章 |
 | `/collections/{collectionSlug}/` | 文集页 |
 | `/collections/{collectionSlug}/{postSlug}/` | 文章页（有文集的文章） |
-| `/posts/{postSlug}/` | 文章页（无文集的文章；有文集的旧路径访问会自动 301 到新结构） |
+| `/posts/{postSlug}/` | 文章页（无文集的文章；有文集的旧路径访问自动 301 到新结构） |
 | `/archive/`、`/about/` | 归档、关于 |
-| `/admin/...` | 管理端 SPA（posts / editor / collections / login） |
-| `/api/...` | 认证、文章、文集、上传、文件读取等 JSON API |
+| `/search/?q=` | 站内搜索 |
+| `/preview/{id}/` | 草稿预览（需登录，`noindex`） |
+| `/rss.xml`、`/sitemap.xml` | 订阅与站点地图（动态生成） |
+| `/admin/...` | 管理端 SPA（login / dashboard / posts / editor / collections / import / media） |
+| `/api/...` | 认证、文章、文集、版本、上传、媒体库等 JSON API |
+
+API 一览：
+
+| 方法 | 路径 | 用途 | 鉴权 |
+| --- | --- | --- | --- |
+| POST/GET | `/api/auth/login` `/logout` `/me` | 登录 / 注销 / 校验会话 | 登录 |
+| GET/POST | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}` | 文集 CRUD | 写需登录 |
+| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published） | 写需登录 |
+| POST | `/api/posts/batch` | 批量操作（如批量删除） | 登录 |
+| GET/POST | `/api/posts/{id}/versions`，GET/PUT `/api/posts/{id}/versions/{version}` | 版本历史与回滚 | 登录 |
+| POST | `/api/upload` | 图片上传 → R2（multipart） | 登录 |
+| GET/DELETE | `/api/media` | 媒体库列表 / 删除 R2 对象 | 登录 |
+| GET | `/api/files/[...key]` | R2 图片回源（带缓存头） | 公开 |
 
 ## 本地开发
 
@@ -77,7 +112,7 @@ npm run cf:dev -- --port 8788
 **本地 D1 初始化**（首次或换机器后，空库需要建表/种子）：
 
 ```bash
-npm run cf:db:local  # 应用 db/migrations/0001_init.sql + db/seed.sql 到本地 D1
+npm run cf:db:local  # 应用 db/migrations/*.sql + db/seed.sql 到本地 D1
 ```
 
 本地密钥（`BLOG_ADMIN_PASSWORD`、`BLOG_SESSION_SECRET` 等）放在根目录 `.dev.vars`（不入库）。
@@ -104,11 +139,11 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 
 | 绑定 | 类型 | 用途 |
 | --- | --- | --- |
-| `DB` | D1 | 文集/文章 + 登录限流（`login_attempts` 表原子计数） |
+| `DB` | D1 | 文集/文章/版本历史 + 登录限流（`login_attempts` 表原子计数） |
 | `IMAGES` | R2 | 上传图片 |
 | `SESSION` | KV | 登录会话 |
 | `ASSETS` | Static Assets | `dist/client` 静态资源（含合并后的 admin SPA） |
-| vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
+| vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
 
 ## 构建与测试
 
@@ -118,7 +153,7 @@ npm run typecheck      # astro check + vue-tsc
 npm test               # 单测 + e2e（需要先 npm run build）
 ```
 
-测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e 用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证、限流、草稿、URL 结构、相邻导航、Markdown 清洗、上传白名单等。
+测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e 用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证、限流、草稿、URL 结构、相邻导航、Markdown 清洗、上传白名单、版本回滚等。
 
 ## 部署
 
@@ -148,4 +183,5 @@ npx wrangler secret put BLOG_SESSION_SECRET
 
 - 迁移：`db/migrations/`，本地用 `npm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
 - 种子：`db/seed.sql`（仅本地演示用）
+- 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`login_attempts`（登录限流计数）
 - 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀

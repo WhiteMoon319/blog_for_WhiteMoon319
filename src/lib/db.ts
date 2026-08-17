@@ -176,14 +176,18 @@ export async function getAdjacentPosts(
   post: PostRow,
 ): Promise<{ prev: PostWithCollection | null; next: PostWithCollection | null }> {
   const base = `SELECT p.*, c.slug AS collection_slug FROM posts p LEFT JOIN collections c ON c.id = p.collection_id WHERE p.status = 'published'`;
-  const prev = await db
-    .prepare(`${base} AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`)
-    .bind(post.created_at, post.created_at, post.id)
-    .first<PostWithCollection>();
-  const next = await db
-    .prepare(`${base} AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`)
-    .bind(post.created_at, post.created_at, post.id)
-    .first<PostWithCollection>();
+  // 文集内优先：与当前篇同组（collection_id 一致，未分类彼此成组）的最近一篇；
+  // 组内没有才回退到全站时间线上的最近一篇。SQLite 的 IS 对 NULL 也成立，可覆盖未分类。
+  const scopedPrev = `${base} AND p.collection_id IS ? AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`;
+  const scopedNext = `${base} AND p.collection_id IS ? AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`;
+  const globalPrev = `${base} AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`;
+  const globalNext = `${base} AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`;
+  const prev =
+    (await db.prepare(scopedPrev).bind(post.collection_id, post.created_at, post.created_at, post.id).first<PostWithCollection>()) ??
+    (await db.prepare(globalPrev).bind(post.created_at, post.created_at, post.id).first<PostWithCollection>());
+  const next =
+    (await db.prepare(scopedNext).bind(post.collection_id, post.created_at, post.created_at, post.id).first<PostWithCollection>()) ??
+    (await db.prepare(globalNext).bind(post.created_at, post.created_at, post.id).first<PostWithCollection>());
   return { prev, next };
 }
 

@@ -56,7 +56,7 @@ export const api = {
 
   posts: (query = '') => request<{ posts: Post[] }>(`/api/posts?status=all${query}`),
 
-  post: (id: number) => request<{ post: Post }>(`/api/posts/${id}`),
+  post: (id: number) => request<{ post: Post; tags: Tag[] }>(`/api/posts/${id}`),
 
   createPost: (data: Partial<Post>) =>
     request<{ post: Post }>('/api/posts', { method: 'POST', body: JSON.stringify(data) }),

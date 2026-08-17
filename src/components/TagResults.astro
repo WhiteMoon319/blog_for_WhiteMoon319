@@ -1,0 +1,164 @@
+---
+import { envOf, getTagsUnion, fmtDate } from '../lib/db';
+import { postHref } from '../lib/utils';
+
+export const prerender = false;
+
+interface Props {
+  names: string[];
+  keyword?: string;
+}
+
+const { names, keyword = '' } = Astro.props;
+const env = await envOf();
+const result = await getTagsUnion(env.DB, names, keyword);
+const collections = result.collections;
+const posts = result.posts;
+const collectionPosts = result.collectionPosts;
+const active = names.length > 0;
+---
+
+{
+  collections.length > 0 && (
+    <div class="tag-collections">
+      {collections.map((c, i) => {
+        const members = collectionPosts.get(c.id) ?? [];
+        return (
+          <details class="collection-block reveal" data-delay={String((i % 3) + 1)}>
+            <summary>
+              <div class="collection-summary">
+                <span class="post-tag">{c.title}</span>
+                <h3 class="post-title">{c.title}</h3>
+                {c.summary && <p class="post-summary">{c.summary}</p>}
+                <div class="post-meta">
+                  <span>{c.post_count} 篇</span>
+                  {active && <span class="tag-chip-inline">{names.join(' / ')}</span>}
+                </div>
+              </div>
+            </summary>
+            {members.length > 0 && (
+              <ul class="collection-members">
+                {members.map((p) => (
+                  <li>
+                    <a href={postHref(p.slug, p.collection_slug)}>
+                      {p.title}
+                      <span class="member-date">{fmtDate(p.created_at)}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+        );
+      })}
+    </div>
+  )
+}
+
+{
+  posts.length > 0 && (
+    <>
+      <div class="section-head" style="margin-top:44px;">
+        <span class="kicker">文 章</span>
+        <h2 class="section-title">{keyword ? '寻得的篇章' : '单篇'}</h2>
+      </div>
+      <div class="posts-grid">
+        {posts.map((p, i) => (
+          <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, p.collection_slug)}>
+            <h3 class="post-title">{p.title}</h3>
+            {p.summary && <p class="post-summary">{p.summary}</p>}
+            <div class="post-meta">
+              <span>{fmtDate(p.created_at)}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </>
+  )
+}
+
+{
+  collections.length === 0 && posts.length === 0 && (
+    <p class="section-lead reveal in" style="text-align:center;">
+      {keyword ? `未寻得「${keyword}」相关著作。` : active ? '此标签之下，尚无著作。' : '尚无文集与文章。'}
+    </p>
+  )
+}
+
+<style>
+  .tag-collections {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .collection-block {
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    transition: border-color 0.2s ease;
+  }
+  .collection-block:hover {
+    border-color: color-mix(in srgb, var(--cinnabar) 35%, transparent);
+  }
+  .collection-block summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .collection-block summary::-webkit-details-marker {
+    display: none;
+  }
+  .collection-block summary::before {
+    content: '▸';
+    position: absolute;
+    margin-left: -1.2em;
+    color: var(--cc, var(--cinnabar));
+    transition: transform 0.2s ease;
+  }
+  .collection-block[open] summary::before {
+    transform: rotate(90deg);
+  }
+  .collection-block summary:hover .post-title {
+    color: var(--cc, var(--cinnabar));
+  }
+  .collection-members {
+    margin: 14px 0 0;
+    padding: 12px 0 0;
+    border-top: 1px dashed var(--hairline);
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .collection-members li {
+    font-family: var(--font-serif);
+    font-size: 0.92rem;
+    line-height: 2.1;
+  }
+  .collection-members a {
+    color: var(--ink-mid);
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+  }
+  .collection-members a:hover {
+    color: var(--cc, var(--cinnabar));
+    background: color-mix(in srgb, var(--cc, var(--cinnabar)) 6%, transparent);
+  }
+  .member-date {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+  .tag-chip-inline {
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+</style>

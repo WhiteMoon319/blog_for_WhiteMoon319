@@ -11,6 +11,7 @@ import {
   listPostEffectiveTags,
   listAllTagCounts,
   getTagPage,
+  getTagsUnion,
   deletePost,
   deleteCollection,
   getTagByName,
@@ -157,5 +158,58 @@ test('标签：文集标签变更后继承即时生效（不落地复制）', as
   assert.deepEqual(
     (await listPostEffectiveTags(db, p.id)).map((t) => t.name),
     ['继承试乙'],
+  );
+});
+
+test('标签：多标签交集——同时具备全部选中标签才命中，覆盖规则不变', async () => {
+  const col = await createCollection(db, { title: '己集', slug: 'tag-union' });
+  assert.ok(col);
+  await setCollectionTags(db, col.id, ['并集试甲', '并集试乙']);
+  const a = await createPost(db, { title: '章辛', slug: 'tu-in', collection_id: col.id, content_md: '正文', status: 'published' });
+  const b = await createPost(db, { title: '章壬', slug: 'tu-own', collection_id: col.id, content_md: '正文', status: 'published' });
+  const loose = await createPost(db, { title: '散篇癸', slug: 'tu-loose', content_md: '', status: 'published' });
+  const loose2 = await createPost(db, { title: '散篇戊', slug: 'tu-loose2', content_md: '', status: 'published' });
+  const loose3 = await createPost(db, { title: '散篇己', slug: 'tu-loose3', content_md: '', status: 'published' });
+  assert.ok(a && b && loose && loose2 && loose3);
+  await setPostOwnTags(db, b.id, ['并集试乙']);
+  await setPostOwnTags(db, loose.id, ['并集试甲']);
+  await setPostOwnTags(db, loose2.id, ['并集试乙']);
+  await setPostOwnTags(db, loose3.id, ['并集试甲', '并集试乙']);
+
+  const both = await getTagsUnion(db, ['并集试甲', '并集试乙']);
+  assert.deepEqual(
+    both.collections.map((c) => c.slug),
+    ['tag-union'],
+    '同时具备两个标签的文集出现',
+  );
+  assert.deepEqual(
+    both.posts.map((p) => p.slug),
+    ['tu-loose3'],
+    '只出现自有标签涵盖全部选中标签、且未被文集卡覆盖的散篇',
+  );
+  assert.deepEqual(
+    (both.collectionPosts.get(col.id) ?? []).map((p) => p.slug),
+    ['tu-in', 'tu-own'],
+    '展开列表 = 继承 ∪ 自有同时具备全部选中标签的章节',
+  );
+
+  const single = await getTagsUnion(db, ['并集试甲']);
+  assert.deepEqual(
+    single.posts.map((p) => p.slug),
+    ['tu-loose3', 'tu-loose'],
+    '单标签时多出只带试甲的散篇癸',
+  );
+
+  const kw = await getTagsUnion(db, ['并集试甲', '并集试乙'], '章辛');
+  assert.deepEqual(kw.collections.map((c) => c.slug), [], '关键词不匹配文集名则不出现文集');
+  assert.deepEqual(
+    (kw.collectionPosts.get(col.id) ?? []).map((p) => p.slug),
+    ['tu-in'],
+    '标签内寻章命中具体章节',
+  );
+  assert.deepEqual(
+    kw.posts.map((p) => p.slug),
+    ['tu-in'],
+    '关键词模式放宽到章节级，继承命中的章节也列出',
   );
 });

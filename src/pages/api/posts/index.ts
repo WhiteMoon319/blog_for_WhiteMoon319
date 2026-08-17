@@ -73,6 +73,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
       status,
     });
+    if (!created) return json({ error: 'post create failed' }, 500);
     const tags = Array.isArray(body.tags)
       ? await setPostOwnTags(env.DB, created.id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
       : [];

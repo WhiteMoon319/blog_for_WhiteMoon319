@@ -1309,6 +1309,12 @@ section[id],
   transform: translateY(-1px);
 }
 
+.tag-chip.is-active {
+  background: var(--cc, var(--cinnabar));
+  color: #fff;
+  border-color: var(--cc, var(--cinnabar));
+}
+
 .tag-chip .tag-count {
   font-size: 0.72rem;
   opacity: 0.75;

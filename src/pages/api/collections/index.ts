@@ -46,6 +46,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
     });
+    if (!created) return json({ error: 'collection create failed' }, 500);
     const tags = Array.isArray(body.tags)
       ? await setCollectionTags(env.DB, created.id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
       : [];

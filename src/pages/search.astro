@@ -8,24 +8,32 @@ export const prerender = false;
 const env = await envOf();
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
 
-// 「#标签 [关键词]」为标签检索：#校园 → 转标签聚合页；#校园 庄桂清 → 在标签内按关键词寻章；
-// 仅带 #、无此标签或未指定标签时按普通检索处理
+// 「#标签1 #标签2 关键词」为标签检索：# 前缀词均为标签（多标签并集），其余 token 为标签内关键词。
+// 例：#校园 → 校园；#校园 #恋爱 → 校园∪恋爱；#校园 庄桂清 → 校园内寻「庄桂清」。
+// 无任何 # 标签词时按普通全文检索处理。
+const tagNames: string[] = [];
+const keywordTokens: string[] = [];
+for (const token of q.split(/\s+/).filter(Boolean)) {
+  if (token.startsWith('#')) {
+    const name = token.slice(1).trim();
+    if (name && !tagNames.includes(name)) tagNames.push(name);
+  } else {
+    keywordTokens.push(token);
+  }
+}
+const tagKeyword = keywordTokens.join(' ').trim();
 let tagMode = false;
 let tagNotFound = '';
-if (q.startsWith('#') && q.length > 1) {
-  const rest = q.slice(1).trim();
-  const splitAt = rest.search(/\s/);
-  const tagName = (splitAt === -1 ? rest : rest.slice(0, splitAt)).trim();
-  const keyword = splitAt === -1 ? '' : rest.slice(splitAt + 1).trim();
-  if (tagName) {
-    tagMode = true;
-    const page = await getTagPage(env.DB, tagName, keyword);
-    if (page) {
-      const target = `/tags/${encodeURIComponent(tagName)}/${keyword ? `?q=${encodeURIComponent(keyword)}` : ''}`;
-      return Astro.redirect(target);
-    }
-    tagNotFound = tagName;
+if (tagNames.length > 0) {
+  tagMode = true;
+  const page = await getTagPage(env.DB, tagNames[0]!, tagKeyword);
+  if (page) {
+    const params = new URLSearchParams();
+    tagNames.forEach((n) => params.append('t', n));
+    if (tagKeyword) params.set('q', tagKeyword);
+    return Astro.redirect(`/tags/?${params.toString()}`);
   }
+  tagNotFound = tagNames[0]!;
 }
 
 const posts = q ? await searchPublishedPosts(env.DB, q) : [];
@@ -60,7 +68,7 @@ for (const post of posts) {
       <button class="btn btn-primary" type="submit">寻</button>
     </form>
     <p class="section-lead reveal in" style="text-align:center;font-size:0.8rem;margin-top:10px;opacity:0.65;">
-      以「#」开头的词检索标签：「#校园」览全标签，「#校园 庄桂清」在标签内寻章；其余照常寻章。
+      以「#」开头的词为标签：「#校园」览全标签，「#校园 #恋爱」多标签交集，「#校园 庄桂清」在标签内寻章；其余照常寻章。
     </p>
 
     {

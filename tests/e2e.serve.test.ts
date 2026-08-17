@@ -538,13 +538,30 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   assert.equal(cloud.status, 200);
   const cloudHtml = await cloud.text();
   assert.ok(cloudHtml.includes(tagName), '标签云出现该标签');
+  assert.ok(cloudHtml.includes('文集 1 · 文章 1'), '标签云计数分单位显示（文集/文章）');
 
   const tagPage = await get(tagPath);
   assert.equal(tagPage.status, 200);
   const tagHtml = await tagPage.text();
-  assert.ok(tagHtml.includes('标引测试集'), '标签页出现文集卡');
-  assert.ok(tagHtml.includes('标引散篇'), '标签页出现未分类文章');
-  assert.ok(!tagHtml.includes('标引章甲'), '继承的章甲不单独展开');
+  assert.ok(tagHtml.includes('标引测试集'), '独立标签页出现文集卡');
+  assert.ok(tagHtml.includes('标引散篇'), '独立标签页出现未分类文章');
+  assert.ok(!tagHtml.includes('<h3 class="post-title">标引章甲</h3>'), '继承的章甲不单独展开');
+  assert.ok(tagHtml.includes('collection-members'), '文集卡带可展开的成员列表');
+
+  const inlinePage = await get(`/tags/?t=${encodeURIComponent(tagName)}`);
+  assert.equal(inlinePage.status, 200);
+  const inlineHtml = await inlinePage.text();
+  assert.ok(inlineHtml.includes('标引测试集'), '内联页出现文集卡');
+  assert.ok(inlineHtml.includes('标引散篇'), '内联页出现未分类文章');
+  assert.ok(!inlineHtml.includes('<h3 class="post-title">标引章甲</h3>'), '继承的章甲不单独展开');
+  assert.ok(inlineHtml.includes('<details'), '文集卡为可折叠两级展示');
+
+  const unionPage = await get(`/tags/?t=${encodeURIComponent(tagName)}&t=${encodeURIComponent('番外试')}`);
+  assert.equal(unionPage.status, 200);
+  const unionHtml = await unionPage.text();
+  assert.ok(unionHtml.includes('标引章甲'), '交集：章甲自有番外试且继承玄幻试，同时具备两标 → 单独露出');
+  assert.ok(!unionHtml.includes('标引测试集'), '交集：文集只带玄幻试，不具备全部选中标签 → 不出现');
+  assert.ok(!unionHtml.includes('标引散篇'), '交集：散篇只带玄幻试 → 不出现');
 
   const chapter = await get('/collections/tag-e2e-col/tag-e2e-a/');
   assert.equal(chapter.status, 200);
@@ -553,8 +570,15 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   const tagSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName}`)}`);
   assert.equal(tagSearch.status, 302, '「#标签」检索应转标签页');
   assert.ok(
-    String(tagSearch.headers.get('location')).includes(`/tags/${encodeURIComponent(tagName)}/`),
-    '转跳到对应标签聚合页',
+    String(tagSearch.headers.get('location')).includes(`/tags/?t=${encodeURIComponent(tagName)}`),
+    '单标签转跳到 /tags/ 内联页',
+  );
+
+  const multiSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName} #番外试`)}`);
+  assert.equal(multiSearch.status, 302, '「#标签1 #标签2」多标签应转标签页');
+  assert.ok(
+    String(multiSearch.headers.get('location')).includes(`/tags/?t=${encodeURIComponent(tagName)}&t=${encodeURIComponent('番外试')}`),
+    '多标签参数依次携带',
   );
 
   const plainSearch = await get(`/search/?q=${encodeURIComponent(tagName)}`);
@@ -566,17 +590,17 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   assert.ok((await missingTag.text()).includes('尚未建立'), '未创建的标签给出空态提示');
 
   const inTagSearch = await get(`/search/?q=${encodeURIComponent(`#${tagName} 章甲`)}`);
-  assert.equal(inTagSearch.status, 302, '「#标签 关键词」应转标签页');
+  assert.equal(inTagSearch.status, 302, '「#标签 关键词」应转标签内联页');
   assert.ok(
-    String(inTagSearch.headers.get('location')).includes(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('章甲')}`),
+    String(inTagSearch.headers.get('location')).includes(`/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('章甲')}`),
     '转跳地址携带标签内关键词',
   );
-  const inTagPage = await get(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('章甲')}`);
-  assert.equal(inTagPage.status, 200);
-  const inTagHtml = await inTagPage.text();
+  const inTagInline = await get(`/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('章甲')}`);
+  assert.equal(inTagInline.status, 200);
+  const inTagHtml = await inTagInline.text();
   assert.ok(inTagHtml.includes('标引章甲'), '标签内寻章能命中具体章节');
   assert.ok(!inTagHtml.includes('标引散篇'), '不匹配的文章不出现');
-  const inTagMiss = await get(`/tags/${encodeURIComponent(tagName)}/?q=${encodeURIComponent('查无此词')}`);
+  const inTagMiss = await get(`/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('查无此词')}`);
   assert.ok((await inTagMiss.text()).includes('未寻得'), '标签内无命中给出空态');
 
   const apiTags = await get('/api/tags');

@@ -648,53 +648,110 @@ export async function getTagPage(
 ): Promise<TagPageResult | null> {
   const tag = await getTagByName(db, name);
   if (!tag) return null;
+  const result = await getTagsUnion(db, [name], keyword);
+  return { tag, collections: result.collections, posts: result.posts };
+}
+
+export interface TagsUnionResult {
+  collections: TagPageCollectionsRow[];
+  posts: PostWithCollection[];
+  // 每个文集旗下命中文章（两级展示展开用），按 collection_id 分组
+  collectionPosts: Map<number, PostWithCollection[]>;
+}
+
+// 多标签交集（names 为空 = 全部浏览）：
+// 文集 = 同时具备全部选中标签；文章 = 自有标签涵盖全部选中标签，且其文集未同时具备全部选中标签（未被文集卡覆盖）；
+// 展开列表 = 各文集中（继承 ∪ 自有）同时具备全部选中标签的已发布文章。
+// keyword 时按关键词过滤；文章放宽到章节级（含继承），供「标签内寻章」。
+export async function getTagsUnion(
+  db: D1Database,
+  names: string[],
+  keyword = '',
+): Promise<TagsUnionResult> {
+  const unique = cleanTagNames(names);
+  const tagIds = unique.length > 0 ? await resolveTagIds(db, unique) : [];
   const kw = keyword.trim();
-  const [collections, posts] = await Promise.all([
-    kw
-      ? db
-          .prepare(
-            `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
-             FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
-             WHERE ct.tag_id = ? AND (c.title LIKE ? OR c.summary LIKE ?)
-             ORDER BY c.sort_order ASC, c.id ASC`,
-          )
-          .bind(tag.id, `%${kw}%`, `%${kw}%`)
-          .all<TagPageCollectionsRow>()
-      : db
-          .prepare(
-            `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
-             FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
-             WHERE ct.tag_id = ? ORDER BY c.sort_order ASC, c.id ASC`,
-          )
-          .bind(tag.id)
-          .all<TagPageCollectionsRow>(),
-    kw
+  const inList = tagIds.map(() => '?').join(',');
+  const inArgs = tagIds;
+  const need = tagIds.length;
+
+  const kwCol = kw ? ` AND (c.title LIKE ? OR c.summary LIKE ?)` : '';
+  const kwPost = kw
+    ? ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content_md LIKE ?)`
+    : '';
+
+  const [collections, posts, collectionPosts] = await Promise.all([
+    db
+      .prepare(
+        `SELECT DISTINCT c.*,
+                (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
+         FROM collections c
+         WHERE 1=1${tagIds.length > 0
+           ? ` AND (SELECT COUNT(DISTINCT ct.tag_id) FROM collection_tags ct
+                    WHERE ct.collection_id = c.id AND ct.tag_id IN (${inList})) = ${need}`
+           : ''}${kwCol}
+         ORDER BY c.sort_order ASC, c.id ASC`,
+      )
+      .bind(...inArgs, ...(kw ? [`%${kw}%`, `%${kw}%`] : []))
+      .all<TagPageCollectionsRow>(),
+    tagIds.length > 0
       ? db
           .prepare(
             `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
              LEFT JOIN collections c ON c.id = p.collection_id
-             LEFT JOIN post_tags pt ON pt.post_id = p.id
-             LEFT JOIN collection_tags ct ON ct.collection_id = p.collection_id
-             WHERE p.status = 'published' AND (pt.tag_id = ? OR ct.tag_id = ?)
-               AND (p.title LIKE ? OR p.summary LIKE ? OR p.content_md LIKE ?)
+             WHERE p.status = 'published'
+               AND (SELECT COUNT(DISTINCT t3.tag_id) FROM (
+                     SELECT tag_id FROM post_tags WHERE post_id = p.id
+                     UNION SELECT tag_id FROM collection_tags WHERE collection_id = p.collection_id
+                   ) t3 WHERE t3.tag_id IN (${inList})) = ${need}
+               ${kw
+                 ? ''
+                 : `AND NOT EXISTS (
+                     SELECT 1 FROM collections c2
+                     WHERE c2.id = p.collection_id
+                       AND (SELECT COUNT(DISTINCT ct2.tag_id) FROM collection_tags ct2
+                            WHERE ct2.collection_id = c2.id AND ct2.tag_id IN (${inList})) = ${need}
+                   )`}${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
-          .bind(tag.id, tag.id, `%${kw}%`, `%${kw}%`, `%${kw}%`)
+          .bind(...(kw ? [...inArgs, `%${kw}%`, `%${kw}%`, `%${kw}%`] : [...inArgs, ...inArgs]))
           .all<PostWithCollection>()
       : db
           .prepare(
-            `SELECT p.*, c.slug AS collection_slug FROM posts p JOIN post_tags pt ON pt.post_id = p.id
-             LEFT JOIN collections c ON c.id = p.collection_id
-             WHERE pt.tag_id = ? AND p.status = 'published'
-               AND NOT EXISTS (
-                 SELECT 1 FROM collection_tags ct WHERE ct.tag_id = pt.tag_id AND ct.collection_id = p.collection_id
-               )
+            `SELECT DISTINCT p.*, NULL AS collection_slug FROM posts p
+             WHERE p.status = 'published' AND p.collection_id IS NULL${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
-          .bind(tag.id)
+          .bind(...(kw ? [`%${kw}%`, `%${kw}%`, `%${kw}%`] : []))
           .all<PostWithCollection>(),
+    db
+      .prepare(
+        `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
+         JOIN collections c ON c.id = p.collection_id
+         WHERE p.status = 'published'
+           AND (${tagIds.length > 0
+             ? `(SELECT COUNT(DISTINCT t3.tag_id) FROM (
+                  SELECT tag_id FROM post_tags WHERE post_id = p.id
+                  UNION SELECT tag_id FROM collection_tags WHERE collection_id = p.collection_id
+                ) t3 WHERE t3.tag_id IN (${inList})) = ${need}`
+             : `1=1`})${kwPost}
+         ORDER BY p.created_at ASC, p.id ASC`,
+      )
+      .bind(...inArgs, ...(kw ? [`%${kw}%`, `%${kw}%`, `%${kw}%`] : []))
+      .all<PostWithCollection>(),
   ]);
-  return { tag, collections: collections.results ?? [], posts: posts.results ?? [] };
+
+  const map = new Map<number, PostWithCollection[]>();
+  for (const p of collectionPosts.results ?? []) {
+    const list = map.get(p.collection_id ?? 0);
+    if (list) list.push(p);
+    else map.set(p.collection_id ?? 0, [p]);
+  }
+  return {
+    collections: collections.results ?? [],
+    posts: posts.results ?? [],
+    collectionPosts: map,
+  };
 }
 
 function purgeOrphanTagsStmt(db: D1Database): D1PreparedStatement {

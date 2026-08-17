@@ -24,6 +24,15 @@ export interface Post {
   updated_at: string;
 }
 
+export interface Tag {
+  id: number;
+  name: string;
+  collections?: number;
+  posts?: number;
+  total?: number;
+  created_at?: string;
+}
+
 export interface MediaFile {
   key: string;
   size: number;

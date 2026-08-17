@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, updatePost, deletePost, isSlugConflict } from '../../../lib/db';
+import { envOf, getPostById, updatePost, deletePost, listPostOwnTags, setPostOwnTags, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 
@@ -22,7 +22,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   if (post.status === 'draft' && !isAdmin(session)) {
     return json({ error: 'not found' }, 404);
   }
-  return json({ post });
+  const tags = await listPostOwnTags(env.DB, id);
+  return json({ post, tags });
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
@@ -66,7 +67,10 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     const env = await envOf();
     const updated = await updatePost(env.DB, id, patch, versionMessage);
     if (!updated) return json({ error: 'not found' }, 404);
-    return json({ post: updated });
+    const tags = Array.isArray(body.tags)
+      ? await setPostOwnTags(env.DB, id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+      : await listPostOwnTags(env.DB, id);
+    return json({ post: updated, tags });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

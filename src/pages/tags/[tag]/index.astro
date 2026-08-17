@@ -1,0 +1,88 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { envOf, getTagPage, fmtDate } from '../../../lib/db';
+import { postHref } from '../../../lib/utils';
+
+export const prerender = false;
+
+const env = await envOf();
+const raw = Astro.params.tag ?? '';
+const name = decodeURIComponent(raw);
+const page = await getTagPage(env.DB, name);
+
+if (!page) {
+  return Astro.redirect('/404');
+}
+const collections = page.collections;
+const posts = page.posts;
+---
+
+<BaseLayout title={`标签「${name}」`} description={`标签「${name}」下的文集与文章。`}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/tags/">← 回到标签</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">标 引</p>
+      <h1>「{name}」</h1>
+      <p class="lead">{collections.length} 部文集 · {posts.length} 篇单文</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    {
+      collections.length > 0 && (
+        <>
+          <div class="section-head">
+            <span class="kicker">文 集</span>
+            <h2 class="section-title">诸集</h2>
+          </div>
+          <div class="posts-grid">
+            {collections.map((c, i) => (
+              <a
+                class="post-card reveal"
+                data-delay={String((i % 3) + 1)}
+                href={`/collections/${encodeURI(c.slug)}/`}
+                style={`--cc: ${c.theme_color};`}
+              >
+                <h3 class="post-title">{c.title}</h3>
+                {c.summary && <p class="post-summary">{c.summary}</p>}
+                <div class="post-meta">
+                  <span class="post-tag">{name}</span>
+                  <span>{c.post_count} 篇</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </>
+      )
+    }
+
+    {
+      posts.length > 0 && (
+        <>
+          <div class="section-head" style="margin-top:44px;">
+            <span class="kicker">文 章</span>
+            <h2 class="section-title">单篇</h2>
+          </div>
+          <div class="posts-grid">
+            {posts.map((p, i) => (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, p.collection_slug)}>
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  <span class="post-tag">{name}</span>
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </>
+      )
+    }
+
+    {
+      collections.length === 0 && posts.length === 0 && (
+        <p class="section-lead reveal in" style="text-align:center;">此标之下，尚无著作。</p>
+      )
+    }
+  </section>
+</BaseLayout>

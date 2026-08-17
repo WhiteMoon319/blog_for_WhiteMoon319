@@ -1,4 +1,4 @@
-import type { Collection, MediaFile, Post, PostVersion } from './types';
+import type { Collection, MediaFile, Post, PostVersion, Tag } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -33,6 +33,11 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
   collections: () => request<{ collections: Collection[] }>('/api/collections'),
+
+  tags: () => request<{ tags: Tag[] }>('/api/tags'),
+
+  collection: (id: number) =>
+    request<{ collection: Collection; tags: Tag[] }>(`/api/collections/${id}`),
 
   createCollection: (data: Partial<Collection>) =>
     request<{ collection: Collection }>('/api/collections', {

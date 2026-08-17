@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
-import type { Collection } from '../types';
+import type { Collection, Tag } from '../types';
+import TagChips from '../components/TagChips.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -9,8 +10,9 @@ const collections = ref<Collection[]>([]);
 const loaded = ref(false);
 const editing = ref<Collection | null>(null);
 const creating = ref(false);
+const suggestions = ref<string[]>([]);
 
-const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc' });
+const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', tags: [] as string[] });
 
 const COLORS = ['#c23a30', '#2d6a4f', '#2f4858', '#8a6d3b', '#6baed6'];
 
@@ -19,15 +21,18 @@ async function load() {
   collections.value = r.collections;
   loaded.value = true;
 }
-onMounted(load);
+onMounted(async () => {
+  await load();
+  api.tags().then((r) => (suggestions.value = r.tags.map((t: Tag) => t.name))).catch(() => {});
+});
 
 function openCreate() {
   creating.value = true;
   editing.value = null;
-  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' });
+  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', tags: [] });
 }
 
-function openEdit(c: Collection) {
+async function openEdit(c: Collection) {
   editing.value = c;
   creating.value = false;
   Object.assign(form, {
@@ -37,7 +42,14 @@ function openEdit(c: Collection) {
     theme_color: c.theme_color,
     sort_order: c.sort_order,
     post_order: c.post_order,
+    tags: [],
   });
+  try {
+    const { tags } = await api.collection(c.id);
+    form.tags = tags.map((t) => t.name);
+  } catch {
+    form.tags = [];
+  }
 }
 
 async function save() {
@@ -148,6 +160,10 @@ async function remove(c: Collection) {
             <option value="asc">旧在前（小说连载顺读）</option>
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label>标签（其下文章默认继承）</label>
+        <TagChips v-model="form.tags" :suggestions="suggestions" placeholder="回车添加题材标签" />
       </div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-primary" type="submit">落印</button>

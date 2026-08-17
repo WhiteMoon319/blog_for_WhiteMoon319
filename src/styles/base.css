@@ -1277,6 +1277,48 @@ section[id],
   }
 }
 
+/* ===== 标签 ===== */
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--cc, var(--cinnabar));
+  background: color-mix(in srgb, var(--cc, var(--cinnabar)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cc, var(--cinnabar)) 22%, transparent);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.tag-chip:hover {
+  background: var(--cc, var(--cinnabar));
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.tag-chip .tag-count {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.tag-row {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
 /* ===== 无障碍：尊重减少动效偏好 ===== */
 @media (prefers-reduced-motion: reduce) {
   *,

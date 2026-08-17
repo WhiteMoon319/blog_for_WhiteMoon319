@@ -11,12 +11,14 @@ import TurndownService from 'turndown';
 import { diffLines, diffWords } from 'diff';
 import { api } from '../api';
 import type { Collection, MediaFile, PostVersion } from '../types';
+import TagChips from '../components/TagChips.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
 const router = useRouter();
 
 const collections = ref<Collection[]>([]);
+const suggestions = ref<string[]>([]);
 const loading = ref(true);
 const saving = ref(false);
 const uploading = ref(false);
@@ -32,6 +34,8 @@ const form = reactive({
   cover_url: '',
   status: 'draft' as 'draft' | 'published',
   version_message: '',
+  tags: [] as string[],
+  inherited_tags: [] as string[],
 });
 const coverFileInput = ref<HTMLInputElement | null>(null);
 const imageFileInput = ref<HTMLInputElement | null>(null);
@@ -109,13 +113,14 @@ async function load() {
   loadedId.value = id;
   form.version_message = '';
   if (id) {
-    const { post } = await api.post(id);
+    const { post, tags } = await api.post(id);
     form.title = post.title;
     form.slug = post.slug;
     form.collection_id = post.collection_id;
     form.summary = post.summary;
     form.cover_url = post.cover_url;
     form.status = post.status;
+    form.tags = tags.map((t) => t.name);
     if (editor.value) editor.value.commands.setContent(marked.parse(post.content_md) as string);
   } else {
     form.title = '';
@@ -125,6 +130,8 @@ async function load() {
     form.cover_url = '';
     form.status = 'draft';
     form.version_message = '';
+    form.tags = [];
+    form.inherited_tags = [];
     const cid = parseId(route.query.collection);
     form.collection_id = collections.value.some((c) => c.id === cid) ? cid : null;
     if (editor.value) editor.value.commands.setContent('');
@@ -132,8 +139,25 @@ async function load() {
   loading.value = false;
 }
 
+watch(
+  () => form.collection_id,
+  async (id) => {
+    if (id == null) {
+      form.inherited_tags = [];
+      return;
+    }
+    try {
+      const { tags } = await api.collection(id);
+      form.inherited_tags = tags.map((t) => t.name);
+    } catch {
+      form.inherited_tags = [];
+    }
+  },
+);
+
 onMounted(() => {
   load().catch((e) => emit('notify', (e as Error).message, true));
+  api.tags().then((r) => (suggestions.value = r.tags.map((t) => t.name))).catch(() => {});
 });
 
 watch(
@@ -171,6 +195,7 @@ async function save() {
       content_md,
       status: form.status,
       version_message: form.version_message.trim(),
+      tags: form.tags,
     };
     if (loadedId.value !== null) {
       await api.updatePost(loadedId.value, payload);
@@ -407,6 +432,15 @@ async function restoreVersion(v: PostVersion) {
             <option value="draft">草稿（暂不示人）</option>
             <option value="published">刊发（立即示人）</option>
           </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>标签（自有，叠加在文集标签之上）</label>
+        <TagChips v-model="form.tags" :suggestions="suggestions" placeholder="回车添加标签" />
+        <div v-if="form.inherited_tags.length" class="hint" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          继承自文集：
+          <span v-for="t in form.inherited_tags" :key="t" class="tag-chip-item is-readonly">{{ t }}</span>
         </div>
       </div>
 

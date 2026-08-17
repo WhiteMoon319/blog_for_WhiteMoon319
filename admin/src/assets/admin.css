@@ -294,6 +294,46 @@ textarea {
   margin-top: 4px;
 }
 
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  color: var(--cinnabar);
+  background: color-mix(in srgb, var(--cinnabar) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cinnabar) 24%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tag-chip-item .tag-chip-x {
+  opacity: 0.65;
+  font-size: 0.8rem;
+}
+
+.tag-chip-item.is-readonly {
+  cursor: default;
+  color: var(--ink-mid);
+  background: color-mix(in srgb, var(--ink-light) 12%, transparent);
+  border-color: var(--hairline);
+}
+
+.tag-chip-input {
+  width: 150px;
+  flex: 0 1 150px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
 .input,
 .select,
 .textarea {

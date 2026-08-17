@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { envOf, listAllTagCounts } from '../../lib/db';
+
+export const prerender = false;
+
+const env = await envOf();
+const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
+---
+
+<BaseLayout title="标签" description="按题材标签寻览诸作。">
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">← 回到卷首</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">标 引</p>
+      <h1>标签</h1>
+      <p class="lead">按题材寻览，一标即得。</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    {
+      tags.length > 0 ? (
+        <div class="tag-cloud">
+          {tags.map((t) => (
+            <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>
+              {t.name}
+              <span class="tag-count">{t.total}</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead reveal in" style="text-align:center;">尚无标签。</p>
+      )
+    }
+  </section>
+</BaseLayout>

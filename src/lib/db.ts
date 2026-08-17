@@ -317,10 +317,11 @@ export async function deleteCollection(db: D1Database, id: number): Promise<bool
   } else {
     stmts.push(db.prepare('UPDATE posts SET collection_id = NULL WHERE collection_id = ?').bind(id));
   }
-  stmts.push(db.prepare('DELETE FROM collections WHERE id = ?').bind(id));
+  const delStmt = db.prepare('DELETE FROM collections WHERE id = ?').bind(id);
+  stmts.push(delStmt);
+  stmts.push(purgeOrphanTagsStmt(db));
   const results = await db.batch(stmts);
-  const last = results[results.length - 1];
-  return (last.meta.changes ?? 0) > 0;
+  return (results[stmts.indexOf(delStmt)]!.meta.changes ?? 0) > 0;
 }
 
 /* ===== 文章 CRUD ===== */
@@ -409,8 +410,11 @@ export async function updatePost(
   }
 
 export async function deletePost(db: D1Database, id: number): Promise<boolean> {
-    const res = await db.prepare(`DELETE FROM posts WHERE id = ?`).bind(id).run();
-    return (res.meta.changes ?? 0) > 0;
+    const results = await db.batch([
+      db.prepare(`DELETE FROM posts WHERE id = ?`).bind(id),
+      purgeOrphanTagsStmt(db),
+    ]);
+    return (results[0].meta.changes ?? 0) > 0;
   }
 
   /* ===== 版本历史 ===== */
@@ -504,4 +508,169 @@ export function fmtDate(iso: string): string {
 export function yearOf(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : String(d.getFullYear());
+}
+
+/* ===== 标签 ===== */
+
+export interface TagRow {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface TagCountRow extends TagRow {
+  collections: number;
+  posts: number;
+  total: number;
+}
+
+function cleanTagNames(names: string[]): string[] {
+  return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
+}
+
+async function resolveTagIds(db: D1Database, names: string[]): Promise<number[]> {
+  const unique = cleanTagNames(names);
+  if (unique.length === 0) return [];
+  await db.batch(unique.map((n) => db.prepare('INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO NOTHING').bind(n)));
+  const rows = await db
+    .prepare(`SELECT id FROM tags WHERE name IN (${unique.map(() => '?').join(',')})`)
+    .bind(...unique)
+    .all<{ id: number }>();
+  return (rows.results ?? []).map((r) => r.id);
+}
+
+export async function listCollectionTags(db: D1Database, collectionId: number): Promise<TagRow[]> {
+  return db
+    .prepare(
+      `SELECT t.id, t.name, t.created_at FROM tags t
+       JOIN collection_tags ct ON ct.tag_id = t.id
+       WHERE ct.collection_id = ? ORDER BY t.name`,
+    )
+    .bind(collectionId)
+    .all<TagRow>()
+    .then((r) => r.results ?? []);
+}
+
+export async function listPostOwnTags(db: D1Database, postId: number): Promise<TagRow[]> {
+  return db
+    .prepare(
+      `SELECT t.id, t.name, t.created_at FROM tags t
+       JOIN post_tags pt ON pt.tag_id = t.id
+       WHERE pt.post_id = ? ORDER BY t.name`,
+    )
+    .bind(postId)
+    .all<TagRow>()
+    .then((r) => r.results ?? []);
+}
+
+// 文章有效标签 = 文集标签 ∪ 自有标签（查询时计算，不落地复制）
+export async function listPostEffectiveTags(db: D1Database, postId: number): Promise<TagRow[]> {
+  return db
+    .prepare(
+      `SELECT DISTINCT t.id, t.name, t.created_at FROM tags t
+       JOIN (
+         SELECT tag_id FROM post_tags WHERE post_id = ?
+         UNION
+         SELECT ct.tag_id FROM collection_tags ct JOIN posts p ON p.collection_id = ct.collection_id WHERE p.id = ?
+       ) x ON x.tag_id = t.id
+       ORDER BY t.name`,
+    )
+    .bind(postId, postId)
+    .all<TagRow>()
+    .then((r) => r.results ?? []);
+}
+
+export async function setCollectionTags(db: D1Database, collectionId: number, names: string[]): Promise<TagRow[]> {
+  const ids = await resolveTagIds(db, names);
+  await db.batch([
+    db.prepare('DELETE FROM collection_tags WHERE collection_id = ?').bind(collectionId),
+    ...ids.map((tagId) =>
+      db.prepare('INSERT INTO collection_tags (collection_id, tag_id) VALUES (?, ?)').bind(collectionId, tagId),
+    ),
+  ]);
+  return listCollectionTags(db, collectionId);
+}
+
+export async function setPostOwnTags(db: D1Database, postId: number, names: string[]): Promise<TagRow[]> {
+  const ids = await resolveTagIds(db, names);
+  await db.batch([
+    db.prepare('DELETE FROM post_tags WHERE post_id = ?').bind(postId),
+    ...ids.map((tagId) =>
+      db.prepare('INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)').bind(postId, tagId),
+    ),
+  ]);
+  return listPostOwnTags(db, postId);
+}
+
+// 标签云计数：文集数 + 「自有该标签且其文集未带该标签」的已发布文章数（继承的不重复计数）
+export async function listAllTagCounts(db: D1Database): Promise<TagCountRow[]> {
+  const rows = await db
+    .prepare(
+      `SELECT t.id, t.name, t.created_at,
+              (SELECT COUNT(*) FROM collection_tags ct WHERE ct.tag_id = t.id) AS collections,
+              (SELECT COUNT(*) FROM post_tags pt JOIN posts p ON p.id = pt.post_id
+                 WHERE pt.tag_id = t.id AND p.status = 'published'
+                   AND NOT EXISTS (
+                     SELECT 1 FROM collection_tags ct2
+                     WHERE ct2.tag_id = pt.tag_id AND ct2.collection_id = p.collection_id
+                   )) AS posts
+       FROM tags t
+       ORDER BY collections + posts DESC, t.name`,
+    )
+    .all<TagCountRow>();
+  return (rows.results ?? []).map((r) => ({
+    ...r,
+    total: (r.collections ?? 0) + (r.posts ?? 0),
+  }));
+}
+
+export async function getTagByName(db: D1Database, name: string): Promise<TagRow | null> {
+  return db.prepare('SELECT * FROM tags WHERE name = ?').bind(name).first<TagRow>();
+}
+
+export interface TagPageCollectionsRow extends CollectionRow {
+  post_count: number;
+}
+
+export interface TagPageResult {
+  tag: TagRow;
+  collections: TagPageCollectionsRow[];
+  posts: PostWithCollection[];
+}
+
+// 标签页：带该标签的文集 + 自有该标签且未被文集卡覆盖的已发布文章
+export async function getTagPage(db: D1Database, name: string): Promise<TagPageResult | null> {
+  const tag = await getTagByName(db, name);
+  if (!tag) return null;
+  const [collections, posts] = await Promise.all([
+    db
+      .prepare(
+        `SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
+         FROM collections c JOIN collection_tags ct ON ct.collection_id = c.id
+         WHERE ct.tag_id = ? ORDER BY c.sort_order ASC, c.id ASC`,
+      )
+      .bind(tag.id)
+      .all<TagPageCollectionsRow>(),
+    db
+      .prepare(
+        `SELECT p.*, c.slug AS collection_slug FROM posts p JOIN post_tags pt ON pt.post_id = p.id
+         LEFT JOIN collections c ON c.id = p.collection_id
+         WHERE pt.tag_id = ? AND p.status = 'published'
+           AND NOT EXISTS (
+             SELECT 1 FROM collection_tags ct WHERE ct.tag_id = pt.tag_id AND ct.collection_id = p.collection_id
+           )
+         ORDER BY p.created_at DESC, p.id DESC`,
+      )
+      .bind(tag.id)
+      .all<PostWithCollection>(),
+  ]);
+  return { tag, collections: collections.results ?? [], posts: posts.results ?? [] };
+}
+
+function purgeOrphanTagsStmt(db: D1Database): D1PreparedStatement {
+  return db.prepare(
+    `DELETE FROM tags
+     WHERE NOT EXISTS (SELECT 1 FROM post_tags WHERE post_tags.tag_id = tags.id)
+       AND NOT EXISTS (SELECT 1 FROM collection_tags WHERE collection_tags.tag_id = tags.id)`,
+  );
 }

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPost, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPost, setPostOwnTags, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -73,7 +73,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
       status,
     });
-    return json({ post: created }, 201);
+    const tags = Array.isArray(body.tags)
+      ? await setPostOwnTags(env.DB, created.id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+      : [];
+    return json({ post: created, tags }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

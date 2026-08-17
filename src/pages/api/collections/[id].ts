@@ -1,5 +1,13 @@
 import type { APIContext } from 'astro';
-import { envOf, getCollectionById, updateCollection, deleteCollection, isSlugConflict } from '../../../lib/db';
+import {
+  envOf,
+  getCollectionById,
+  updateCollection,
+  deleteCollection,
+  listCollectionTags,
+  setCollectionTags,
+  isSlugConflict,
+} from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 
@@ -16,7 +24,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   const collection = await getCollectionById(env.DB, id);
   if (!collection) return json({ error: 'not found' }, 404);
-  return json({ collection });
+  const tags = await listCollectionTags(env.DB, id);
+  return json({ collection, tags });
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
@@ -55,7 +64,10 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     const env = await envOf();
     const updated = await updateCollection(env.DB, id, patch);
     if (!updated) return json({ error: 'not found' }, 404);
-    return json({ collection: updated });
+    const tags = Array.isArray(body.tags)
+      ? await setCollectionTags(env.DB, id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+      : await listCollectionTags(env.DB, id);
+    return json({ collection: updated, tags });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

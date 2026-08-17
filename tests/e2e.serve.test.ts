@@ -488,6 +488,89 @@ test('e2e：搜索页按关键字命中已刊文章', async () => {
   assert.ok((await miss.text()).includes('未寻得'));
 });
 
+test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿清理', async () => {
+  if (!HAS_BUILD) return;
+  const tagName = '玄幻试';
+  const tagPath = `/tags/${encodeURIComponent(tagName)}/`;
+
+  const created = await post('/api/collections', {
+    title: '标引测试集',
+    slug: 'tag-e2e-col',
+    summary: 'e2e',
+    tags: [tagName],
+  });
+  assert.equal(created.status, 201);
+  const colBody = await created.json();
+  assert.ok(Array.isArray(colBody.tags) && colBody.tags.some((t: { name: string }) => t.name === tagName), '创建响应带 tags');
+  const colId = colBody.collection.id as number;
+
+  const chRes = await post('/api/posts', {
+    title: '标引章甲',
+    slug: 'tag-e2e-a',
+    collection_id: colId,
+    content_md: '## 正文\n\n内容。',
+    status: 'published',
+    tags: ['番外试'],
+  });
+  assert.equal(chRes.status, 201);
+  const chId = (await chRes.json()).post.id as number;
+
+  const looseRes = await post('/api/posts', {
+    title: '标引散篇',
+    slug: 'tag-e2e-loose',
+    content_md: '## 正文\n\n内容。',
+    status: 'published',
+    tags: [tagName],
+  });
+  assert.equal(looseRes.status, 201);
+  const looseId = (await looseRes.json()).post.id as number;
+
+  const got = await get(`/api/posts/${chId}`);
+  assert.equal(got.status, 200);
+  const gotBody = await got.json();
+  assert.deepEqual(
+    (gotBody.tags as Array<{ name: string }>).map((t) => t.name),
+    ['番外试'],
+    '编辑器读取文章自带标签',
+  );
+
+  const cloud = await get('/tags/');
+  assert.equal(cloud.status, 200);
+  const cloudHtml = await cloud.text();
+  assert.ok(cloudHtml.includes(tagName), '标签云出现该标签');
+
+  const tagPage = await get(tagPath);
+  assert.equal(tagPage.status, 200);
+  const tagHtml = await tagPage.text();
+  assert.ok(tagHtml.includes('标引测试集'), '标签页出现文集卡');
+  assert.ok(tagHtml.includes('标引散篇'), '标签页出现未分类文章');
+  assert.ok(!tagHtml.includes('标引章甲'), '继承的章甲不单独展开');
+
+  const chapter = await get('/collections/tag-e2e-col/tag-e2e-a/');
+  assert.equal(chapter.status, 200);
+  assert.ok((await chapter.text()).includes(tagName), '章节页展示继承的文集标签');
+
+  const apiTags = await get('/api/tags');
+  assert.equal(apiTags.status, 200);
+  const apiTagsBody = await apiTags.json();
+  const found = (apiTagsBody.tags as Array<{ name: string; collections: number; posts: number }>).find(
+    (t) => t.name === tagName,
+  );
+  assert.ok(found, '管理端标签建议接口列出该标签');
+  assert.equal(found!.collections, 1);
+  assert.equal(found!.posts, 1, '只计未分类散篇，继承的章甲不计');
+
+  const delRes = await del(`/api/posts/${looseId}`);
+  assert.equal(delRes.status, 200);
+  const delRes2 = await del(`/api/posts/${chId}`);
+  assert.equal(delRes2.status, 200);
+  const delColRes = await del(`/api/collections/${colId}`);
+  assert.equal(delColRes.status, 200);
+
+  const after = await get('/tags/');
+  assert.ok(!(await after.text()).includes(tagName), '删除后孤儿标签被清理');
+});
+
 test('e2e：sitemap 覆盖静态页、文集与文章', async () => {
   if (!HAS_BUILD) return;
   const res = await get('/sitemap.xml');

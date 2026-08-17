@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Miniflare } from 'miniflare';
-import { XMLValidator, XMLParser } from 'fast-xml-parser';
 
 const SERVER_DIR = resolve('dist/server');
 
@@ -480,18 +479,6 @@ test('e2e：搜索页按关键字命中已刊文章', async () => {
   const miss = await get('/search/?q=不存在的关键字XYZ');
   assert.equal(miss.status, 200);
   assert.ok((await miss.text()).includes('未寻得'));
-});
-
-test('e2e：RSS 输出已刊文章与规范头', async () => {
-  if (!HAS_BUILD) return;
-  const res = await get('/rss.xml');
-  assert.equal(res.status, 200);
-  assert.ok(String(res.headers.get('content-type')).includes('application/rss+xml'));
-  const xml = await res.text();
-  assert.ok(xml.includes('<rss version="2.0"'));
-  assert.ok(xml.includes('<item>'));
-  assert.ok(xml.includes('<link>http://e2e.test/collections/essays/first-post/</link>'));
-  assert.ok(!xml.includes('draft-post'), '草稿不应出现在 RSS');
 });
 
 test('e2e：sitemap 覆盖静态页、文集与文章', async () => {
@@ -1040,30 +1027,4 @@ test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼�
   assert.ok(html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'), '相对 URL 应拼上站点基址');
   await del(`/api/posts/${(await rel.json()).post.id}`);
   await del(`/api/collections/${colId}`);
-});
-
-test('e2e：RSS 含 ]]>、&、< 等内容时仍是合法 XML', async () => {
-  if (!HAS_BUILD) return;
-  const tricky = await post('/api/posts', {
-    title: ']]> & <标签> 试炼',
-    slug: 'rss-tricky',
-    summary: '摘要包含 ]]> 与 & 与 <x>',
-    content_md: '正文包含 ]]> 与 & 与 <标记>。',
-    status: 'published',
-  });
-  assert.equal(tricky.status, 201);
-
-  const res = await get('/rss.xml');
-  assert.equal(res.status, 200);
-  const xml = await res.text();
-  const valid = XMLValidator.validate(xml);
-  assert.equal(valid, true, `RSS 必须是合法 XML：${typeof valid === 'object' ? valid.err?.msg : ''}`);
-
-  const parsed = new XMLParser().parse(xml);
-  const titles = Array.isArray(parsed.rss.channel.item)
-    ? parsed.rss.channel.item.map((i: { title?: string }) => i.title)
-    : [parsed.rss.channel.item.title];
-  assert.ok(titles.includes(']]> & <标签> 试炼'), 'CDATA 拆分后标题应完整还原');
-
-  await del(`/api/posts/${(await tricky.json()).post.id}`);
 });

@@ -36,7 +36,6 @@
     "@types/diff": "^7.0.2",
     "@types/node": "^24.0.0",
     "@types/sanitize-html": "^2.16.0",
-    "fast-xml-parser": "^5.11.0",
     "miniflare": "5.20260811.1-alpha",
     "typescript": "^5.7.0",
     "wrangler": "^4.60.0"

@@ -9,7 +9,7 @@
 - 首页：文集入口 + 最新文章（分页）
 - 文集页 / 文章页：按文集组织文章，旧路径自动 301 到新结构
 - 归档页（按时间轴）、关于页、站内搜索（`/search/`）
-- 阅读量统计、上一篇/下一篇相邻导航、`/rss.xml` 与 `/sitemap.xml` 动态生成
+- 阅读量统计、上一篇/下一篇相邻导航、`/sitemap.xml` 动态生成
 - 古风水墨视觉风格：纸纹背景、印章、毛笔标题、朱砂强调色、深色模式
 
 **后台（`/admin`）**
@@ -60,7 +60,7 @@ wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 | `/archive/`、`/about/` | 归档、关于 |
 | `/search/?q=` | 站内搜索 |
 | `/preview/{id}/` | 草稿预览（需登录，`noindex`） |
-| `/rss.xml`、`/sitemap.xml` | 订阅与站点地图（动态生成） |
+| `/sitemap.xml` | 站点地图（动态生成） |
 | `/admin/...` | 管理端 SPA（login / dashboard / posts / editor / collections / import / media） |
 | `/api/...` | 认证、文章、文集、版本、上传、媒体库等 JSON API |
 

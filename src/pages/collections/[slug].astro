@@ -24,6 +24,7 @@ const posts = await listPublishedPosts(env.DB, {
   collectionId: collection.id,
   limit: PAGE_SIZE,
   offset: (page - 1) * PAGE_SIZE,
+  order: collection.post_order,
 });
 ---
 

@@ -308,6 +308,41 @@ test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', as
   assert.ok(htmlB.includes('/collections/adj-col-a/adj-a-3/'), '别集组内无文章，上一篇应回退为邻三');
 });
 
+test('e2e：集内文章顺序 post_order（asc 旧在前 / desc 新在前）', async () => {
+  if (!HAS_BUILD) return;
+  const bad = await post('/api/collections', { title: '坏顺序', slug: 'bad-order', post_order: 'sideways' });
+  assert.equal(bad.status, 400, '非法 post_order 应 400');
+
+  const novel = await post('/api/collections', { title: '连载集', slug: 'order-novel', post_order: 'asc' });
+  assert.equal(novel.status, 201);
+  const novelId = (await novel.json()).collection.id as number;
+  for (const t of ['第一章', '第二章', '第三章']) {
+    const r = await post('/api/posts', { collection_id: novelId, title: t, slug: `order-novel-${t}`, content_md: '正文', status: 'published' });
+    assert.equal(r.status, 201);
+  }
+  const blog = await post('/api/collections', { title: '随感集', slug: 'order-blog' });
+  assert.equal(blog.status, 201);
+  const blogId = (await blog.json()).collection.id as number;
+  for (const t of ['甲帖', '乙帖']) {
+    const r = await post('/api/posts', { collection_id: blogId, title: t, slug: `order-blog-${t}`, content_md: '正文', status: 'published' });
+    assert.equal(r.status, 201);
+  }
+
+  const novelHtml = await (await get('/collections/order-novel/')).text();
+  const novelLinks = [...novelHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  assert.deepEqual(novelLinks, ['/collections/order-novel/order-novel-第一章/', '/collections/order-novel/order-novel-第二章/', '/collections/order-novel/order-novel-第三章/'], '连载集应第一章在前');
+
+  const blogHtml = await (await get('/collections/order-blog/')).text();
+  const blogLinks = [...blogHtml.matchAll(/href="(\/collections\/order-blog\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  assert.deepEqual(blogLinks, ['/collections/order-blog/order-blog-乙帖/', '/collections/order-blog/order-blog-甲帖/'], '博客集应最新在前');
+
+  const flipped = await put(`/api/collections/${novelId}`, { post_order: 'desc' });
+  assert.equal(flipped.status, 200);
+  const flippedHtml = await (await get('/collections/order-novel/')).text();
+  const flippedLinks = [...flippedHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  assert.deepEqual(flippedLinks, ['/collections/order-novel/order-novel-第三章/', '/collections/order-novel/order-novel-第二章/', '/collections/order-novel/order-novel-第一章/'], '改 desc 后应最新在前');
+});
+
 test('e2e：slug 校验与重复 slug', async () => {
   if (!HAS_BUILD) return;
   const bad = await post('/api/collections', { title: '坏 slug', slug: '-bad-' });

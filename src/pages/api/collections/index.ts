@@ -31,6 +31,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'invalid slug: 仅允许中英文、数字与连字符，且不以连字符起止' }, 400);
   }
 
+  const postOrder = typeof body.post_order === 'string' ? body.post_order : undefined;
+  if (postOrder !== undefined && postOrder !== 'asc' && postOrder !== 'desc') {
+    return json({ error: 'invalid post_order: 仅允许 asc（旧在前）或 desc（新在前）' }, 400);
+  }
+
   try {
     const env = await envOf();
     const created = await createCollection(env.DB, {
@@ -39,6 +44,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       summary: typeof body.summary === 'string' ? body.summary : '',
       theme_color: typeof body.theme_color === 'string' && body.theme_color ? body.theme_color : '#c23a30',
       sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
+      post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
     });
     return json({ collection: created }, 201);
   } catch (e) {

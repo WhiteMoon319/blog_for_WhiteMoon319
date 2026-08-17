@@ -5,6 +5,7 @@ export interface Collection {
   summary: string;
   theme_color: string;
   sort_order: number;
+  post_order: 'asc' | 'desc';
   created_at: string;
   updated_at: string;
 }

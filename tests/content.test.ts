@@ -5,6 +5,7 @@ import {
   incrementViewCount,
   createPost,
   updatePost,
+  createCollection,
   deleteCollection,
   getPostById,
   countPublishedPosts,
@@ -279,4 +280,45 @@ test('版本史：版本写入失败时文章更新整体回滚', async () => {
   const row = await getPostById(db, created.id);
   assert.equal(row?.content_md, '原文。', '版本写入失败时文章更新必须回滚');
   assert.equal((await listPostVersions(db, created.id)).length, 1, '不应留下半提交的版本');
+});
+
+test('集内文章排序：post_order 控制旧在前（asc）或新在前（desc）', async () => {
+  const novel = await createCollection(db, { title: '小说集', slug: 'novel-order', post_order: 'asc' });
+  const blog = await createCollection(db, { title: '博客集', slug: 'blog-order', post_order: 'desc' });
+  assert.ok(novel && blog);
+  assert.equal(novel.post_order, 'asc');
+  assert.equal(blog.post_order, 'desc');
+
+  const mk = async (col: number, title: string, at: string) => {
+    const p = await createPost(db, {
+      collection_id: col,
+      title,
+      slug: `${title}`,
+      content_md: '正文',
+      status: 'published',
+    });
+    assert.ok(p);
+    await db.prepare(`UPDATE posts SET created_at = ? WHERE id = ?`).bind(at, p.id).run();
+    return p.id;
+  };
+  await mk(novel.id, '第一章', '2026-01-01 00:00:00');
+  await mk(novel.id, '第二章', '2026-02-01 00:00:00');
+  await mk(novel.id, '第三章', '2026-03-01 00:00:00');
+  await mk(blog.id, '甲帖', '2026-01-01 00:00:00');
+  await mk(blog.id, '乙帖', '2026-02-01 00:00:00');
+  await mk(blog.id, '丙帖', '2026-03-01 00:00:00');
+
+  const novelPosts = await listPublishedPosts(db, { collectionId: novel.id, order: novel.post_order });
+  assert.deepEqual(
+    novelPosts.map((p) => p.slug),
+    ['第一章', '第二章', '第三章'],
+    '小说集应第一章在前',
+  );
+
+  const blogPosts = await listPublishedPosts(db, { collectionId: blog.id, order: blog.post_order });
+  assert.deepEqual(
+    blogPosts.map((p) => p.slug),
+    ['丙帖', '乙帖', '甲帖'],
+    '博客集应最新在前',
+  );
 });

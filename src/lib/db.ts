@@ -16,6 +16,7 @@ export interface CollectionRow {
   summary: string;
   theme_color: string;
   sort_order: number;
+  post_order: 'asc' | 'desc';
   created_at: string;
   updated_at: string;
 }
@@ -54,7 +55,7 @@ export async function getCollectionById(db: D1Database, id: number): Promise<Col
 
 export async function listPublishedPosts(
   db: D1Database,
-  opts: { collectionId?: number | null; limit?: number; offset?: number } = {},
+  opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc' } = {},
 ): Promise<PostRow[]> {
   let sql = `SELECT * FROM posts WHERE status = 'published'`;
   const args: (number | string | null)[] = [];
@@ -66,7 +67,7 @@ export async function listPublishedPosts(
       args.push(opts.collectionId);
     }
   }
-  sql += ` ORDER BY created_at DESC`;
+  sql += opts.order === 'asc' ? ` ORDER BY created_at ASC, id ASC` : ` ORDER BY created_at DESC, id DESC`;
   if (opts.limit) {
     sql += ` LIMIT ?`;
     args.push(opts.limit);
@@ -201,12 +202,13 @@ export async function createCollection(
     summary?: string;
     theme_color?: string;
     sort_order?: number;
+    post_order?: 'asc' | 'desc';
   },
 ): Promise<CollectionRow | null> {
   const res = await db
     .prepare(
-      `INSERT INTO collections (title, slug, summary, theme_color, sort_order)
-       VALUES (?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order)
+       VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
     )
     .bind(
       data.title,
@@ -214,12 +216,13 @@ export async function createCollection(
       data.summary ?? '',
       data.theme_color ?? '#c23a30',
       data.sort_order ?? 0,
+      data.post_order ?? 'desc',
     )
     .first<CollectionRow>();
   return res ?? null;
 }
 
-const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order'] as const;
+const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order'] as const;
 export type CollectionPatch = Partial<Record<(typeof COLLECTION_FIELDS)[number], string | number>>;
 
 export async function updateCollection(db: D1Database, id: number, patch: CollectionPatch): Promise<CollectionRow | null> {

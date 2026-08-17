@@ -44,6 +44,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.summary === 'string') patch.summary = body.summary;
   if (typeof body.theme_color === 'string' && body.theme_color) patch.theme_color = body.theme_color;
   if (typeof body.sort_order === 'number') patch.sort_order = body.sort_order;
+  if (typeof body.post_order === 'string') {
+    if (body.post_order !== 'asc' && body.post_order !== 'desc') {
+      return json({ error: 'invalid post_order: 仅允许 asc（旧在前）或 desc（新在前）' }, 400);
+    }
+    patch.post_order = body.post_order;
+  }
 
   try {
     const env = await envOf();

@@ -10,7 +10,7 @@ const loaded = ref(false);
 const editing = ref<Collection | null>(null);
 const creating = ref(false);
 
-const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0 });
+const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc' });
 
 const COLORS = ['#c23a30', '#2d6a4f', '#2f4858', '#8a6d3b', '#6baed6'];
 
@@ -24,7 +24,7 @@ onMounted(load);
 function openCreate() {
   creating.value = true;
   editing.value = null;
-  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0 });
+  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' });
 }
 
 function openEdit(c: Collection) {
@@ -36,6 +36,7 @@ function openEdit(c: Collection) {
     summary: c.summary,
     theme_color: c.theme_color,
     sort_order: c.sort_order,
+    post_order: c.post_order,
   });
 }
 
@@ -92,7 +93,7 @@ async function remove(c: Collection) {
       </thead>
       <tbody>
         <tr v-for="c in collections" :key="c.id">
-          <td>{{ c.sort_order }}</td>
+          <td>{{ c.sort_order }}<span v-if="c.post_order === 'asc'" title="集内文章旧在前（正读）" style="color:var(--ink-light);font-size:0.75rem;">·正读</span></td>
           <td class="title-cell">
             <span class="color-dot" :style="{ background: c.theme_color }"></span>{{ c.title }}
             <span style="color:var(--ink-light);font-size:0.78rem;">/{{ c.slug }}</span>
@@ -139,6 +140,13 @@ async function remove(c: Collection) {
         <div class="field">
           <label>排序（小者在前）</label>
           <input v-model.number="form.sort_order" class="input" type="number" />
+        </div>
+        <div class="field">
+          <label>集内文章顺序</label>
+          <select v-model="form.post_order" class="select">
+            <option value="desc">新在前（博客）</option>
+            <option value="asc">旧在前（小说连载顺读）</option>
+          </select>
         </div>
       </div>
       <div style="display:flex;gap:10px;">

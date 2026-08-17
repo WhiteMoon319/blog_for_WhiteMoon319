@@ -22,10 +22,10 @@
   --paper-warm: #faf7f2;
   --paper-card: #fffef9;
 
-  /* 字体 */
-  --font-brush: "Ma Shan Zheng", cursive;
-  --font-serif: "Noto Serif SC", serif;
-  --font-sans: "Noto Sans SC", sans-serif;
+  /* 字体（Google Fonts 异步加载；回退栈优先中文系统字体，离线/境内亦美观） */
+  --font-brush: "Ma Shan Zheng", "STKaiti", "KaiTi", "楷体", "Kaiti SC", "LXGW WenKai", cursive;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", "宋体", "Source Han Serif SC", serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "微软雅黑", "Heiti SC", "Source Han Sans SC", sans-serif;
 
   /* 圆角 */
   --radius-sm: 6px;

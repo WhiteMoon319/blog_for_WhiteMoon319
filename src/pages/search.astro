@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { envOf, searchPublishedPosts, getCollectionById, fmtDate } from '../lib/db';
+import { envOf, searchPublishedPosts, getCollectionsByIds, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -8,9 +8,10 @@ export const prerender = false;
 const env = await envOf();
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
 const posts = q ? await searchPublishedPosts(env.DB, q) : [];
+const collections = await getCollectionsByIds(env.DB, posts.map((p) => p.collection_id ?? 0));
 const results: { post: (typeof posts)[number]; collection: { slug: string; title: string; theme_color: string } | null }[] = [];
 for (const post of posts) {
-  const collection = post.collection_id ? await getCollectionById(env.DB, post.collection_id) : null;
+  const collection = post.collection_id ? collections.get(post.collection_id) ?? null : null;
   results.push({ post, collection });
 }
 ---

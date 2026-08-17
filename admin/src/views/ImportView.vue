@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import mammoth from 'mammoth';
 import TurndownService from 'turndown';
 import { api } from '../api';
 import { buildImportPayloads, slugify } from '../lib/import';
@@ -141,7 +140,8 @@ async function parseOne(file: File, ext: string): Promise<ImportItem> {
       error: '',
     };
   }
-  // docx
+  // docx（mammoth 体积大，选中文件时才按需加载）
+  const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
   const html = (
     await mammoth.convertToHtml({

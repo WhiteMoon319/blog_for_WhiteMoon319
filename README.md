@@ -25,7 +25,6 @@
 - **Astro 7**（`output: server`）+ **@astrojs/cloudflare** 适配器，SSR 运行在 **Cloudflare Workers**
 - **Cloudflare D1**：文集、文章、版本历史与登录限流数据
 - **Cloudflare R2**：上传图片
-- **Cloudflare KV**：`SESSION` 登录会话
 - **Vue 3 + Vite**：`admin/` 管理端 SPA，构建后合并进 Worker 静态资源（`dist/client/admin`）
 - **marked + sanitize-html**：Markdown 渲染与 XSS 清洗
 - **miniflare + node:test**：本地 e2e 测试
@@ -72,7 +71,7 @@ API 一览：
 | GET/POST | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}` | 文集 CRUD | 写需登录 |
 | GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published） | 写需登录 |
 | POST | `/api/posts/batch` | 批量操作（如批量删除） | 登录 |
-| GET/POST | `/api/posts/{id}/versions`，GET/PUT `/api/posts/{id}/versions/{version}` | 版本历史与回滚 | 登录 |
+| GET/POST | `/api/posts/{id}/versions`，GET `/api/posts/{id}/versions/{version}`，POST `.../restore` | 版本历史与回滚 | 登录 |
 | POST | `/api/upload` | 图片上传 → R2（multipart） | 登录 |
 | GET/DELETE | `/api/media` | 媒体库列表 / 删除 R2 对象 | 登录 |
 | GET | `/api/files/[...key]` | R2 图片回源（带缓存头） | 公开 |
@@ -131,7 +130,6 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 | 变量 | 说明 | 获取方式 |
 | --- | --- | --- |
 | `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
-| `BLOG_SESSION_KV_ID` | 会话 KV 命名空间 ID | `npx wrangler kv namespace list` |
 
 `npm run build` / `cf:dev` / `cf:deploy` 都会先自动执行 `cf:config`。未配置 `.env` 时生成的文件保留占位符：本地 miniflare 可正常启动，`wrangler deploy` 会因资源 ID 无效而明确失败，不会误指向其他资源。
 
@@ -141,7 +139,6 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 | --- | --- | --- |
 | `DB` | D1 | 文集/文章/版本历史 + 登录限流（`login_attempts` 表原子计数） |
 | `IMAGES` | R2 | 上传图片 |
-| `SESSION` | KV | 登录会话 |
 | `ASSETS` | Static Assets | `dist/client` 静态资源（含合并后的 admin SPA） |
 | vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
 
@@ -157,7 +154,7 @@ npm test               # 单测 + e2e（需要先 npm run build）
 
 ## 部署
 
-前置：已按上文配置 `.env`（真实资源 ID），并已创建 D1 数据库 / KV 命名空间 / R2 桶（或复用现有资源）。
+前置：已按上文配置 `.env`（真实资源 ID），并已创建 D1 数据库 / R2 桶（或复用现有资源）。
 
 ```bash
 npm run cf:deploy      # 生成配置 → 构建 → wrangler deploy

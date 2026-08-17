@@ -1,10 +1,6 @@
-export function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import { slugify } from '../../../src/lib/utils.ts';
+
+export { slugify };
 
 export interface ImportItemLike {
   title: string;

@@ -16,7 +16,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const contentType = object.httpMetadata?.contentType ?? 'application/octet-stream';
   const headers = new Headers();
   headers.set('Content-Type', contentType);
-  headers.set('Cache-Control', 'public, max-age=86400');
+  // key 为 uploads/yyyy/MM/uuid.ext，永不变更，可长缓存
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('X-Content-Type-Options', 'nosniff');
   if (!isInlineSafeType(contentType)) {
     const name = key.split('/').pop() ?? 'download';

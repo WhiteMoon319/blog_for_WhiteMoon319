@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /preview
 
 Sitemap: https://blog.whitemoon319.xyz/sitemap.xml

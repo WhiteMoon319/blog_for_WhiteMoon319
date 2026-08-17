@@ -1,6 +1,6 @@
 /* ===== 基础样式（移植自 CXJC） ===== */
 
-@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+/* 字体改为 BaseLayout 中异步加载（不阻塞渲染），国内不可达时回退系统字体栈 */
 
 /* ===== 全局 Reset ===== */
 *,

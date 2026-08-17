@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getCollectionById, listCollections, listPublishedPosts } from '../lib/db';
+import { envOf, getCollectionsByIds, listCollections, listPublishedPosts } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -9,6 +9,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const base = env.SITE_URL.replace(/\/$/, '');
   const collections = await listCollections(env.DB);
   const posts = await listPublishedPosts(env.DB);
+  const collectionById = await getCollectionsByIds(env.DB, posts.map((p) => p.collection_id ?? 0));
 
   const urls = ['/', '/archive/', '/about/', '/search/'].map((path) => ({
     path,
@@ -19,7 +20,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
     urls.push({ path: `/collections/${encodeURI(c.slug)}/`, lastmod: c.updated_at });
   }
   for (const p of posts) {
-    const collection = p.collection_id ? await getCollectionById(env.DB, p.collection_id) : null;
+    const collection = p.collection_id ? collectionById.get(p.collection_id) : undefined;
     urls.push({ path: postHref(p.slug, collection?.slug), lastmod: p.updated_at });
   }
 

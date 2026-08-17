@@ -2,7 +2,7 @@
 // 真实资源 ID 只允许来自环境变量或根目录 .env，不入库。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
-const REQUIRED_KEYS = ['BLOG_D1_ID', 'BLOG_SESSION_KV_ID'];
+const REQUIRED_KEYS = ['BLOG_D1_ID'];
 const TEMPLATE_FILE = 'wrangler.jsonc.template';
 const OUTPUT_FILE = 'wrangler.jsonc';
 

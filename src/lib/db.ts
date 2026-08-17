@@ -53,6 +53,16 @@ export async function getCollectionById(db: D1Database, id: number): Promise<Col
   return db.prepare('SELECT * FROM collections WHERE id = ?').bind(id).first<CollectionRow>();
 }
 
+export async function getCollectionsByIds(db: D1Database, ids: number[]): Promise<Map<number, CollectionRow>> {
+  const unique = [...new Set(ids.filter((x): x is number => Number.isInteger(x) && x > 0))];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .prepare(`SELECT * FROM collections WHERE id IN (${unique.map(() => '?').join(',')})`)
+    .bind(...unique)
+    .all<CollectionRow>();
+  return new Map((rows.results ?? []).map((r) => [r.id, r]));
+}
+
 export async function listPublishedPosts(
   db: D1Database,
   opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc' } = {},
@@ -135,12 +145,8 @@ export async function searchPublishedPosts(
 }
 
 export async function incrementViewCount(db: D1Database, id: number): Promise<number> {
-  await db
-    .prepare(`UPDATE posts SET view_count = view_count + 1 WHERE id = ?`)
-    .bind(id)
-    .run();
   const row = await db
-    .prepare(`SELECT view_count FROM posts WHERE id = ?`)
+    .prepare(`UPDATE posts SET view_count = view_count + 1 WHERE id = ? RETURNING view_count`)
     .bind(id)
     .first<{ view_count: number }>();
   return row?.view_count ?? 0;
@@ -176,20 +182,36 @@ export async function getAdjacentPosts(
   db: D1Database,
   post: PostRow,
 ): Promise<{ prev: PostWithCollection | null; next: PostWithCollection | null }> {
-  const base = `SELECT p.*, c.slug AS collection_slug FROM posts p LEFT JOIN collections c ON c.id = p.collection_id WHERE p.status = 'published'`;
-  // 文集内优先：与当前篇同组（collection_id 一致，未分类彼此成组）的最近一篇；
-  // 组内没有才回退到全站时间线上的最近一篇。SQLite 的 IS 对 NULL 也成立，可覆盖未分类。
-  const scopedPrev = `${base} AND p.collection_id IS ? AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`;
-  const scopedNext = `${base} AND p.collection_id IS ? AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`;
-  const globalPrev = `${base} AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?)) ORDER BY p.created_at DESC, p.id DESC LIMIT 1`;
-  const globalNext = `${base} AND (p.created_at > ? OR (p.created_at = ? AND p.id > ?)) ORDER BY p.created_at ASC, p.id ASC LIMIT 1`;
-  const prev =
-    (await db.prepare(scopedPrev).bind(post.collection_id, post.created_at, post.created_at, post.id).first<PostWithCollection>()) ??
-    (await db.prepare(globalPrev).bind(post.created_at, post.created_at, post.id).first<PostWithCollection>());
-  const next =
-    (await db.prepare(scopedNext).bind(post.collection_id, post.created_at, post.created_at, post.id).first<PostWithCollection>()) ??
-    (await db.prepare(globalNext).bind(post.created_at, post.created_at, post.id).first<PostWithCollection>());
-  return { prev, next };
+  // 一条窗口函数查询同时求出同组（collection_id 一致，未分类彼此成组）与全站的相邻 id：
+  // LAG/LEAD 在 (created_at, id) 升序上取值，语义与原逐查一致；组内有才用组内值，否则回退全站。
+  const window = await db
+    .prepare(
+      `WITH ranked AS (
+         SELECT p.id,
+                LAG(p.id) OVER (PARTITION BY p.collection_id ORDER BY p.created_at ASC, p.id ASC) AS in_prev_id,
+                LEAD(p.id) OVER (PARTITION BY p.collection_id ORDER BY p.created_at ASC, p.id ASC) AS in_next_id,
+                LAG(p.id) OVER (ORDER BY p.created_at ASC, p.id ASC) AS global_prev_id,
+                LEAD(p.id) OVER (ORDER BY p.created_at ASC, p.id ASC) AS global_next_id
+         FROM posts p
+         WHERE p.status = 'published'
+       )
+       SELECT * FROM ranked WHERE id = ?`,
+    )
+    .bind(post.id)
+    .first<{ in_prev_id: number | null; in_next_id: number | null; global_prev_id: number | null; global_next_id: number | null }>();
+  if (!window) return { prev: null, next: null };
+  const prevId = window.in_prev_id ?? window.global_prev_id;
+  const nextId = window.in_next_id ?? window.global_next_id;
+  const ids = [...new Set([prevId, nextId].filter((x): x is number => x !== null))];
+  if (ids.length === 0) return { prev: null, next: null };
+  const rows = await db
+    .prepare(
+      `SELECT p.*, c.slug AS collection_slug FROM posts p LEFT JOIN collections c ON c.id = p.collection_id WHERE p.id IN (${ids.map(() => '?').join(',')})`,
+    )
+    .bind(...ids)
+    .all<PostWithCollection>();
+  const byId = new Map((rows.results ?? []).map((r) => [r.id, r]));
+  return { prev: prevId ? byId.get(prevId) ?? null : null, next: nextId ? byId.get(nextId) ?? null : null };
 }
 
 /* ===== 文集 CRUD ===== */

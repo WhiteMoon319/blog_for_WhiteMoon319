@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import type { MediaFile } from '../types';
 
@@ -27,11 +27,13 @@ async function load() {
   }
 }
 
+onMounted(() => {
+  void load();
+});
+
 function insert(url: string) {
   emit('pick', url);
 }
-
-defineExpose({ load });
 </script>
 
 <template>

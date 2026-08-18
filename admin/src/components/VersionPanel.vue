@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { diffLines, diffWords } from 'diff';
 import { api } from '../api';
 import type { PostVersion } from '../types';
@@ -111,6 +111,10 @@ async function load() {
   }
 }
 
+onMounted(() => {
+  void load();
+});
+
 async function restoreVersion(v: PostVersion) {
   if (!confirm(`确认回滚到 v${v.version}（${v.created_at.slice(0, 10)}）？当前内容将被覆盖，并生成一条新版本记录。`)) return;
   versionsBusy.value = true;
@@ -125,8 +129,6 @@ async function restoreVersion(v: PostVersion) {
     versionsBusy.value = false;
   }
 }
-
-defineExpose({ load });
 </script>
 
 <template>

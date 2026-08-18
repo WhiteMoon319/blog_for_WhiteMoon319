@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import { fmtDate, fmtSize } from '../lib/format';
 import type { MediaFile } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
@@ -11,16 +12,6 @@ const loaded = ref(false);
 const busy = ref(false);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
-
-function fmtSize(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function fmtDate(iso: string): string {
-  return iso.slice(0, 10).replace(/-/g, '/');
-}
 
 async function loadMore() {
   if (busy.value) return;

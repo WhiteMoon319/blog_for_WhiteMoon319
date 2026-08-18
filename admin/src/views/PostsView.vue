@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api';
+import { fmtDate } from '../lib/format';
 import type { Collection, Post } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
@@ -41,10 +42,6 @@ function colColor(id: number | null): string {
 function postUrl(p: Post): string {
   const col = collections.value.find((c) => c.id === p.collection_id);
   return col ? `/collections/${encodeURI(col.slug)}/${encodeURI(p.slug)}/` : `/posts/${encodeURI(p.slug)}/`;
-}
-
-function fmt(iso: string): string {
-  return iso.slice(0, 10).replace(/-/g, '/');
 }
 
 function edit(p: Post) {
@@ -210,7 +207,7 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
               </span>
             </td>
             <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
-            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmt(p.created_at) }}</td>
+            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmtDate(p.created_at) }}</td>
             <td>
               <div class="actions">
                 <button class="btn btn-ghost mini" @click="edit(p)">改</button>

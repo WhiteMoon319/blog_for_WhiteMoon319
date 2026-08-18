@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import TurndownService from 'turndown';
 import { api } from '../api';
-import { buildImportPayloads, slugify } from '../lib/import';
+import {
+  buildImportPayloads,
+  slugify,
+  stem,
+  titleFromMarkdown,
+  summaryFromMarkdown,
+  looksLikeMarkdown,
+  plainToParagraphs,
+  firstHeadingFromHtml,
+  EXT_MIME,
+} from '../lib/import';
+import { createTurndown } from '../lib/editor';
 import type { Collection } from '../types';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
@@ -25,14 +35,7 @@ const status = ref<'draft' | 'published'>('draft');
 const slugMode = ref<'auto' | 'manual'>('auto');
 const fileInput = ref<HTMLInputElement | null>(null);
 
-const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
-
-const EXT_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-};
+const turndown = createTurndown();
 
 onMounted(async () => {
   try {
@@ -42,43 +45,6 @@ onMounted(async () => {
     emit('notify', (e as Error).message, true);
   }
 });
-
-function stem(name: string): string {
-  return name.replace(/\.[^.]+$/, '').trim();
-}
-
-function titleFromMarkdown(md: string, fallback: string): string {
-  const h = md.match(/^\s*#{1,6}\s+(.+)$/m);
-  if (h) return h[1].replace(/[*_`]/g, '').trim();
-  return fallback;
-}
-
-function summaryFromMarkdown(md: string): string {
-  const para = md
-    .split(/\n{2,}/)
-    .map((p) => p.replace(/^[#>\-*+\d.\s`]+/m, '').replace(/[*_`[\]]/g, '').trim())
-    .find((t) => t.length > 0);
-  return (para ?? '').slice(0, 120);
-}
-
-function looksLikeMarkdown(text: string): boolean {
-  return /(^|\n)\s*(#{1,6}\s|[-*+]\s|>\s|```|`[^`\n]+`|\d+\.\s)/.test(text);
-}
-
-function plainToParagraphs(text: string): string {
-  return text
-    .replace(/\r\n?/g, '\n')
-    .split(/\n{2,}/)
-    .map((p) => p.replace(/\s*\n\s*/g, '\n').trim())
-    .filter((p) => p.length > 0)
-    .join('\n\n');
-}
-
-function firstHeadingFromHtml(html: string): string | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const h = doc.querySelector('h1, h2, h3');
-  return h?.textContent?.trim() || null;
-}
 
 async function onFiles(e: Event) {
   const input = e.target as HTMLInputElement;

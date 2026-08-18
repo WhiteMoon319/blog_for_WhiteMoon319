@@ -8,11 +8,12 @@ import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { marked } from 'marked';
 import { api } from '../api';
-import type { Collection, MediaFile } from '../types';
+import type { Collection } from '../types';
 import TagChips from '../components/TagChips.vue';
 import VersionPanel from '../components/VersionPanel.vue';
 import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
+import { parseId } from '../lib/format';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -164,11 +165,6 @@ watch(
   },
 );
 
-function parseId(raw: unknown): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
 watch(() => [route.query.id, route.query.collection] as const, async ([id, collection]) => {
   if (loading.value) return;
   const next = parseId(id);
@@ -261,11 +257,9 @@ function setLink() {
 }
 
 const showPicker = ref(false);
-const pickerRef = ref<InstanceType<typeof MediaPickerModal> | null>(null);
 
 function openPicker() {
   showPicker.value = true;
-  void pickerRef.value?.load();
 }
 
 function insertMedia(url: string) {
@@ -405,7 +399,6 @@ function openVersions() {
 
   <MediaPickerModal
     v-if="showPicker"
-    ref="pickerRef"
     @close="showPicker = false"
     @notify="emit('notify', $event)"
     @pick="insertMedia"

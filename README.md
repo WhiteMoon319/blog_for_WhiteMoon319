@@ -38,7 +38,7 @@ admin/                   Vue 3 管理端 SPA（/admin/ 基路径，Tiptap 编辑
   src/components/        版本历史面板、媒体选择弹窗
   src/lib/               Turndown 封装、内容风险检查
 db/
-  migrations/            D1 迁移（0001_init ~ 0010_tags）
+  migrations/            D1 迁移（0001_init ~ 0012_fts_update_trigger）
   seed.sql               本地演示种子数据
   reset.sql              本地整库重置（cf:db:local 可重入）
 scripts/
@@ -76,8 +76,8 @@ API 一览：
 | --- | --- | --- | --- |
 | POST | `/api/auth/login` `logout`，GET `/me` | 登录 / 注销 / 校验会话 | 登录 |
 | GET/POST | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}` | 文集 CRUD | 写需登录 |
-| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published；PUT 带 `base_version` 乐观锁，过期 409） | 写需登录 |
-| POST | `/api/posts/batch` | 批量创建/刊发/转草稿/移动/删除（slug 自动避让；move 全成功或全失败） | 登录 |
+| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published；PUT 带 `base_version` 乐观锁，过期 409；tags 严格校验：非法/超长/空标签或超过 20 个一律 400，且与正文写入同批原子） | 写需登录 |
+| POST | `/api/posts/batch` | 批量创建/刊发/转草稿/移动/删除（单请求 ≤50，超限整体拒绝；slug 自动避让且 ≤63 字符；publish/draft/delete 单事务原子、状态变更留版本留档；move 全成功或全失败） | 登录 |
 | GET/POST | `/api/posts/{id}/versions`，GET `/api/posts/{id}/versions/{version}`，POST `.../restore` | 版本历史与回滚 | 登录 |
 | GET | `/api/tags` | 标签建议（云计数） | 公开 |
 | POST | `/api/upload` | 图片上传 → R2（multipart） | 登录 |
@@ -158,7 +158,7 @@ pnpm run typecheck      # astro check + vue-tsc + tsc（含 tests/**）
 pnpm test               # 单测 + e2e（需要先 pnpm run build）
 ```
 
-测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。e2e 引导会校验构建产物存在且不早于源码（`requireBuild`），改代码忘 build 会明确报错而非误测旧产物。
+测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；`tests/consistency.test.ts` 覆盖原子写（slug 冲突整批回滚）、严格标签解析、删文集分批迁移与故障注入幂等续跑、FTS 触发器行为；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。e2e 引导会校验构建产物存在且不早于源码（`requireBuild`），改代码忘 build 会明确报错而非误测旧产物。
 
 ## 部署
 
@@ -189,5 +189,5 @@ npx wrangler secret put R2_PUBLIC_URL     # 可选：R2 公共域名，如 https
 
 - 迁移：`db/migrations/`，本地用 `pnpm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
 - 种子：`db/seed.sql`（仅本地演示用）
-- 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`tags`/`post_tags`（标签：文章自有标签 + 文集继承标签，删除后孤儿标签自动清理）、`login_attempts`（登录限流计数）、`posts_fts`（FTS 全文检索虚拟表，迁移 0009）
-- 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀；文集可设 `post_order`（`asc` 连载序 / `desc` 博客序，迁移 0008）
+- 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`tags`/`post_tags`（标签：文章自有标签 + 文集继承标签，删除后孤儿标签自动清理）、`collection_deletes`（删文集分批迁移账本，迁移 0011）、`login_attempts`（登录限流计数）、`posts_fts`（FTS 全文检索虚拟表，迁移 0009；更新触发器仅 title/summary/content_md 变化时同步，迁移 0012）
+- 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀；成员超过 48 篇时分批迁移（进度记入 `collection_deletes`，失败可幂等续跑），每篇均留「文集删除迁移」版本；文集可设 `post_order`（`asc` 连载序 / `desc` 博客序，迁移 0008）

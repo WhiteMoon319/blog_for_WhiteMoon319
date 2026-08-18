@@ -6,8 +6,8 @@ import { envOf, getTagPage } from '../../../lib/db';
 export const prerender = false;
 
 const env = await envOf();
-const raw = Astro.params.tag ?? '';
-const name = decodeURIComponent(raw);
+// Astro.params 已解码，勿再 decodeURIComponent（标签名含 % 会被双重解码炸 500）
+const name = Astro.params.tag ?? '';
 const keyword = (Astro.url.searchParams.get('q') ?? '').trim();
 const page = await getTagPage(env.DB, name, keyword);
 

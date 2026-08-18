@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPost, setPostOwnTags, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPost, getCollectionById, setPostOwnTags, parseTagNames, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -64,6 +64,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   try {
     const env = await envOf();
+    if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
+      return json({ error: 'collection not found' }, 404);
+    }
     const created = await createPost(env.DB, {
       title: body.title.trim(),
       slug: ensureSlug(slug, body.title, 'post'),
@@ -74,9 +77,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       status,
     });
     if (!created) return json({ error: 'post create failed' }, 500);
-    const tags = Array.isArray(body.tags)
-      ? await setPostOwnTags(env.DB, created.id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
-      : [];
+    const tags = await setPostOwnTags(env.DB, created.id, parseTagNames(body.tags));
     return json({ post: created, tags }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);

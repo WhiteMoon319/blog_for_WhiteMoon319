@@ -26,6 +26,9 @@ export async function GET(ctx: APIContext): Promise<Response> {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex',
+      // admin 产物无内联脚本，可收紧 CSP（style unsafe-inline 供 Vue 运行时注入样式）
+      'Content-Security-Policy':
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     },
   });
 }

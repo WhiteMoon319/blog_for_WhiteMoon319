@@ -132,6 +132,11 @@ function escapeFtsPhrase(query: string): string {
   return `"${query.replace(/"/g, '""')}"`;
 }
 
+// LIKE 通配符转义：% 与 _ 作为字面字符匹配，配合 ESCAPE '\'
+function escapeLike(query: string): string {
+  return query.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export async function searchPublishedPosts(
   db: D1Database,
   q: string,
@@ -152,13 +157,14 @@ export async function searchPublishedPosts(
       .catch(() => null);
     if (rows && (rows.results ?? []).length > 0) return rows.results ?? [];
   }
+  const like = `%${escapeLike(query)}%`;
   return db
     .prepare(
       `SELECT * FROM posts
-       WHERE status = 'published' AND (title LIKE ? OR summary LIKE ? OR content_md LIKE ?)
+       WHERE status = 'published' AND (title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR content_md LIKE ? ESCAPE '\\')
        ORDER BY created_at DESC LIMIT ?`,
     )
-    .bind(`%${query}%`, `%${query}%`, `%${query}%`, limit)
+    .bind(like, like, like, limit)
     .all<PostRow>()
     .then((r) => r.results ?? []);
 }
@@ -378,7 +384,8 @@ export async function updatePost(
     id: number,
     patch: PostPatch,
     versionMessage?: string,
-  ): Promise<PostRow | null> {
+    baseVersion?: number,
+  ): Promise<PostRow | 'conflict' | null> {
     const current = await getPostById(db, id);
     if (!current) return null;
     const keys = Object.keys(patch).filter((k) => POST_FIELDS.includes(k as (typeof POST_FIELDS)[number]));
@@ -393,20 +400,35 @@ export async function updatePost(
     const values = changed.map((k) => patch[k as keyof PostPatch]);
     // 文章更新与版本留档放入同一个 D1 事务（batch 原子执行）：
     // 版本写入失败时文章更新一并回滚；版本号由同一事务内 MAX(version)+1 计算，写事务串行化保证不冲突。
+    // baseVersion 提供时做乐观锁：当前版本不匹配则整批不生效并返回 'conflict'。
+    const versionMatch =
+      baseVersion !== undefined
+        ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
+        : '';
+    const versionArgs = baseVersion !== undefined ? [id, baseVersion] : [];
     const results = await db.batch([
       db
-        .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? RETURNING *`)
-        .bind(...values, id),
+        .prepare(
+          `UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? ${versionMatch} RETURNING *`,
+        )
+        .bind(...values, id, ...versionArgs),
       db
         .prepare(
           `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
-           SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+           SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
                   title, slug, collection_id, summary, content_md, cover_url, status, ?
-           FROM posts WHERE id = ?`,
+           FROM posts WHERE id = ? ${versionMatch}`,
         )
-        .bind(id, id, versionMessage ?? '自动保存', id),
+        .bind(
+          id,
+          ...(baseVersion !== undefined ? [baseVersion + 1, versionMessage ?? '自动保存'] : [id, versionMessage ?? '自动保存']),
+          id,
+          ...versionArgs,
+        ),
     ]);
-    return results[0].results?.[0] as PostRow | undefined ?? null;
+    const row = results[0].results?.[0] as PostRow | undefined;
+    if (!row) return baseVersion !== undefined ? 'conflict' : null;
+    return row;
   }
 
 export async function deletePost(db: D1Database, id: number): Promise<boolean> {
@@ -459,6 +481,14 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
 
 export async function getPostById(db: D1Database, id: number): Promise<PostRow | null> {
   return db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>();
+}
+
+export async function getLatestPostVersion(db: D1Database, id: number): Promise<number> {
+  const row = await db
+    .prepare('SELECT COALESCE(MAX(version), 0) AS version FROM post_versions WHERE post_id = ?')
+    .bind(id)
+    .first<{ version: number }>();
+  return row?.version ?? 0;
 }
 
 export async function listPosts(
@@ -528,6 +558,25 @@ function cleanTagNames(names: string[]): string[] {
   return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
 }
 
+// 标签名不允许的字符：% 与 URL 保留/不安全字符、控制字符（含空格的标签由 cleanTagNames 归一化）
+const TAG_BAD_CHARS = /[%#/?&=<>"'\\[\u0000-\u001F\u007F]/;
+
+export function isValidTagName(name: string): boolean {
+  return name.length > 0 && name.length <= 32 && !TAG_BAD_CHARS.test(name);
+}
+
+// 从 API 请求体解析标签名：只收字符串、过滤非法字符与重复
+export function parseTagNames(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const t of raw) {
+    if (typeof t !== 'string') continue;
+    const name = t.trim().replace(/\s+/g, ' ');
+    if (isValidTagName(name) && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
 // 写路径用：按名解析标签 id，不存在的直接创建（管理端打标签）
 async function resolveTagIds(db: D1Database, names: string[]): Promise<number[]> {
   const unique = cleanTagNames(names);
@@ -595,6 +644,7 @@ export async function setCollectionTags(db: D1Database, collectionId: number, na
     ...ids.map((tagId) =>
       db.prepare('INSERT INTO collection_tags (collection_id, tag_id) VALUES (?, ?)').bind(collectionId, tagId),
     ),
+    purgeOrphanTagsStmt(db),
   ]);
   return listCollectionTags(db, collectionId);
 }
@@ -606,6 +656,7 @@ export async function setPostOwnTags(db: D1Database, postId: number, names: stri
     ...ids.map((tagId) =>
       db.prepare('INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)').bind(postId, tagId),
     ),
+    purgeOrphanTagsStmt(db),
   ]);
   return listPostOwnTags(db, postId);
 }
@@ -678,8 +729,8 @@ export async function getTagsUnion(
 ): Promise<TagsUnionResult> {
   const unique = cleanTagNames(names);
   const tagIds = unique.length > 0 ? await findTagIds(db, unique) : [];
-  // 指定了标签但一个都解析不到 → 明确返回空，而非落入「全部浏览」
-  if (unique.length > 0 && tagIds.length === 0) {
+  // 指定了标签但任一解析不到 → 交集为空，明确返回空（而非静默降级为已存在标签的交集）
+  if (unique.length > 0 && tagIds.length !== unique.length) {
     return { collections: [], posts: [], collectionPosts: new Map() };
   }
   const kw = keyword.trim();
@@ -766,7 +817,7 @@ export async function getTagsUnion(
   };
 }
 
-function purgeOrphanTagsStmt(db: D1Database): D1PreparedStatement {
+export function purgeOrphanTagsStmt(db: D1Database): D1PreparedStatement {
   return db.prepare(
     `DELETE FROM tags
      WHERE NOT EXISTS (SELECT 1 FROM post_tags WHERE post_tags.tag_id = tags.id)

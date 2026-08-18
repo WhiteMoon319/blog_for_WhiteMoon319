@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, listCollections, createCollection, setCollectionTags, isSlugConflict } from '../../../lib/db';
+import { envOf, listCollections, createCollection, setCollectionTags, parseTagNames, isSlugConflict } from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -47,9 +47,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
     });
     if (!created) return json({ error: 'collection create failed' }, 500);
-    const tags = Array.isArray(body.tags)
-      ? await setCollectionTags(env.DB, created.id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
-      : [];
+    const tags = await setCollectionTags(env.DB, created.id, parseTagNames(body.tags));
     return json({ collection: created, tags }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);

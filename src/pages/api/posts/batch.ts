@@ -1,10 +1,9 @@
 import type { APIContext } from 'astro';
 import {
   envOf,
-  updatePost,
-  deletePost,
   createPost,
   getCollectionById,
+  purgeOrphanTagsStmt,
   isSlugConflict,
   type PostRow,
 } from '../../../lib/db';
@@ -152,9 +151,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
     const placeholders = ids.map(() => '?').join(', ');
     const rows = await env.DB
-      .prepare(`SELECT id, slug FROM posts WHERE id IN (${placeholders})`)
+      .prepare(`SELECT id, slug, collection_id FROM posts WHERE id IN (${placeholders})`)
       .bind(...ids)
-      .all<{ id: number; slug: string }>();
+      .all<{ id: number; slug: string; collection_id: number | null }>();
     const found = rows.results ?? [];
     if (found.length !== ids.length) {
       return json({ error: '部分文章不存在，本次移动未执行' }, 404);
@@ -168,7 +167,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
       : env.DB.prepare('SELECT slug FROM posts WHERE collection_id = ?').bind(target);
     const scopeRows = await scope.all<{ slug: string }>();
     for (const r of scopeRows.results ?? []) taken.add(r.slug);
-    for (const r of found) taken.delete(r.slug); // 被移动的文章即将离开原范围
+    // 仅在文章本就在目标范围（同范围重定位）时移除其 slug，避免把目标范围内
+    // 已存在的同 slug 一并抹掉而漏检真实冲突
+    for (const r of found) {
+      if (target === null ? r.collection_id === null : r.collection_id === target) {
+        taken.delete(r.slug);
+      }
+    }
 
     const seen = new Set<string>();
     const conflicts: string[] = [];
@@ -210,15 +215,34 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ ok: true, count: found.length });
   }
 
-  let count = 0;
-  for (const id of ids) {
-    if (action === 'delete') {
-      await deletePost(env.DB, id);
-    } else {
-      await updatePost(env.DB, id, { status: action === 'publish' ? 'published' : 'draft' });
+  if (action === 'delete') {
+    // 先查实际存在的 id，按存在数删除并计数（避免依赖 meta.changes 的级联行数）
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = await env.DB
+      .prepare(`SELECT id FROM posts WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .all<{ id: number }>();
+    const existing = (rows.results ?? []).map((r) => r.id);
+    if (existing.length === 0) return json({ ok: true, count: 0 });
+    const stmts: D1PreparedStatement[] = [];
+    for (const id of existing) {
+      stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
+      stmts.push(purgeOrphanTagsStmt(env.DB));
     }
-    count++;
+    await env.DB.batch(stmts);
+    return json({ ok: true, count: existing.length });
   }
 
-  return json({ ok: true, count });
+  // 批量 publish/draft 并入单个 D1 batch：全成功或全失败
+  const stmts: D1PreparedStatement[] = [];
+  for (const id of ids) {
+    stmts.push(
+      env.DB
+        .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ?`)
+        .bind(action === 'publish' ? 'published' : 'draft', id),
+    );
+  }
+  await env.DB.batch(stmts);
+
+  return json({ ok: true, count: ids.length });
 }

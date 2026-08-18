@@ -6,7 +6,7 @@ import { postHref } from '../lib/utils';
 export const prerender = false;
 
 const env = await envOf();
-const q = (Astro.url.searchParams.get('q') ?? '').trim();
+let q = (Astro.url.searchParams.get('q') ?? '').trim();
 
 // 「#标签1 #标签2 关键词」为标签检索：# 前缀词均为标签（多标签交集），其余 token 为标签内关键词。
 // 例：#校园 → 校园；#校园 #恋爱 → 校园∩恋爱；#校园 庄桂清 → 校园内寻「庄桂清」。
@@ -22,6 +22,10 @@ for (const token of q.split(/\s+/).filter(Boolean)) {
   }
 }
 const tagKeyword = keywordTokens.join(' ').trim();
+// 查询仅由孤立的「#」组成（如 "#"、"# #"）时没有可检索内容，清空 q 展示空态
+if (tagNames.length === 0 && !tagKeyword && /#/.test(q)) {
+  q = '';
+}
 let tagMode = false;
 let tagNotFound = '';
 if (tagNames.length > 0) {

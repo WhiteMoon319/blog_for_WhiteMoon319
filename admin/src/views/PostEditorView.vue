@@ -23,6 +23,7 @@ const loading = ref(true);
 const saving = ref(false);
 const uploading = ref(false);
 const loadedId = ref<number | null>(null);
+const baseVersion = ref(0);
 
 const isEdit = computed(() => loadedId.value !== null);
 
@@ -39,6 +40,16 @@ const form = reactive({
 });
 const coverFileInput = ref<HTMLInputElement | null>(null);
 const imageFileInput = ref<HTMLInputElement | null>(null);
+
+// 编辑器不支持的结构提示：加载/保存时检测 markdown 表格与块级 HTML，避免往返后静默丢失
+const contentRisk = ref('');
+const TABLE_RE = /^\s*\|[^\n]*\|\s*$/m;
+const RAW_HTML_RE = /<(table|div|details|section|article|aside|header|footer|nav|main|figure|dl|iframe|style|script|form)[\s>]/i;
+function checkContentRisk(md: string): string {
+  if (TABLE_RE.test(md)) return '正文包含 Markdown 表格，编辑器会将其摊平为纯文本后保存，结构将丢失。';
+  if (RAW_HTML_RE.test(md)) return '正文包含块级 HTML（表格/布局标签等），编辑器会剥掉这些结构，保存后内容可能改变。';
+  return '';
+}
 
 const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
 
@@ -111,9 +122,11 @@ async function load() {
 
   const id = parseId(route.query.id);
   loadedId.value = id;
+  baseVersion.value = 0;
   form.version_message = '';
   if (id) {
-    const { post, tags } = await api.post(id);
+    const { post, tags, version } = await api.post(id);
+    baseVersion.value = version;
     form.title = post.title;
     form.slug = post.slug;
     form.collection_id = post.collection_id;
@@ -121,6 +134,7 @@ async function load() {
     form.cover_url = post.cover_url;
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
+    contentRisk.value = checkContentRisk(post.content_md);
     if (editor.value) editor.value.commands.setContent(marked.parse(post.content_md) as string);
   } else {
     form.title = '';
@@ -186,6 +200,7 @@ async function save() {
   saving.value = true;
   try {
     const content_md = turndown.turndown(editor.value.getHTML());
+    contentRisk.value = checkContentRisk(content_md);
     const payload = {
       title: form.title.trim(),
       slug: form.slug,
@@ -196,9 +211,11 @@ async function save() {
       status: form.status,
       version_message: form.version_message.trim(),
       tags: form.tags,
+      base_version: baseVersion.value,
     };
     if (loadedId.value !== null) {
-      await api.updatePost(loadedId.value, payload);
+      const { version } = await api.updatePost(loadedId.value, payload);
+      baseVersion.value = version;
       emit('notify', '篇章已存');
       form.version_message = '';
     } else {
@@ -468,6 +485,7 @@ async function restoreVersion(v: PostVersion) {
 
       <div class="field">
         <label>正文（可直接拖入或粘贴图片）</label>
+        <div v-if="contentRisk" class="risk-banner">{{ contentRisk }}</div>
         <div class="editor-shell">
           <div class="editor-toolbar">
             <button type="button" :class="{ 'is-active': editor?.isActive('bold') }" @click="editor?.chain().focus().toggleBold().run()"><b>B</b></button>
@@ -611,6 +629,16 @@ async function restoreVersion(v: PostVersion) {
 </template>
 
 <style scoped>
+.risk-banner {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #8a5a12;
+  background: #fdf3d8;
+  border: 1px solid #e8d3a0;
+  border-radius: 6px;
+}
 .media-mask {
   position: fixed;
   inset: 0;

@@ -32,6 +32,12 @@ function onKeydown(e: KeyboardEvent) {
     remove(props.modelValue[props.modelValue.length - 1]);
   }
 }
+
+// datalist 选择先触发 blur 再回填 input.value，直接 add 会把旧文本落进 chips；
+// 延迟一拍等回填完成再提交
+function onBlur() {
+  setTimeout(add, 0);
+}
 </script>
 
 <template>
@@ -45,7 +51,7 @@ function onKeydown(e: KeyboardEvent) {
       :placeholder="placeholder ?? '回车添加标签'"
       :list="listId"
       @keydown="onKeydown"
-      @blur="add"
+      @blur="onBlur"
     />
     <datalist :id="listId">
       <option v-for="s in suggestions ?? []" :key="s" :value="s">{{ s }}</option>

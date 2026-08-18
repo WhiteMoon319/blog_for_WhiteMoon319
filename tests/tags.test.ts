@@ -16,6 +16,10 @@ import {
   deletePost,
   deleteCollection,
   getTagByName,
+  getLatestPostVersion,
+  isValidTagName,
+  parseTagNames,
+  searchPublishedPosts,
 } from '../src/lib/db.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
@@ -76,7 +80,7 @@ test('标签：替换式设置，删旧增新', async () => {
     ['武侠', '玄幻'],
     '江湖被替换掉',
   );
-  assert.equal((await getTagByName(db, '江湖'))?.name, '江湖', '替换只是解绑，标签实体仍在');
+  assert.equal(await getTagByName(db, '江湖'), null, '替换后不再被引用的孤儿标签被 purge');
 });
 
 test('标签：云计数——继承不重复计，未覆盖的自有标签计', async () => {
@@ -177,6 +181,15 @@ test('标签：只读查询不产生副作用——findTagIds/getTagsUnion 不�
   assert.ok(p);
   await setPostOwnTags(db, p.id, [ghost]);
   assert.ok(await getTagByName(db, ghost), '写路径（打标签）才会创建');
+
+  // 部分标签缺失 → 交集为空，不静默降级为已存在标签的交集
+  const col = await createCollection(db, { title: '辛集', slug: 'tag-partial' });
+  assert.ok(col);
+  await setCollectionTags(db, col.id, ['部分试甲']);
+  const partial = await getTagsUnion(db, ['部分试甲', ghost]);
+  assert.deepEqual(partial.collections, [], '任一标签缺失时交集为空');
+  assert.deepEqual(partial.posts, []);
+  assert.deepEqual([...partial.collectionPosts.keys()], []);
 });
 
 test('标签：多标签交集——同时具备全部选中标签才命中，覆盖规则不变', async () => {
@@ -230,4 +243,76 @@ test('标签：多标签交集——同时具备全部选中标签才命中，�
     ['tu-in'],
     '关键词模式放宽到章节级，继承命中的章节也列出',
   );
+});
+
+test('标签名：parseTagNames 过滤非法字符，isValidTagName 判据', () => {
+  assert.ok(isValidTagName('校园'));
+  assert.ok(isValidTagName('百分之十')); // 中文百分号没问题
+  assert.ok(!isValidTagName('100%'));
+  assert.ok(!isValidTagName('a#b'));
+  assert.ok(!isValidTagName('a/b'));
+  assert.ok(!isValidTagName('x'.repeat(33)));
+  assert.deepEqual(parseTagNames(['校园', 1, null, '100%', ' a#b ', '校园', '恋爱']), ['校园', '恋爱']);
+  assert.deepEqual(parseTagNames('not-array'), []);
+});
+
+test('检索：LIKE 通配符按字面匹配（% 与 _ 不展开）', async () => {
+  const pct = await createPost(db, {
+    title: '完成度 100% 检视',
+    slug: `like-pct-${Date.now().toString(36)}`,
+    content_md: '旁注 100% 对照',
+    status: 'published',
+  });
+  const under = await createPost(db, {
+    title: '下划线 a_b 记录',
+    slug: `like-und-${Date.now().toString(36)}`,
+    content_md: '',
+    status: 'published',
+  });
+  assert.ok(pct && under);
+
+  const hit = await searchPublishedPosts(db, '100%');
+  assert.ok(hit.some((p) => p.id === pct.id), '搜索 100% 命中含字面 % 的篇章');
+  assert.ok(!hit.some((p) => p.id === under.id), '未命中无关篇章');
+
+  const hit2 = await searchPublishedPosts(db, 'a_b');
+  assert.ok(hit2.some((p) => p.id === under.id), 'a_b 按字面匹配');
+  assert.ok(!hit2.some((p) => p.id === pct.id));
+});
+
+test('版本：base_version 乐观锁，过期基线拒绝更新', async () => {
+  const p = await createPost(db, { title: '锁文', slug: `lock-${Date.now().toString(36)}`, content_md: '' });
+  assert.ok(p);
+  assert.equal(await getLatestPostVersion(db, p.id), 1, '创建即留 v1');
+
+  const v1 = await updatePost(db, p.id, { title: '锁文一改' }, '手动', 1);
+  assert.ok(v1 !== null && v1 !== 'conflict', '基线 1 匹配可更新');
+  assert.equal(await getLatestPostVersion(db, p.id), 2);
+
+  const stale = await updatePost(db, p.id, { title: '锁文二改' }, '手动', 1);
+  assert.equal(stale, 'conflict', '基线 1 已过期 → conflict');
+
+  const v2 = await updatePost(db, p.id, { title: '锁文二改' }, '手动', 2);
+  assert.ok(v2 !== null && v2 !== 'conflict', '基线 2 匹配可更新');
+
+  const noBase = await updatePost(db, p.id, { title: '锁文三改' });
+  assert.ok(noBase !== null && noBase !== 'conflict', '不带基线照常更新');
+  assert.equal(await getLatestPostVersion(db, p.id), 4);
+});
+
+test('标签：替换式设置后孤儿标签被清理', async () => {
+  const col = await createCollection(db, { title: '孤儿集', slug: `orphan-${Date.now().toString(36)}` });
+  assert.ok(col);
+  await setCollectionTags(db, col.id, ['孤儿甲']);
+  assert.ok(await getTagByName(db, '孤儿甲'), '标签已建');
+  await setCollectionTags(db, col.id, []);
+  assert.equal(await getTagByName(db, '孤儿甲'), null, '清空文集标签后孤儿标签被 purge');
+
+  const p = await createPost(db, { title: '孤儿文', slug: `orphanp-${Date.now().toString(36)}`, content_md: '' });
+  assert.ok(p);
+  await setPostOwnTags(db, p.id, ['孤儿乙']);
+  assert.ok(await getTagByName(db, '孤儿乙'));
+  await setPostOwnTags(db, p.id, ['孤儿丙']);
+  assert.equal(await getTagByName(db, '孤儿乙'), null, '文章换标签后旧标签被 purge');
+  assert.ok(await getTagByName(db, '孤儿丙'));
 });

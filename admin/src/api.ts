@@ -56,13 +56,13 @@ export const api = {
 
   posts: (query = '') => request<{ posts: Post[] }>(`/api/posts?status=all${query}`),
 
-  post: (id: number) => request<{ post: Post; tags: Tag[] }>(`/api/posts/${id}`),
+  post: (id: number) => request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`),
 
   createPost: (data: Partial<Post>) =>
     request<{ post: Post }>('/api/posts', { method: 'POST', body: JSON.stringify(data) }),
 
   updatePost: (id: number, data: Partial<Post>) =>
-    request<{ post: Post }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<{ post: Post; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
 

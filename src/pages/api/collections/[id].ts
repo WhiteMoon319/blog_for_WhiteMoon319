@@ -6,6 +6,7 @@ import {
   deleteCollection,
   listCollectionTags,
   setCollectionTags,
+  parseTagNames,
   isSlugConflict,
 } from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
@@ -65,7 +66,7 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     const updated = await updateCollection(env.DB, id, patch);
     if (!updated) return json({ error: 'not found' }, 404);
     const tags = Array.isArray(body.tags)
-      ? await setCollectionTags(env.DB, id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+      ? await setCollectionTags(env.DB, id, parseTagNames(body.tags))
       : await listCollectionTags(env.DB, id);
     return json({ collection: updated, tags });
   } catch (e) {

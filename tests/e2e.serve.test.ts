@@ -91,7 +91,6 @@ async function boot(): Promise<void> {
             SITE_SLOGAN: { type: 'json', value: '一角书斋' },
             SITE_POEM: { type: 'json', value: '晨起摊书卷。' },
             SITE_URL: { type: 'json', value: 'http://e2e.test' },
-            SITE_URL: { type: 'json', value: 'http://e2e.test' },
             BLOG_ADMIN_PASSWORD: { type: 'json', value: 'admin123' },
             BLOG_SESSION_SECRET: { type: 'json', value: 'e2e-secret-0123456789abcdef0123456789abcdef' },
             R2_PUBLIC_URL: { type: 'json', value: '' },
@@ -1185,4 +1184,94 @@ test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼�
   assert.ok(html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'), '相对 URL 应拼上站点基址');
   await del(`/api/posts/${(await rel.json()).post.id}`);
   await del(`/api/collections/${colId}`);
+});
+
+test('e2e：PUT 乐观锁——过期 base_version 返回 409，正确基线放行', async () => {
+  if (!HAS_BUILD) return;
+  const created = await post('/api/posts', {
+    title: '锁测篇',
+    slug: `lock-e2e-${Date.now().toString(36)}`,
+    content_md: '初稿。',
+    status: 'draft',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const fresh = await get(`/api/posts/${id}`);
+  assert.equal(fresh.status, 200);
+  const { version } = await fresh.json();
+  assert.equal(version, 1, '创建即 v1');
+
+  const ok1 = await put(`/api/posts/${id}`, { content_md: '二稿。', base_version: version });
+  assert.equal(ok1.status, 200, '基线匹配应放行');
+  assert.equal((await ok1.json()).version, 2);
+
+  const stale = await put(`/api/posts/${id}`, { content_md: '三稿（过期基线）。', base_version: version });
+  assert.equal(stale.status, 409, '过期基线应拒绝');
+
+  const ok2 = await put(`/api/posts/${id}`, { content_md: '三稿。', base_version: 2 });
+  assert.equal(ok2.status, 200, '更新基线应放行');
+  assert.equal((await ok2.json()).version, 3);
+
+  const v3 = await get(`/api/posts/${id}`);
+  assert.equal((await v3.json()).version, 3, 'GET 返回当前版本');
+
+  await del(`/api/posts/${id}`);
+});
+
+test('e2e：批量删除/刊发/草稿单事务——含不存在 id 时原子失败', async () => {
+  if (!HAS_BUILD) return;
+  const mk = async (title: string) => {
+    const r = await post('/api/posts', { title, slug: `batx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, status: 'draft' });
+    assert.equal(r.status, 201);
+    return (await r.json()).post.id as number;
+  };
+  const a = await mk('批量甲');
+  const b = await mk('批量乙');
+
+  const pub = await post('/api/posts/batch', { action: 'publish', ids: [a, b] });
+  assert.equal(pub.status, 200);
+  assert.equal((await pub.json()).count, 2);
+
+  // delete 混入不存在的 id：存在的照删，计数按实际删除数
+  const ghost = await post('/api/posts/batch', { action: 'delete', ids: [99999999] });
+  assert.equal(ghost.status, 200);
+  assert.equal((await ghost.json()).count, 0, '全部未命中时计数为 0');
+  assert.equal((await get(`/api/posts/${a}`)).status, 200, '未命中的批量删除不得误删');
+
+  const mixed = await post('/api/posts/batch', { action: 'delete', ids: [a, b, 99999999] });
+  assert.equal(mixed.status, 200, 'delete 不应 404');
+  assert.equal((await mixed.json()).count, 2, '计数按实际删除数');
+  assert.equal((await get(`/api/posts/${a}`)).status, 404, '存在的 id 已删除');
+
+  const again = await post('/api/posts/batch', { action: 'delete', ids: [a, b] });
+  assert.equal(again.status, 200);
+  assert.equal((await again.json()).count, 0, '重复删除时计数为 0');
+});
+
+test('e2e：搜索单独 # 时展示空态，不按字面检索', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/search/?q=%23');
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.ok(!html.includes('未寻得「#」'), '不得按字面 # 检索');
+  assert.ok(html.includes('输入关键字，遍寻全卷'), '应展示空态提示');
+});
+
+test('e2e：含 % 的标签名经 URL 参数访问不 500（无双重解码）', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/tags/?t=100%25');
+  assert.equal(res.status, 200, '含 % 的标签参数不应触发双重解码 500');
+  const res2 = await get('/tags/100%25/');
+  assert.equal(res2.status, 302, '未知标签详情路由应跳 /404 而非 500');
+});
+
+test('e2e：admin 页面带 CSP 与 no-store', async () => {
+  if (!HAS_BUILD) return;
+  const res = await get('/admin/');
+  assert.equal(res.status, 200);
+  const csp = res.headers.get('content-security-policy') ?? '';
+  assert.ok(csp.includes("script-src 'self'"), 'admin CSP 应禁止内联脚本');
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex');
 });

@@ -36,9 +36,12 @@ async function hmacSign(secret: string, data: string): Promise<Uint8Array> {
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // 不做长度短路，按两串最大长度统一扫描，避免长度侧信道
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (i < a.length ? a.charCodeAt(i) : 0) ^ (i < b.length ? b.charCodeAt(i) : 0);
+  }
   return diff === 0;
 }
 
@@ -86,6 +89,8 @@ export function clearSessionCookie(ctx: APIContext): void {
 
 export async function getSession(ctx: APIContext): Promise<Session | null> {
   const env = await envOf();
+  // 密钥缺失/过短时 fail-closed：任何会话一律视为无效，避免无密钥状态下验签空转
+  if (!env.BLOG_SESSION_SECRET || env.BLOG_SESSION_SECRET.length < 16) return null;
   const token = ctx.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(env.BLOG_SESSION_SECRET, token);

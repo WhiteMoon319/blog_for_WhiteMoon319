@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, updatePost, deletePost, listPostOwnTags, setPostOwnTags, isSlugConflict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePost, deletePost, listPostOwnTags, setPostOwnTags, parseTagNames, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 
@@ -23,7 +23,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
     return json({ error: 'not found' }, 404);
   }
   const tags = await listPostOwnTags(env.DB, id);
-  return json({ post, tags });
+  const version = await getLatestPostVersion(env.DB, id);
+  return json({ post, tags, version });
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
@@ -62,15 +63,22 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.version_message === 'string' && body.version_message.trim()) {
     versionMessage = body.version_message.trim();
   }
+  const baseVersion =
+    typeof body.base_version === 'number' && Number.isInteger(body.base_version) && body.base_version >= 0
+      ? body.base_version
+      : undefined;
 
   try {
     const env = await envOf();
-    const updated = await updatePost(env.DB, id, patch, versionMessage);
+    const updated = await updatePost(env.DB, id, patch, versionMessage, baseVersion);
+    if (updated === 'conflict') {
+      return json({ error: '版本冲突：该文章已在别处被修改，请刷新后重试' }, 409);
+    }
     if (!updated) return json({ error: 'not found' }, 404);
     const tags = Array.isArray(body.tags)
-      ? await setPostOwnTags(env.DB, id, (body.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+      ? await setPostOwnTags(env.DB, id, parseTagNames(body.tags))
       : await listPostOwnTags(env.DB, id);
-    return json({ post: updated, tags });
+    return json({ post: updated, tags, version: await getLatestPostVersion(env.DB, id) });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

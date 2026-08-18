@@ -6,7 +6,8 @@ import { envOf, listAllTagCounts } from '../../lib/db';
 export const prerender = false;
 
 const env = await envOf();
-const selected = Astro.url.searchParams.getAll('t').map((t) => decodeURIComponent(t)).filter(Boolean);
+// searchParams.get 已解码，勿再 decodeURIComponent（标签名含 % 会被双重解码炸 500）
+const selected = Astro.url.searchParams.getAll('t').filter(Boolean);
 const keyword = Astro.url.searchParams.get('q') ?? '';
 const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
 

@@ -10,7 +10,7 @@ export const HAS_BUILD = existsSync(resolve(SERVER_DIR, 'entry.mjs'));
 
 // 校验构建产物存在且不早于源码（改代码忘 build 时明确失败，避免 e2e 误测旧产物）
 export function requireBuild(): void {
-  if (!HAS_BUILD) throw new Error('dist/server/entry.mjs 缺失，请先运行 npm run build');
+  if (!HAS_BUILD) throw new Error('dist/server/entry.mjs 缺失，请先运行 pnpm run build');
 
   let srcNewest = 0;
   const walk = (dir: string) => {
@@ -35,7 +35,7 @@ export function requireBuild(): void {
     }
   }
   if (distNewest < srcNewest) {
-    throw new Error('dist 构建产物早于源码，请先重新运行 npm run build');
+    throw new Error('dist 构建产物早于源码，请先重新运行 pnpm run build');
   }
 }
 

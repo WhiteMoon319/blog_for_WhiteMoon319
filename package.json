@@ -3,26 +3,23 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "admin"
-  ],
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/cf-config.mjs && npm run build:admin && astro build && node scripts/merge-admin.mjs",
-    "build:admin": "npm --prefix admin run build",
-    "dev:admin": "npm --prefix admin run dev",
+    "build": "node scripts/cf-config.mjs && pnpm -C admin run build && astro build && node scripts/merge-admin.mjs",
+    "build:admin": "pnpm -C admin run build",
+    "dev:admin": "pnpm -C admin run dev",
     "preview": "astro preview",
     "astro": "astro",
-    "typecheck": "npm run typecheck:astro && npm run typecheck:admin && npm run typecheck:tests",
+    "typecheck": "pnpm run typecheck:astro && pnpm run typecheck:admin && pnpm run typecheck:tests",
     "typecheck:astro": "astro check",
-    "typecheck:admin": "npm --prefix admin run typecheck",
+    "typecheck:admin": "pnpm -C admin run typecheck",
     "typecheck:tests": "tsc -p tsconfig.test.json",
     "test": "node --test \"tests/**/*.test.ts\"",
     "cf:login": "wrangler login",
     "cf:config": "node scripts/cf-config.mjs",
     "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/reset.sql && wrangler d1 migrations apply blog-db --local && wrangler d1 execute blog-db --local --file=db/seed.sql",
-    "cf:dev": "npm run build && wrangler dev",
-    "cf:deploy": "npm run build && wrangler deploy"
+    "cf:dev": "pnpm run build && wrangler dev",
+    "cf:deploy": "pnpm run build && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.2.1",

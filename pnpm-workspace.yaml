@@ -1,0 +1,7 @@
+packages:
+  - admin
+
+# pnpm 11 默认拦截依赖的 postinstall 脚本；esbuild/workerd 需下载平台二进制，必须放行
+allowBuilds:
+  esbuild: true
+  workerd: true

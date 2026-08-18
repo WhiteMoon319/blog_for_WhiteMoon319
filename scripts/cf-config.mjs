@@ -50,7 +50,7 @@ if (missing.length > 0) {
       .map((k) => `\${${k}}`)
       .join(' ')} 占位符。`,
   );
-  console.warn('[cf-config] 请复制 .env.example 为根目录 .env 并填写真实资源 ID，再运行 npm run cf:config。');
+  console.warn('[cf-config] 请复制 .env.example 为根目录 .env 并填写真实资源 ID，再运行 pnpm run cf:config。');
 } else {
   console.log(`[cf-config] ${OUTPUT_FILE} 已由模板生成（真实资源 ID 仅存于本机，不入库）。`);
 }

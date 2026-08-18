@@ -16,7 +16,7 @@ INSERT INTO posts (collection_id, title, slug, summary, content_md, status) VALU
 
 > 且把文章当茶煮。
 
-`npm run dev` 即可本地开写。',
+`pnpm run dev` 即可本地开写。',
    'published'),
   (1, '草稿：未完待续', 'draft-post', '还没写完的一篇。', '## 未完\n\n此处留白。', 'draft'),
   (2, '把 Astro 架到 Cloudflare 上', 'astro-on-cloudflare', '部署流水账。',

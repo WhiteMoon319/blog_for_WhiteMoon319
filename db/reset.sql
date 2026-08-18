@@ -1,4 +1,4 @@
--- 本地 D1 整库重置（仅供 npm run cf:db:local 可重入使用）
+-- 本地 D1 整库重置（仅供 pnpm run cf:db:local 可重入使用）
 -- 先删触发器与表，再清空 wrangler 的迁移记录表，随后可重新执行 migrations + seed
 DROP TABLE IF EXISTS d1_migrations;
 DROP TABLE IF EXISTS posts_fts;

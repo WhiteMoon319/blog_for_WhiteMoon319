@@ -13,8 +13,8 @@ after(async () => {
   if (c) await c.dispose();
 });
 
-test('e2e：构建产物存在（先运行 npm run build）', () => {
-  assert.ok(HAS_BUILD, 'dist/server/entry.mjs 缺失，请先 npm run build');
+test('e2e：构建产物存在（先运行 pnpm run build）', () => {
+  assert.ok(HAS_BUILD, 'dist/server/entry.mjs 缺失，请先 pnpm run build');
 });
 
 test('e2e：首页渲染文集与最新文章', async () => {

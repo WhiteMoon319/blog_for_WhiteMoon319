@@ -86,40 +86,40 @@ API 一览：
 
 ## 本地开发
 
-要求：Node.js ≥ 22.12（Vite 7 / Astro 7 要求），已登录 wrangler（`npm run cf:login`）。
+要求：Node.js ≥ 22.12（Vite 7 / Astro 7 要求），已登录 wrangler（`pnpm run cf:login`）。
 
 ```bash
-npm install          # npm workspaces：一次安装根目录与 admin 全部依赖
+pnpm install          # pnpm workspace：一次安装根目录与 admin 全部依赖
 ```
 
 **前台（astro dev）**
 
 ```bash
-npm run dev          # http://localhost:4321
+pnpm run dev          # http://localhost:4321
 ```
 
 **前后台联调（Worker 本地跑构建产物）**
 
 ```bash
-npm run cf:dev       # 生成配置 → 构建 → wrangler dev（默认 http://localhost:8787）
+pnpm run cf:dev       # 生成配置 → 构建 → wrangler dev（默认 http://localhost:8787）
 ```
 
 **管理端 SPA 单独开发**
 
 ```bash
-npm run dev:admin    # Vite dev，http://localhost:5174，/api 代理到 127.0.0.1:8788
+pnpm run dev:admin    # Vite dev，http://localhost:5174，/api 代理到 127.0.0.1:8788
 ```
 
 若要让管理端开发代理直连本地 Worker，请把 Worker 起在 8788 端口：
 
 ```bash
-npm run cf:dev -- --port 8788
+pnpm run cf:dev -- --port 8788
 ```
 
 **本地 D1 初始化**（整库重建，可重复执行；会先清空本地库再应用迁移与种子）：
 
 ```bash
-npm run cf:db:local  # db/reset.sql 重置 → 应用 db/migrations/*.sql → 导入 db/seed.sql
+pnpm run cf:db:local  # db/reset.sql 重置 → 应用 db/migrations/*.sql → 导入 db/seed.sql
 ```
 
 本地密钥（`BLOG_ADMIN_PASSWORD`、`BLOG_SESSION_SECRET`、`R2_PUBLIC_URL` 等）放在根目录 `.dev.vars`（不入库）。
@@ -130,7 +130,7 @@ npm run cf:db:local  # db/reset.sql 重置 → 应用 db/migrations/*.sql → �
 
 ```bash
 cp .env.example .env   # 填入真实 ID
-npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
+pnpm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 ```
 
 `.env` 需要两个值：
@@ -139,7 +139,7 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 | --- | --- | --- |
 | `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
 
-`npm run build` / `cf:dev` / `cf:deploy` 都会先自动执行 `cf:config`。未配置 `.env` 时生成的文件保留占位符：本地 miniflare 可正常启动，`wrangler deploy` 会因资源 ID 无效而明确失败，不会误指向其他资源。
+`pnpm run build` / `cf:dev` / `cf:deploy` 都会先自动执行 `cf:config`。未配置 `.env` 时生成的文件保留占位符：本地 miniflare 可正常启动，`wrangler deploy` 会因资源 ID 无效而明确失败，不会误指向其他资源。
 
 ### 绑定一览（Workers 侧）
 
@@ -153,9 +153,9 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 ## 构建与测试
 
 ```bash
-npm run build          # cf-config → admin 构建 → astro build → 合并 admin 产物
-npm run typecheck      # astro check + vue-tsc + tsc（含 tests/**）
-npm test               # 单测 + e2e（需要先 npm run build）
+pnpm run build          # cf-config → admin 构建 → astro build → 合并 admin 产物
+pnpm run typecheck      # astro check + vue-tsc + tsc（含 tests/**）
+pnpm test               # 单测 + e2e（需要先 pnpm run build）
 ```
 
 测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。e2e 引导会校验构建产物存在且不早于源码（`requireBuild`），改代码忘 build 会明确报错而非误测旧产物。
@@ -165,7 +165,7 @@ npm test               # 单测 + e2e（需要先 npm run build）
 前置：已按上文配置 `.env`（真实资源 ID），并已创建 D1 数据库 / R2 桶（或复用现有资源）。
 
 ```bash
-npm run cf:deploy      # 生成配置 → 构建 → wrangler deploy
+pnpm run cf:deploy      # 生成配置 → 构建 → wrangler deploy
 ```
 
 **首次部署后的数据准备（远程 D1）：**
@@ -187,7 +187,7 @@ npx wrangler secret put R2_PUBLIC_URL     # 可选：R2 公共域名，如 https
 
 ## 数据库
 
-- 迁移：`db/migrations/`，本地用 `npm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
+- 迁移：`db/migrations/`，本地用 `pnpm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
 - 种子：`db/seed.sql`（仅本地演示用）
 - 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`tags`/`post_tags`（标签：文章自有标签 + 文集继承标签，删除后孤儿标签自动清理）、`login_attempts`（登录限流计数）、`posts_fts`（FTS 全文检索虚拟表，迁移 0009）
 - 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀；文集可设 `post_order`（`asc` 连载序 / `desc` 博客序，迁移 0008）

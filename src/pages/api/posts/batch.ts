@@ -3,6 +3,7 @@ import {
   envOf,
   createPost,
   getCollectionById,
+  getCollectionsByIds,
   purgeOrphanTagsStmt,
   isSlugConflict,
   type PostRow,
@@ -55,9 +56,21 @@ export async function POST(ctx: APIContext): Promise<Response> {
       return json({ error: 'collection not found' }, 404);
     }
 
+    const parsed = rawPosts.map((raw) => parseCreateItem(raw, fallbackCol));
+    const colIds = [
+      ...new Set(
+        parsed
+          .filter((x): x is BatchCreateItem => typeof x !== 'string')
+          .map((x) => x.collection_id)
+          .filter((x): x is number => x !== null),
+      ),
+    ];
+    if (colIds.length > 0 && (await getCollectionsByIds(env.DB, colIds)).size !== colIds.length) {
+      return json({ error: 'collection not found' }, 404);
+    }
+
     const results: Array<{ ok: boolean; error?: string; post?: PostRow }> = [];
-    for (const raw of rawPosts) {
-      const item = parseCreateItem(raw, fallbackCol);
+    for (const item of parsed) {
       if (typeof item === 'string') {
         results.push({ ok: false, error: item });
         continue;
@@ -166,33 +179,45 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   if (action === 'delete') {
-    // 先查实际存在的 id，按存在数删除并计数（避免依赖 meta.changes 的级联行数）
-    const placeholders = ids.map(() => '?').join(', ');
-    const rows = await env.DB
-      .prepare(`SELECT id FROM posts WHERE id IN (${placeholders})`)
-      .bind(...ids)
-      .all<{ id: number }>();
-    const existing = (rows.results ?? []).map((r) => r.id);
-    if (existing.length === 0) return json({ ok: true, count: 0 });
-    const stmts: D1PreparedStatement[] = [];
-    for (const id of existing) {
-      stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
-      stmts.push(purgeOrphanTagsStmt(env.DB));
+    // 先查实际存在的 id，按存在数删除并计数（避免依赖 meta.changes 的级联行数）。
+    // D1 单语句绑定参数上限 100：存在性查询按 50 一批；D1 batch 单次上限 100 条语句：
+    // 删除按 25 篇一批（每篇 2 条：删除 + 孤儿标签清理）。
+    const existing: number[] = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      const chunk = ids.slice(i, i + 50);
+      const rows = await env.DB
+        .prepare(`SELECT id FROM posts WHERE id IN (${chunk.map(() => '?').join(',')})`)
+        .bind(...chunk)
+        .all<{ id: number }>();
+      existing.push(...(rows.results ?? []).map((r) => r.id));
     }
-    await env.DB.batch(stmts);
+    if (existing.length === 0) return json({ ok: true, count: 0 });
+    for (let i = 0; i < existing.length; i += 25) {
+      const chunk = existing.slice(i, i + 25);
+      const stmts: D1PreparedStatement[] = [];
+      for (const id of chunk) {
+        stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
+        stmts.push(purgeOrphanTagsStmt(env.DB));
+      }
+      await env.DB.batch(stmts);
+    }
     return json({ ok: true, count: existing.length });
   }
 
-  // 批量 publish/draft 并入单个 D1 batch：全成功或全失败
-  const stmts: D1PreparedStatement[] = [];
-  for (const id of ids) {
-    stmts.push(
-      env.DB
-        .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ?`)
-        .bind(action === 'publish' ? 'published' : 'draft', id),
-    );
+  // 批量 publish/draft：每篇 1 条语句，按 100 篇一批（不跨批事务，部分成功可重试）
+  const CHUNK = 100;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const stmts: D1PreparedStatement[] = [];
+    for (const id of chunk) {
+      stmts.push(
+        env.DB
+          .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(action === 'publish' ? 'published' : 'draft', id),
+      );
+    }
+    await env.DB.batch(stmts);
   }
-  await env.DB.batch(stmts);
 
   return json({ ok: true, count: ids.length });
 }

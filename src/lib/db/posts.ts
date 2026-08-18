@@ -1,5 +1,6 @@
 import type { PostInput, PostPatch, PostRow, PostWithCollection } from './types.ts';
 import { purgeOrphanTagsStmt } from './tags.ts';
+import { getLatestPostVersion } from './versions.ts';
 
 export async function listPublishedPosts(
   db: D1Database,
@@ -51,6 +52,14 @@ export async function getPublishedPostBySlug(db: D1Database, slug: string): Prom
       `SELECT * FROM posts WHERE slug = ? AND status = 'published' AND collection_id IS NULL
        ORDER BY created_at DESC, id DESC LIMIT 1`,
     )
+    .bind(slug)
+    .first<PostRow>();
+}
+
+// 跨文集查已刊同名文章：用于旧路径 /posts/{slug}/ 的 301 转正（未分类优先，已收录则跳文集路径）
+export async function getPublishedPostBySlugAny(db: D1Database, slug: string): Promise<PostRow | null> {
+  return db
+    .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published' ORDER BY created_at DESC, id DESC LIMIT 1`)
     .bind(slug)
     .first<PostRow>();
 }
@@ -143,7 +152,11 @@ export async function updatePost(
     const cv = current[k as keyof PostRow];
     return String(pv ?? null) !== String(cv ?? null);
   });
-  if (changed.length === 0) return current;
+  if (changed.length === 0) {
+    // 无实质变化时仍需校验乐观锁基线，避免掩盖另一端的并发写入
+    if (baseVersion !== undefined && (await getLatestPostVersion(db, id)) !== baseVersion) return 'conflict';
+    return current;
+  }
   const sets = changed.map((k) => `${k} = ?`).join(', ');
   const values = changed.map((k) => patch[k as keyof PostPatch]);
   // 文章更新与版本留档放入同一个 D1 事务（batch 原子执行）：
@@ -249,6 +262,6 @@ export async function getAdjacentPosts(
     )
     .bind(...ids)
     .all<PostWithCollection>();
-  const byId = new Map((rows.results ?? []).map((r) => [r.id, r]));
+  const byId = new Map<number, PostWithCollection>((rows.results ?? []).map((r) => [r.id, r]));
   return { prev: prevId ? byId.get(prevId) ?? null : null, next: nextId ? byId.get(nextId) ?? null : null };
 }

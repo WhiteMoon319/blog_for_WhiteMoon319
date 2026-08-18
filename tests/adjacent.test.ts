@@ -63,7 +63,7 @@ test('相邻文章：文集内优先，组内没有才跨文集回退', async ()
   const t = await insertIn(db, 'T 他组', '2026-02-03 00:00:00', colTId);
   const a3 = await insertIn(db, 'A 三', '2026-02-04 00:00:00', colId);
 
-  const get = (id: number) => db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>()!;
+  const get = async (id: number) => (await db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>())!;
 
   const { prev: pA2, next: nA2 } = await getAdjacentPosts(db, await get(a2));
   assert.equal(pA2?.id, a1, 'A2 的上一篇应为同文集 A1');
@@ -85,7 +85,7 @@ test('相邻文章：未分类自成一组（collection_id 为 NULL）', async (
   const u2 = await insertIn(db, 'U 二', '2026-03-03 00:00:00', null);
   const e2 = await insertIn(db, 'E 二', '2026-03-04 00:00:00', colId);
 
-  const get = (id: number) => db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>()!;
+  const get = async (id: number) => (await db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>())!;
 
   const { prev: pU2, next: nU2 } = await getAdjacentPosts(db, await get(u2));
   assert.equal(pU2?.id, u1, 'U2 的上一篇应为未分类 U1，而非更近的 E1');

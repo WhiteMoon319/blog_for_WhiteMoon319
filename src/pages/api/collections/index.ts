@@ -36,13 +36,18 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'invalid post_order: 仅允许 asc（旧在前）或 desc（新在前）' }, 400);
   }
 
+  const themeColor = typeof body.theme_color === 'string' && body.theme_color ? body.theme_color : '#c23a30';
+  if (!/^#[0-9a-fA-F]{6}$/.test(themeColor)) {
+    return json({ error: 'invalid theme_color: 需为 #RRGGBB 格式' }, 400);
+  }
+
   try {
     const env = await envOf();
     const created = await createCollection(env.DB, {
       title: body.title.trim(),
       slug: ensureSlug(slug, body.title, 'collection'),
       summary: typeof body.summary === 'string' ? body.summary : '',
-      theme_color: typeof body.theme_color === 'string' && body.theme_color ? body.theme_color : '#c23a30',
+      theme_color: themeColor,
       sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
     });

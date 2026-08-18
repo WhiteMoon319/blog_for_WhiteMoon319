@@ -174,6 +174,7 @@ watch(() => [route.query.id, route.query.collection] as const, async ([id, colle
     await load();
   } catch (e) {
     emit('notify', (e as Error).message, true);
+  } finally {
     loading.value = false;
   }
 });
@@ -212,7 +213,8 @@ async function save() {
       emit('notify', '篇章已存');
       form.version_message = '';
     } else {
-      const { post } = await api.createPost(payload);
+      const { post, version } = await api.createPost(payload);
+      baseVersion.value = version;
       emit('notify', '新篇已成');
       router.replace({ path: '/editor', query: { id: post.id } });
       loadedId.value = post.id;

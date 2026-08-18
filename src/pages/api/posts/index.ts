@@ -78,7 +78,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
     });
     if (!created) return json({ error: 'post create failed' }, 500);
     const tags = await setPostOwnTags(env.DB, created.id, parseTagNames(body.tags));
-    return json({ post: created, tags }, 201);
+    return json({ post: created, tags, version: 1 }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

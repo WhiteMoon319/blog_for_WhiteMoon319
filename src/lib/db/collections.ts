@@ -78,7 +78,6 @@ export async function deleteCollection(db: D1Database, id: number): Promise<bool
     .all<{ id: number; slug: string }>();
   const rows = members.results ?? [];
 
-  const stmts: D1PreparedStatement[] = [];
   if (rows.length > 0) {
     const taken = new Set(
       (await db.prepare('SELECT slug FROM posts WHERE collection_id IS NULL').all<{ slug: string }>()).results?.map(
@@ -98,19 +97,18 @@ export async function deleteCollection(db: D1Database, id: number): Promise<bool
       taken.add(candidate);
       assigned.set(row.id, candidate);
     }
-    for (const row of rows) {
-      stmts.push(
-        db
-          .prepare(`UPDATE posts SET collection_id = NULL, slug = ?, updated_at = datetime('now') WHERE id = ?`)
-          .bind(assigned.get(row.id)!, row.id),
+    for (let i = 0; i < rows.length; i += 48) {
+      const chunk = rows.slice(i, i + 48);
+      await db.batch(
+        chunk.map((row) =>
+          db
+            .prepare(`UPDATE posts SET collection_id = NULL, slug = ?, updated_at = datetime('now') WHERE id = ?`)
+            .bind(assigned.get(row.id)!, row.id),
+        ),
       );
     }
-  } else {
-    stmts.push(db.prepare('UPDATE posts SET collection_id = NULL WHERE collection_id = ?').bind(id));
   }
   const delStmt = db.prepare('DELETE FROM collections WHERE id = ?').bind(id);
-  stmts.push(delStmt);
-  stmts.push(purgeOrphanTagsStmt(db));
-  const results = await db.batch(stmts);
-  return (results[stmts.indexOf(delStmt)]!.meta.changes ?? 0) > 0;
+  const results = await db.batch([delStmt, purgeOrphanTagsStmt(db)]);
+  return (results[0].meta.changes ?? 0) > 0;
 }

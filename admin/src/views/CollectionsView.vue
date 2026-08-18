@@ -22,7 +22,11 @@ async function load() {
   loaded.value = true;
 }
 onMounted(async () => {
-  await load();
+  try {
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
   api.tags().then((r) => (suggestions.value = r.tags.map((t: Tag) => t.name))).catch(() => {});
 });
 

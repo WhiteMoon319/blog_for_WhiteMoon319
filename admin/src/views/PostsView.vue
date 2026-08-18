@@ -21,7 +21,9 @@ async function load() {
   collections.value = c.collections;
   loaded.value = true;
 }
-onMounted(load);
+onMounted(() => {
+  load().catch((e) => emit('notify', (e as Error).message, true));
+});
 
 const shown = computed(() =>
   posts.value.filter((p) => {
@@ -152,7 +154,7 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
     </div>
 
     <div class="table-wrap">
-      <table class="table" v-if="shown.length">
+      <table class="table posts-table" v-if="shown.length">
         <thead>
           <tr>
             <th style="width:32px;">

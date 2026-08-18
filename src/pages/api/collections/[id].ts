@@ -48,7 +48,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     patch.slug = body.slug.trim();
   }
   if (typeof body.summary === 'string') patch.summary = body.summary;
-  if (typeof body.theme_color === 'string' && body.theme_color) patch.theme_color = body.theme_color;
+  if (typeof body.theme_color === 'string' && body.theme_color) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(body.theme_color)) {
+      return json({ error: 'invalid theme_color: 需为 #RRGGBB 格式' }, 400);
+    }
+    patch.theme_color = body.theme_color;
+  }
   if (typeof body.sort_order === 'number') patch.sort_order = body.sort_order;
   if (typeof body.post_order === 'string') {
     if (body.post_order !== 'asc' && body.post_order !== 'desc') {

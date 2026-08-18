@@ -13,22 +13,29 @@ const busy = ref(false);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
+// gen 递增使旧请求结果作废：reload 时若仍有在途请求，避免旧数据覆盖/清空后的列表被补回
+let gen = 0;
+
 async function loadMore() {
   if (busy.value) return;
   busy.value = true;
+  const myGen = gen;
   try {
     const res = await api.media(cursor.value);
+    if (myGen !== gen) return;
     files.value.push(...res.files);
     cursor.value = res.cursor;
     loaded.value = true;
   } catch (e) {
-    emit('notify', (e as Error).message, true);
+    if (myGen === gen) emit('notify', (e as Error).message, true);
   } finally {
-    busy.value = false;
+    if (myGen === gen) busy.value = false;
   }
 }
 
 function reload() {
+  gen++;
+  busy.value = false;
   files.value = [];
   cursor.value = undefined;
   loaded.value = false;

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getCollectionsByIds, listCollections, listPublishedPosts } from '../lib/db';
+import { envOf, listCollections, type PostWithCollection } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -8,8 +8,13 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   const base = env.SITE_URL.replace(/\/$/, '');
   const collections = await listCollections(env.DB);
-  const posts = await listPublishedPosts(env.DB);
-  const collectionById = await getCollectionsByIds(env.DB, posts.map((p) => p.collection_id ?? 0));
+  const posts = await env.DB
+    .prepare(
+      `SELECT p.*, c.slug AS collection_slug FROM posts p
+       LEFT JOIN collections c ON c.id = p.collection_id
+       WHERE p.status = 'published'`,
+    )
+    .all<PostWithCollection>();
 
   const urls = ['/', '/archive/', '/about/', '/search/'].map((path) => ({
     path,
@@ -19,9 +24,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   for (const c of collections) {
     urls.push({ path: `/collections/${encodeURI(c.slug)}/`, lastmod: c.updated_at });
   }
-  for (const p of posts) {
-    const collection = p.collection_id ? collectionById.get(p.collection_id) : undefined;
-    urls.push({ path: postHref(p.slug, collection?.slug), lastmod: p.updated_at });
+  for (const p of posts.results ?? []) {
+    urls.push({ path: postHref(p.slug, p.collection_slug), lastmod: p.updated_at });
   }
 
   const body = urls

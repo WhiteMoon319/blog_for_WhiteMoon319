@@ -6,13 +6,16 @@ const stats = ref({ collections: 0, published: 0, drafts: 0 });
 const loaded = ref(false);
 
 onMounted(async () => {
-  const [cols, posts] = await Promise.all([api.collections(), api.posts()]);
-  stats.value = {
-    collections: cols.collections.length,
-    published: posts.posts.filter((p) => p.status === 'published').length,
-    drafts: posts.posts.filter((p) => p.status === 'draft').length,
-  };
-  loaded.value = true;
+  try {
+    const [cols, posts] = await Promise.all([api.collections(), api.posts()]);
+    stats.value = {
+      collections: cols.collections.length,
+      published: posts.posts.filter((p) => p.status === 'published').length,
+      drafts: posts.posts.filter((p) => p.status === 'draft').length,
+    };
+  } finally {
+    loaded.value = true;
+  }
 });
 </script>
 

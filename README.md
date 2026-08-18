@@ -6,8 +6,8 @@
 
 **前台**
 
-- 首页：文集入口 + 最新文章（分页）
-- 文集页 / 文章页：按文集组织文章；已收录文章访问旧路径 `/posts/{slug}/` 302 至 /404
+- 首页：文集入口 + 最新文章
+- 文集页 / 文章页：按文集组织文章；已收入文集的旧路径 `/posts/{slug}/` 永久 301 转跳文集路径，未收录则 404
 - 标签：标签云、独立标签页 `/tags/{tag}/`、`/tags/?t=` 多标签交集检索、标签内关键词搜索
 - 归档页（按时间轴）、关于页、站内搜索（`/search/`，`#标签` 前缀自动转跳标签页）
 - 阅读量统计、上一篇/下一篇相邻导航、`/sitemap.xml` 动态生成
@@ -40,6 +40,7 @@ admin/                   Vue 3 管理端 SPA（/admin/ 基路径，Tiptap 编辑
 db/
   migrations/            D1 迁移（0001_init ~ 0010_tags）
   seed.sql               本地演示种子数据
+  reset.sql              本地整库重置（cf:db:local 可重入）
 scripts/
   cf-config.mjs          由模板 + .env 生成本地 wrangler.jsonc
   merge-admin.mjs        把 admin/dist 合并进 dist/client/admin
@@ -85,7 +86,7 @@ API 一览：
 
 ## 本地开发
 
-要求：Node.js ≥ 20，已登录 wrangler（`npm run cf:login`）。
+要求：Node.js ≥ 22.12（Vite 7 / Astro 7 要求），已登录 wrangler（`npm run cf:login`）。
 
 ```bash
 npm install          # npm workspaces：一次安装根目录与 admin 全部依赖
@@ -115,13 +116,13 @@ npm run dev:admin    # Vite dev，http://localhost:5174，/api 代理到 127.0.0
 npm run cf:dev -- --port 8788
 ```
 
-**本地 D1 初始化**（首次或换机器后，空库需要建表/种子）：
+**本地 D1 初始化**（整库重建，可重复执行；会先清空本地库再应用迁移与种子）：
 
 ```bash
-npm run cf:db:local  # 应用 db/migrations/*.sql + db/seed.sql 到本地 D1
+npm run cf:db:local  # db/reset.sql 重置 → 应用 db/migrations/*.sql → 导入 db/seed.sql
 ```
 
-本地密钥（`BLOG_ADMIN_PASSWORD`、`BLOG_SESSION_SECRET` 等）放在根目录 `.dev.vars`（不入库）。
+本地密钥（`BLOG_ADMIN_PASSWORD`、`BLOG_SESSION_SECRET`、`R2_PUBLIC_URL` 等）放在根目录 `.dev.vars`（不入库）。
 
 ## 资源配置
 
@@ -153,11 +154,11 @@ npm run cf:config      # 生成 wrangler.jsonc（已被 .gitignore 忽略）
 
 ```bash
 npm run build          # cf-config → admin 构建 → astro build → 合并 admin 产物
-npm run typecheck      # astro check + vue-tsc
+npm run typecheck      # astro check + vue-tsc + tsc（含 tests/**）
 npm test               # 单测 + e2e（需要先 npm run build）
 ```
 
-测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、分页、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。
+测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。e2e 引导会校验构建产物存在且不早于源码（`requireBuild`），改代码忘 build 会明确报错而非误测旧产物。
 
 ## 部署
 
@@ -174,11 +175,12 @@ npx wrangler d1 migrations apply blog-db --remote
 npx wrangler d1 execute blog-db --remote --file=db/seed.sql   # 可选：演示种子
 ```
 
-**生产密钥**（不入库，部署后设置一次即可）：
+**生产密钥**（不入库，部署后设置一次即可；`R2_PUBLIC_URL` 为 R2 公共访问基地址，留空则图片经 Worker 回源）：
 
 ```bash
 npx wrangler secret put BLOG_ADMIN_PASSWORD
 npx wrangler secret put BLOG_SESSION_SECRET
+npx wrangler secret put R2_PUBLIC_URL     # 可选：R2 公共域名，如 https://images.example.com
 ```
 
 自定义域名在 Cloudflare 控制台绑定到该 Worker 即可；`routes` 里的 `custom_domain` 会被 wrangler 忽略，请勿在配置文件里配置。

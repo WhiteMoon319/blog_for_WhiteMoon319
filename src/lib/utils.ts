@@ -9,7 +9,7 @@ export function slugify(input: string): string {
 
 export function ensureSlug(input: string | undefined, title: string, prefix: string): string {
   if (input && input.trim()) return input.trim();
-  const slug = slugify(title);
+  const slug = slugify(title).slice(0, 60).replace(/-+$/, '');
   return slug || `${prefix}-${Date.now().toString(36)}`;
 }
 

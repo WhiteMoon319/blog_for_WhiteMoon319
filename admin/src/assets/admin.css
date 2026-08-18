@@ -698,12 +698,13 @@ textarea {
   .form-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr; }
   .card.pad { padding: 20px; }
-  .table th:nth-child(3),
-  .table td:nth-child(3),
-  .table th:nth-child(5),
-  .table td:nth-child(5),
-  .table th:nth-child(6),
-  .table td:nth-child(6) { display: none; }
+  /* 仅文章总览表在窄屏隐藏次要列；导入表等其余表格保持全列（依赖横向滚动） */
+  .posts-table th:nth-child(3),
+  .posts-table td:nth-child(3),
+  .posts-table th:nth-child(5),
+  .posts-table td:nth-child(5),
+  .posts-table th:nth-child(6),
+  .posts-table td:nth-child(6) { display: none; }
 }
 
 @media (prefers-color-scheme: dark) {

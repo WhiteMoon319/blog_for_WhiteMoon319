@@ -8,9 +8,11 @@ function mockEnv(): Env {
   return {
     DB: {} as D1Database,
     IMAGES: {} as R2Bucket,
+    ASSETS: {} as Fetcher,
     SITE_NAME: '测试',
     SITE_SLOGAN: '',
     SITE_POEM: '',
+    SITE_URL: 'http://local',
     BLOG_ADMIN_PASSWORD: 'admin123',
     BLOG_SESSION_SECRET: 'test-secret-0123456789abcdef0123456789abcdef',
     R2_PUBLIC_URL: '',

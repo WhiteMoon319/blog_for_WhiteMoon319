@@ -39,8 +39,8 @@ test('e2e：文章页 TOC 锚点与相邻导航', async () => {
   assert.ok(html2.includes('/collections/essays/first-post/'), '相邻链接应正确');
 
   const legacy = await c.get('/posts/astro-on-cloudflare/');
-  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
-  assert.ok(String(legacy.headers.get('location')).includes('/404'));
+  assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
+  assert.ok(String(legacy.headers.get('location')).includes('/collections/tech/astro-on-cloudflare/'));
 });
 
 test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', async () => {
@@ -127,6 +127,9 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
   const colBody = await created.json();
   const colId = colBody.collection.id as number;
 
+  const badColor = await c.post('/api/collections', { title: '坏色', theme_color: 'red' });
+  assert.equal(badColor.status, 400, '非 #RRGGBB 主题色应 400');
+
   const postRes = await c.post('/api/posts', {
     title: 'e2e 文章',
     slug: 'e2e-post',
@@ -138,10 +141,14 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
   assert.equal(postRes.status, 201);
   const postBody = await postRes.json();
   const postId = postBody.post.id as number;
+  assert.equal(postBody.version, 1, '创建响应应带 version=1（乐观锁基线）');
+
+  const badCol = await c.put(`/api/posts/${postId}`, { collection_id: 99999 });
+  assert.equal(badCol.status, 404, 'PUT 到不存在的文集应 404');
 
   const legacy = await c.get('/posts/e2e-post/');
-  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
-  assert.ok(String(legacy.headers.get('location')).includes('/404'));
+  assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
+  assert.ok(String(legacy.headers.get('location')).includes('/collections/test-col/e2e-post/'));
 
   const page = await c.get('/collections/test-col/e2e-post/');
   assert.equal(page.status, 200);
@@ -155,6 +162,7 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
   assert.equal(delCol.status, 200);
   const gone = await c.get('/posts/e2e-post/');
   assert.equal(gone.status, 302);
+  assert.ok(String(gone.headers.get('location')).includes('/404'));
 });
 
 test('e2e：Markdown 清洗——script/onerror/javascript: 全部去除', async () => {
@@ -226,7 +234,7 @@ test('e2e：文章页阅读量递增并展示', async () => {
   assert.ok(Number(m2[1]) > Number(m1[1]), '再次访问阅读数应递增');
 });
 
-test('e2e：slug 文集内唯一——跨文集可同名，旧路径 302 至 /404', async () => {
+test('e2e：slug 文集内唯一——跨文集可同名，旧路径 301 转跳文集路径', async () => {
   if (!HAS_BUILD) return;
   await c.login();
   const a = await c.post('/api/posts', { title: '同名甲', slug: 'same-name', collection_id: 1, status: 'published' });
@@ -243,8 +251,8 @@ test('e2e：slug 文集内唯一——跨文集可同名，旧路径 302 至 /40
   assert.ok((await pageB.text()).includes('同名乙'), '文集 2 路径应指向自己的文章');
 
   const legacy = await c.get('/posts/same-name/');
-  assert.equal(legacy.status, 302, '已收录文章的旧路径 302 至 /404');
-  assert.ok(String(legacy.headers.get('location')).includes('/404'));
+  assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
+  assert.ok(String(legacy.headers.get('location')).includes('/collections/'));
 
   const dup = await c.post('/api/posts', { title: '同名丙', slug: 'same-name', collection_id: 1, status: 'published' });
   assert.equal(dup.status, 409, '同一文集内重复 slug 应 409');
@@ -382,6 +390,13 @@ test('e2e：批量创建——一次导入多篇、slug 自动避让、逐条报
   });
   assert.equal(badCol.status, 404, '不存在的文集应 404');
 
+  const badPerItem = await c.post('/api/posts/batch', {
+    action: 'create',
+    collection_id: 1,
+    posts: [{ title: '丙', collection_id: 99998 }],
+  });
+  assert.equal(badPerItem.status, 404, '条目指定的文集不存在应 404');
+
   const dup = await c.post('/api/posts/batch', {
     action: 'create',
     collection_id: 1,
@@ -412,6 +427,17 @@ test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () =>
     assert.equal(r.status, 201);
     ids.push((await r.json()).post.id as number);
   }
+
+  const bulkIds: number[] = [];
+  for (let i = 0; i < 120; i++) {
+    const r = await c.post('/api/posts', { title: `大批量${i}`, slug: `big-batch-${i}`, status: 'draft' });
+    assert.equal(r.status, 201);
+    bulkIds.push((await r.json()).post.id as number);
+  }
+  const bigPub = await c.post('/api/posts/batch', { action: 'publish', ids: bulkIds });
+  assert.equal(bigPub.status, 200, '120 篇批量刊发应分批执行而非超限 500');
+  const bigDel = await c.post('/api/posts/batch', { action: 'delete', ids: bulkIds });
+  assert.equal(bigDel.status, 200, '120 篇批量删除应分批执行而非超限 500');
 
   const bad = await c.post('/api/posts/batch', { action: 'nuke', ids: [1] });
   assert.equal(bad.status, 400, '未知动作应拒绝');

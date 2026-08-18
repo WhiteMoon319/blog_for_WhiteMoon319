@@ -1,11 +1,43 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Miniflare } from 'miniflare';
+import { readStatements } from './sql.ts';
 
 const SERVER_DIR = resolve('dist/server');
 const BASE = 'http://e2e.test';
 
 export const HAS_BUILD = existsSync(resolve(SERVER_DIR, 'entry.mjs'));
+
+// 校验构建产物存在且不早于源码（改代码忘 build 时明确失败，避免 e2e 误测旧产物）
+export function requireBuild(): void {
+  if (!HAS_BUILD) throw new Error('dist/server/entry.mjs 缺失，请先运行 npm run build');
+
+  let srcNewest = 0;
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === 'dist' || e.name === '.git' || e.name === '.astro') continue;
+      const p = resolve(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(ts|tsx|vue|js|mjs|json|css|astro|sql)$/i.test(e.name)) {
+        const t = statSync(p).mtimeMs;
+        if (t > srcNewest) srcNewest = t;
+      }
+    }
+  };
+  for (const dir of ['src', 'admin/src', 'scripts', 'db']) walk(dir);
+
+  let distNewest = statSync(resolve(SERVER_DIR, 'entry.mjs')).mtimeMs;
+  const adminDir = resolve('dist/client/admin');
+  if (existsSync(adminDir)) {
+    for (const f of readdirSync(adminDir)) {
+      const t = statSync(resolve(adminDir, f)).mtimeMs;
+      if (t > distNewest) distNewest = t;
+    }
+  }
+  if (distNewest < srcNewest) {
+    throw new Error('dist 构建产物早于源码，请先重新运行 npm run build');
+  }
+}
 
 export const ORIGIN_HEADERS = { Origin: BASE, 'Sec-Fetch-Site': 'same-origin' };
 
@@ -13,21 +45,32 @@ export interface UploadFile {
   name: string;
   filename: string;
   type: string;
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
+}
+
+// e2e 客户端统一返回的响应形态：miniflare 的 Response 与 Node/DOM 类型存在差异，
+// 边界处转回本项目可用的最小接口，避免类型混乱
+export interface E2eResponse {
+  status: number;
+  ok: boolean;
+  url: string;
+  headers: Headers;
+  text(): Promise<string>;
+  json(): Promise<any>;
 }
 
 export interface E2eClient {
   mf: Miniflare;
   base: string;
-  get(path: string, headers?: Record<string, string>): Promise<Response>;
-  post(path: string, body: unknown): Promise<Response>;
-  put(path: string, body: unknown): Promise<Response>;
-  del(path: string): Promise<Response>;
-  raw(path: string, init: RequestInit): Promise<Response>;
-  anon(path: string, init?: RequestInit): Promise<Response>;
+  get(path: string, headers?: Record<string, string>): Promise<E2eResponse>;
+  post(path: string, body: unknown): Promise<E2eResponse>;
+  put(path: string, body: unknown): Promise<E2eResponse>;
+  del(path: string): Promise<E2eResponse>;
+  raw(path: string, init: RequestInit): Promise<E2eResponse>;
+  anon(path: string, init?: RequestInit): Promise<E2eResponse>;
   login(): Promise<void>;
   setSession(cookieValue: string): void;
-  multipart(files: UploadFile[]): { body: Uint8Array; contentType: string };
+  multipart(files: UploadFile[]): { body: Uint8Array<ArrayBuffer>; contentType: string };
   dispose(): Promise<void>;
 }
 
@@ -42,52 +85,8 @@ function loadModules(): Record<string, { type: 'esm'; contents: string }> {
   return modules;
 }
 
-function readStatements(file: string): string[] {
-  const src = readFileSync(resolve(file), 'utf8');
-  const statements: string[] = [];
-  let cur = '';
-  let inStr = false;
-  for (let i = 0; i < src.length; i++) {
-    const ch = src[i];
-    if (ch === "'") {
-      if (inStr && src[i + 1] === "'") {
-        cur += "''";
-        i++;
-        continue;
-      }
-      inStr = !inStr;
-      cur += ch;
-      continue;
-    }
-    if (ch === ';' && !inStr) {
-      // 触发器 BEGIN…END 体内含分号，未闭合前不切分
-      const begins = (cur.match(/\bBEGIN\b/gi) ?? []).length;
-      const ends = (cur.match(/\bEND\b/gi) ?? []).length;
-      if (begins > ends) {
-        cur += ch;
-        continue;
-      }
-      const s = cur
-        .split('\n')
-        .filter((l) => !/^\s*--/.test(l))
-        .join('\n')
-        .trim();
-      if (s.length > 0) statements.push(s);
-      cur = '';
-      continue;
-    }
-    cur += ch;
-  }
-  const tail = cur
-    .split('\n')
-    .filter((l) => !/^\s*--/.test(l))
-    .join('\n')
-    .trim();
-  if (tail.length > 0) statements.push(tail);
-  return statements;
-}
-
 export async function makeE2e(): Promise<E2eClient> {
+  requireBuild();
   const mf = new Miniflare({
     workers: [
       {
@@ -134,39 +133,43 @@ export async function makeE2e(): Promise<E2eClient> {
 
   let cookie = '';
 
+  // miniflare 的 Response 与 DOM Response 存在类型差异（迭代器实现不同），统一转回 E2eResponse
+  const fetchOf = (path: string, init: Parameters<typeof mf.dispatchFetch>[1]): Promise<E2eResponse> =>
+    mf.dispatchFetch(BASE + path, init) as unknown as Promise<E2eResponse>;
+
   const client: E2eClient = {
     mf,
     base: BASE,
     async get(path, headers = {}) {
-      return mf.dispatchFetch(BASE + path, {
+      return fetchOf(path, {
         redirect: 'manual',
         headers: { ...headers, ...(cookie ? { cookie } : {}) },
       });
     },
     async post(path, body) {
-      return mf.dispatchFetch(BASE + path, {
+      return fetchOf(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
         body: JSON.stringify(body),
       });
     },
     async put(path, body) {
-      return mf.dispatchFetch(BASE + path, {
+      return fetchOf(path, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
         body: JSON.stringify(body),
       });
     },
     async del(path) {
-      return mf.dispatchFetch(BASE + path, { method: 'DELETE', headers: { cookie, ...ORIGIN_HEADERS } });
+      return fetchOf(path, { method: 'DELETE', headers: { cookie, ...ORIGIN_HEADERS } });
     },
     async raw(path, init) {
       const headers = new Headers(init.headers ?? {});
       if (cookie) headers.set('cookie', cookie);
-      return mf.dispatchFetch(BASE + path, { ...init, headers });
+      return fetchOf(path, { ...init, headers } as Parameters<typeof mf.dispatchFetch>[1]);
     },
     async anon(path, init = {}) {
-      return mf.dispatchFetch(BASE + path, init);
+      return fetchOf(path, init as Parameters<typeof mf.dispatchFetch>[1]);
     },
     async login() {
       if (cookie) return;

@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, silent401 = false): Promise<T> {
   const res = await fetch(path, {
     credentials: 'same-origin',
     ...options,
@@ -16,7 +16,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (res.status === 401) {
+    if (res.status === 401 && !silent401) {
       window.dispatchEvent(new CustomEvent('auth:expired'));
     }
     throw new ApiError(body?.error ?? `HTTP ${res.status}`, res.status);
@@ -28,7 +28,7 @@ export const api = {
   me: () => request<{ authenticated: boolean; sub?: string }>('/api/auth/me'),
 
   login: (password: string) =>
-    request<{ ok: boolean }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+    request<{ ok: boolean }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }, true),
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
@@ -59,7 +59,10 @@ export const api = {
   post: (id: number) => request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`),
 
   createPost: (data: Partial<Post>) =>
-    request<{ post: Post }>('/api/posts', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ post: Post; tags: Tag[]; version: number }>('/api/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   updatePost: (id: number, data: Partial<Post>) =>
     request<{ post: Post; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -93,9 +96,6 @@ export const api = {
     ),
 
   postVersions: (id: number) => request<{ versions: PostVersion[] }>(`/api/posts/${id}/versions`),
-
-  postVersion: (id: number, version: number) =>
-    request<{ version: PostVersion }>(`/api/posts/${id}/versions/${version}`),
 
   restorePostVersion: (id: number, version: number) =>
     request<{ ok: boolean; post: Post }>(`/api/posts/${id}/versions/${version}/restore`, {

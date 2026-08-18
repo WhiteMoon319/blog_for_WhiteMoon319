@@ -23,7 +23,7 @@ interface ImportItem {
   slug: string;
   summary: string;
   contentMd: string;
-  state: 'ready' | 'importing' | 'done' | 'failed';
+  state: 'ready' | 'done' | 'failed';
   error: string;
 }
 
@@ -326,7 +326,6 @@ async function submitAll() {
           <td>
             <span v-if="item.state === 'done'" class="tag tag-published">完成</span>
             <span v-else-if="item.state === 'failed'" class="tag tag-draft" :title="item.error">失败</span>
-            <span v-else-if="item.state === 'importing'" class="tag">导入中</span>
             <span v-else class="tag">待导入</span>
           </td>
           <td style="text-align: right;">

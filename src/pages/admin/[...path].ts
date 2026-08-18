@@ -4,7 +4,8 @@ import { envOf } from '../../lib/db';
 
 export const prerender = false;
 
-const ASSET_RE = /\.(?:js|mjs|css|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|map|txt)$/i;
+// sourcemap（.map）与编译产物不同，可能含源码路径信息，不对外暴露
+const ASSET_RE = /\.(?:js|mjs|css|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|txt)$/i;
 const HASHED_ASSET_RE = /\/assets\/.+\.(?:js|mjs|css)$/i;
 
 export async function GET(ctx: APIContext): Promise<Response> {

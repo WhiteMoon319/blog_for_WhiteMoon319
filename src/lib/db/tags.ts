@@ -7,8 +7,16 @@ import type {
   TagsUnionResult,
 } from './types.ts';
 
+// 多标签交集上限：D1 单语句绑定参数与 SQL 复杂度限制下，20 个标签足够实际使用
+export const MAX_TAGS = 20;
+
 function cleanTagNames(names: string[]): string[] {
-  return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
+  return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))].slice(0, MAX_TAGS);
+}
+
+// LIKE 通配符转义：% 与 _ 作为字面字符匹配，配合 ESCAPE '\'
+function escapeLike(query: string): string {
+  return query.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 // 标签名不允许的字符：% 与 URL 保留/不安全字符、控制字符（含空格的标签由 cleanTagNames 归一化）
@@ -162,13 +170,14 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
     return { collections: [], posts: [], collectionPosts: new Map() };
   }
   const kw = keyword.trim();
+  const likeKw = escapeLike(kw);
   const inList = tagIds.map(() => '?').join(',');
   const inArgs = tagIds;
   const need = tagIds.length;
 
-  const kwCol = kw ? ` AND (c.title LIKE ? OR c.summary LIKE ?)` : '';
+  const kwCol = kw ? ` AND (c.title LIKE ? ESCAPE '\\' OR c.summary LIKE ? ESCAPE '\\')` : '';
   const kwPost = kw
-    ? ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content_md LIKE ?)`
+    ? ` AND (p.title LIKE ? ESCAPE '\\' OR p.summary LIKE ? ESCAPE '\\' OR p.content_md LIKE ? ESCAPE '\\')`
     : '';
 
   const [collections, posts, collectionPosts] = await Promise.all([
@@ -183,7 +192,7 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
            : ''}${kwCol}
          ORDER BY c.sort_order ASC, c.id ASC`,
       )
-      .bind(...inArgs, ...(kw ? [`%${kw}%`, `%${kw}%`] : []))
+      .bind(...inArgs, ...(kw ? [`%${likeKw}%`, `%${likeKw}%`] : []))
       .all<TagPageCollectionsRow>(),
     tagIds.length > 0
       ? db
@@ -205,7 +214,7 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
                    )`}${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
-          .bind(...(kw ? [...inArgs, `%${kw}%`, `%${kw}%`, `%${kw}%`] : [...inArgs, ...inArgs]))
+          .bind(...(kw ? [...inArgs, `%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : [...inArgs, ...inArgs]))
           .all<PostWithCollection>()
       : db
           .prepare(
@@ -213,8 +222,8 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
              WHERE p.status = 'published' AND p.collection_id IS NULL${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
-          .bind(...(kw ? [`%${kw}%`, `%${kw}%`, `%${kw}%`] : []))
-          .all<PostWithCollection>(),
+.bind(...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))
+      .all<PostWithCollection>(),
     db
       .prepare(
         `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
@@ -228,7 +237,7 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
              : `1=1`})${kwPost}
          ORDER BY p.created_at ASC, p.id ASC`,
       )
-      .bind(...inArgs, ...(kw ? [`%${kw}%`, `%${kw}%`, `%${kw}%`] : []))
+      .bind(...inArgs, ...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))
       .all<PostWithCollection>(),
   ]);
 

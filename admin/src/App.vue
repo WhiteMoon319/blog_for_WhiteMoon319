@@ -70,7 +70,7 @@ async function logout() {
     </main>
   </template>
 
-  <template v-else>
+  <template v-else-if="route.path === '/login'">
     <router-view @notify="notify" />
   </template>
 

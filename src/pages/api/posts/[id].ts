@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePost, deletePost, listPostOwnTags, setPostOwnTags, parseTagNames, isSlugConflict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePost, deletePost, listPostOwnTags, setPostOwnTags, parseTagNames, getCollectionById, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
@@ -66,6 +66,9 @@ export async function PUT(ctx: APIContext): Promise<Response> {
 
   try {
     const env = await envOf();
+    if ('collection_id' in patch && patch.collection_id !== null && !(await getCollectionById(env.DB, Number(patch.collection_id)))) {
+      return json({ error: 'collection not found' }, 404);
+    }
     const updated = await updatePost(env.DB, id, patch, versionMessage, baseVersion);
     if (updated === 'conflict') {
       return json({ error: '版本冲突：该文章已在别处被修改，请刷新后重试' }, 409);

@@ -4,7 +4,9 @@ import {
   createPost,
   getCollectionById,
   getCollectionsByIds,
-  purgeOrphanTagsStmt,
+  trashPosts,
+  restorePosts,
+  purgePosts,
   isSlugConflict,
   type PostRow,
 } from '../../../lib/db';
@@ -19,7 +21,7 @@ import { json, requireAuth } from '../../../lib/auth';
 
 export const prerender = false;
 
-type Action = 'publish' | 'draft' | 'delete' | 'move' | 'create';
+type Action = 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'create';
 
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
@@ -37,6 +39,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     action !== 'publish' &&
     action !== 'draft' &&
     action !== 'delete' &&
+    action !== 'trash' &&
+    action !== 'restore' &&
+    action !== 'purge' &&
     action !== 'move' &&
     action !== 'create'
   ) {
@@ -111,7 +116,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
     const placeholders = ids.map(() => '?').join(', ');
     const rows = await env.DB
-      .prepare(`SELECT id, slug, collection_id FROM posts WHERE id IN (${placeholders})`)
+      .prepare(`SELECT id, slug, collection_id FROM posts WHERE id IN (${placeholders}) AND deleted_at IS NULL`)
       .bind(...ids)
       .all<{ id: number; slug: string; collection_id: number | null }>();
     const found = rows.results ?? [];
@@ -175,32 +180,32 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ ok: true, count: found.length });
   }
 
-  // 刊发/撤稿/删除：单请求 id ≤50，整批放进一个 D1 事务（≤100 语句），全成功或全失败。
+  // 刊发/撤稿/删除（软删除）/回收站：单请求 id ≤50，整批放进一个 D1 事务（≤100 语句），全成功或全失败。
   // 状态变更同时写入 post_versions（message 标明批量操作），开放中的旧编辑器将收到 409。
   // 计数用预检结果而非 meta.changes：D1 batch 内 changes 是会话累计值，无法按语句取增量。
-  const stmts: D1PreparedStatement[] = [];
-  if (action === 'delete') {
-    const preflight = await env.DB
-      .prepare(`SELECT COUNT(*) AS n FROM posts WHERE id IN (${ids.map(() => '?').join(',')})`)
-      .bind(...ids)
-      .first<{ n: number }>();
-    for (const id of ids) {
-      stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
-    }
-    stmts.push(purgeOrphanTagsStmt(env.DB));
-    await env.DB.batch(stmts);
-    return json({ ok: true, count: preflight?.n ?? 0 });
+  if (action === 'delete' || action === 'trash') {
+    const count = await trashPosts(env.DB, ids);
+    return json({ ok: true, count });
+  }
+  if (action === 'restore') {
+    const count = await restorePosts(env.DB, ids);
+    return json({ ok: true, count });
+  }
+  if (action === 'purge') {
+    const count = await purgePosts(env.DB, ids);
+    return json({ ok: true, count });
   }
 
-  // publish / draft：仅对实际状态不同的文章留档（已刊发的重复刊发不产生版本）
+  // publish / draft：仅对实际状态不同且未删除的文章留档（已刊发的重复刊发不产生版本；回收站文章不参与）
   const status = action === 'publish' ? 'published' : 'draft';
   const preflight = await env.DB
-    .prepare(`SELECT id FROM posts WHERE id IN (${ids.map(() => '?').join(',')}) AND status <> ?`)
+    .prepare(`SELECT id FROM posts WHERE id IN (${ids.map(() => '?').join(',')}) AND status <> ? AND deleted_at IS NULL`)
     .bind(...ids, status)
     .all<{ id: number }>();
   const changed = (preflight.results ?? []).map((r) => r.id);
   if (changed.length === 0) return json({ ok: true, count: 0 });
   const message = action === 'publish' ? '批量刊发' : '批量撤稿';
+  const stmts: D1PreparedStatement[] = [];
   for (const id of changed) {
     // 版本 INSERT 先于 UPDATE：`status <> ?` 守卫读到的是旧状态（与预检一致），
     // 并发重复刊发/并发删除时守卫落空，不会产生多余版本；

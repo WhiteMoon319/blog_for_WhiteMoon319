@@ -15,9 +15,11 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const collectionId = Number(url.searchParams.get('collection'));
   const limit = Number(url.searchParams.get('limit'));
   const offset = Number(url.searchParams.get('offset'));
+  // 回收站是显式管理视图：仅登录后可按 status=all&trash=1 查看，普通 status 查询不携带已删内容
+  const trashOnly = url.searchParams.get('trash') === '1';
 
   let statusFilter: 'draft' | 'published' | 'all' | undefined;
-  if (status === 'all') {
+  if (status === 'all' || trashOnly) {
     if (!authed) return json({ error: 'unauthorized' }, 401);
     statusFilter = 'all';
   } else if (status === 'draft') {
@@ -32,6 +34,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
     status: statusFilter,
     limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : undefined,
     offset: Number.isInteger(offset) && offset > 0 ? offset : undefined,
+    trashOnly,
   });
   return json({ posts });
 }

@@ -12,7 +12,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
     .prepare(
       `SELECT p.*, c.slug AS collection_slug FROM posts p
        LEFT JOIN collections c ON c.id = p.collection_id
-       WHERE p.status = 'published'`,
+       WHERE p.status = 'published' AND p.deleted_at IS NULL`,
     )
     .all<PostWithCollection>();
 

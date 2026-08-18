@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, deletePost, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
@@ -99,8 +99,9 @@ export async function DELETE(ctx: APIContext): Promise<Response> {
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
 
+  // 单篇删除 = 移入回收站（软删除），可经回收站恢复；彻底删除走批量 API 的 purge
   const env = await envOf();
-  const deleted = await deletePost(env.DB, id);
-  if (!deleted) return json({ error: 'not found' }, 404);
+  const count = await trashPosts(env.DB, [id]);
+  if (count === 0) return json({ error: 'not found' }, 404);
   return json({ ok: true });
 }

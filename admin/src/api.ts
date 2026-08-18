@@ -71,7 +71,7 @@ export const api = {
 
   batchPosts: (payload:
     | {
-        action: 'publish' | 'draft' | 'delete' | 'move';
+        action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move';
         ids: number[];
         collection_id?: number | null;
       }

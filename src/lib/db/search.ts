@@ -17,7 +17,7 @@ export async function searchPublishedPosts(db: D1Database, q: string, limit = 50
     const rows = await db
       .prepare(
         `SELECT p.* FROM posts_fts JOIN posts p ON p.id = posts_fts.rowid
-         WHERE posts_fts MATCH ? AND p.status = 'published'
+         WHERE posts_fts MATCH ? AND p.status = 'published' AND p.deleted_at IS NULL
          ORDER BY bm25(posts_fts, 5, 2, 1), p.created_at DESC LIMIT ?`,
       )
       .bind(escapeFtsPhrase(query), limit)
@@ -29,7 +29,8 @@ export async function searchPublishedPosts(db: D1Database, q: string, limit = 50
   return db
     .prepare(
       `SELECT * FROM posts
-       WHERE status = 'published' AND (title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR content_md LIKE ? ESCAPE '\\')
+       WHERE status = 'published' AND deleted_at IS NULL
+         AND (title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR content_md LIKE ? ESCAPE '\\')
        ORDER BY created_at DESC LIMIT ?`,
     )
     .bind(like, like, like, limit)

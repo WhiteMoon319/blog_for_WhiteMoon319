@@ -935,3 +935,57 @@ test('e2e：超长标题自动 slug ≤63 且可继续编辑', async () => {
   await c.del(`/api/posts/${body.results[0].post.id}`);
   await c.del(`/api/posts/${body.results[1].post.id}`);
 });
+
+test('e2e：回收站全生命周期——删除即软删、仅管理视图可见、恢复、焚毁', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const created = await c.post('/api/posts', {
+    title: '回收站之旅',
+    slug: 'trash-journey',
+    summary: '摘要',
+    content_md: '正文。',
+    status: 'published',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  assert.equal((await c.get('/posts/trash-journey/')).status, 200, '发布后公开可见');
+
+  // 单篇 DELETE = 移入回收站（软删除）：公开 302 至 404 页（与草稿一致），未登录不可见回收站视图
+  const del = await c.del(`/api/posts/${id}`);
+  assert.equal(del.status, 200);
+  assert.equal((await c.get('/posts/trash-journey/')).status, 302, '删除后公开不可见');
+  assert.equal((await c.get('/api/posts?status=all')).status, 200, '登录可查 status=all');
+  const all = await c.get('/api/posts?status=all');
+  assert.ok(!JSON.stringify(await all.json()).includes('trash-journey'), 'status=all 不含回收站');
+  const anonTrash = await c.anon('/api/posts?status=all&trash=1');
+  assert.equal(anonTrash.status, 401, '回收站视图需登录');
+  const trashList = await c.get('/api/posts?status=all&trash=1');
+  assert.equal(trashList.status, 200);
+  const trashRows = (await trashList.json()).posts as Array<{ id: number; slug: string; deleted_at: string }>;
+  assert.ok(trashRows.some((p) => p.id === id), '回收站视图应含该篇');
+
+  // 恢复：回到公开可见，状态与 slug 不变
+  const restore = await c.post('/api/posts/batch', { action: 'restore', ids: [id] });
+  assert.equal(restore.status, 200);
+  assert.equal((await restore.json()).count, 1);
+  assert.equal((await c.get('/posts/trash-journey/')).status, 200, '恢复后公开可见');
+
+  // 焚毁：仅回收站内可删，彻底消失
+  const trash2 = await c.post('/api/posts/batch', { action: 'trash', ids: [id] });
+  assert.equal((await trash2.json()).count, 1);
+  const purge = await c.post('/api/posts/batch', { action: 'purge', ids: [id] });
+  assert.equal((await purge.json()).count, 1, 'purge 应计数 1');
+  assert.equal((await c.get('/posts/trash-journey/')).status, 302, '焚毁后公开不可见');
+  const after = await c.get('/api/posts?status=all&trash=1');
+  assert.ok(!JSON.stringify(await after.json()).includes('trash-journey'), '焚毁后回收站视图应清空该篇');
+
+  // 未回收的文章不能 purge
+  const live = await c.post('/api/posts', { title: '未焚之篇', slug: 'trash-live-no', content_md: '正文。', status: 'published' });
+  assert.equal(live.status, 201);
+  const liveId = (await live.json()).post.id as number;
+  const noPurge = await c.post('/api/posts/batch', { action: 'purge', ids: [liveId] });
+  assert.equal((await noPurge.json()).count, 0, '非回收站文章 purge 计数 0');
+  assert.equal((await c.get('/posts/trash-live-no/')).status, 200, '未被误删');
+  await c.del(`/api/posts/${liveId}`);
+});

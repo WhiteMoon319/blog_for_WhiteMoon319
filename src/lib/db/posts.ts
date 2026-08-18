@@ -12,7 +12,7 @@ export async function listPublishedPosts(
   db: D1Database,
   opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc' } = {},
 ): Promise<PostRow[]> {
-  let sql = `SELECT * FROM posts WHERE status = 'published'`;
+  let sql = `SELECT * FROM posts WHERE status = 'published' AND deleted_at IS NULL`;
   const args: (number | string | null)[] = [];
   if (opts.collectionId !== undefined) {
     if (opts.collectionId === null) {
@@ -38,7 +38,7 @@ export async function countPublishedPosts(
   db: D1Database,
   opts: { collectionId?: number | null } = {},
 ): Promise<number> {
-  let sql = `SELECT COUNT(*) AS n FROM posts WHERE status = 'published'`;
+  let sql = `SELECT COUNT(*) AS n FROM posts WHERE status = 'published' AND deleted_at IS NULL`;
   const args: (number | null)[] = [];
   if (opts.collectionId !== undefined) {
     if (opts.collectionId === null) {
@@ -55,7 +55,7 @@ export async function countPublishedPosts(
 export async function getPublishedPostBySlug(db: D1Database, slug: string): Promise<PostRow | null> {
   return db
     .prepare(
-      `SELECT * FROM posts WHERE slug = ? AND status = 'published' AND collection_id IS NULL
+      `SELECT * FROM posts WHERE slug = ? AND status = 'published' AND deleted_at IS NULL AND collection_id IS NULL
        ORDER BY created_at DESC, id DESC LIMIT 1`,
     )
     .bind(slug)
@@ -65,7 +65,7 @@ export async function getPublishedPostBySlug(db: D1Database, slug: string): Prom
 // 跨文集查已刊同名文章：用于旧路径 /posts/{slug}/ 的 301 转正（未分类优先，已收录则跳文集路径）
 export async function getPublishedPostBySlugAny(db: D1Database, slug: string): Promise<PostRow | null> {
   return db
-    .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published' ORDER BY created_at DESC, id DESC LIMIT 1`)
+    .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published' AND deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`)
     .bind(slug)
     .first<PostRow>();
 }
@@ -76,14 +76,14 @@ export async function getPublishedPostInCollection(
   slug: string,
 ): Promise<PostRow | null> {
   return db
-    .prepare(`SELECT * FROM posts WHERE collection_id = ? AND slug = ? AND status = 'published'`)
+    .prepare(`SELECT * FROM posts WHERE collection_id = ? AND slug = ? AND status = 'published' AND deleted_at IS NULL`)
     .bind(collectionId, slug)
     .first<PostRow>();
 }
 
 export async function listPosts(
   db: D1Database,
-  opts: { collectionId?: number; status?: 'draft' | 'published' | 'all'; limit?: number; offset?: number } = {},
+  opts: { collectionId?: number; status?: 'draft' | 'published' | 'all'; limit?: number; offset?: number; trashOnly?: boolean } = {},
 ): Promise<PostRow[]> {
   const where: string[] = [];
   const args: (number | string)[] = [];
@@ -95,6 +95,8 @@ export async function listPosts(
     where.push('status = ?');
     args.push(opts.status);
   }
+  // 回收站是显式管理视图：status=all 绝不携带已删内容；只有 trashOnly 才查已删
+  where.push(opts.trashOnly ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL');
   let sql = 'SELECT * FROM posts';
   if (where.length > 0) sql += ` WHERE ${where.join(' AND ')}`;
   sql += ' ORDER BY created_at DESC';
@@ -111,7 +113,9 @@ export async function listPosts(
 }
 
 export async function getPostById(db: D1Database, id: number): Promise<PostRow | null> {
-  return db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>();
+  // 已删除（回收站）文章对一切业务路径不可见：编辑、预览、公开 GET 全部 404；
+  // 回收站的查看/恢复/彻底删除走专门的管理查询。
+  return db.prepare('SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL').bind(id).first<PostRow>();
 }
 
 export async function createPost(db: D1Database, data: PostInput): Promise<PostRow | null> {
@@ -320,6 +324,76 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
   return (del.meta.changes ?? 0) > 0;
 }
 
+// ---- 回收站（软删除）：trash/restore 每篇 2 语句（版本 + 更新），50 篇 = 100 恰好落在 D1 batch 上限内 ----
+
+const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+       title, slug, collection_id, summary, content_md, cover_url, status, ?
+FROM posts WHERE id = ?`;
+
+function trashVersionStmt(db: D1Database, id: number, message: string, guard: string): D1PreparedStatement {
+  // 版本 INSERT 先于 UPDATE：guard（deleted_at 旧状态）读到的是变更前状态；
+  // 并发重复执行时 guard 落空，不会重复留档。
+  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, message, id);
+}
+
+// trash（fromTrashed=false）/restore（fromTrashed=true）共用：预检计数 + 每篇 [版本留档, 状态更新]。
+// 回收期间文章 slug 仍占据唯一索引位（UNIQUE(collection_id, slug) 不受 deleted_at 影响），
+// 恢复不会发生 slug 冲突，无需重命名。
+async function trashStateStmts(
+  db: D1Database,
+  ids: number[],
+  fromTrashed: boolean,
+): Promise<{ stmts: D1PreparedStatement[]; count: number }> {
+  const sql =
+    fromTrashed
+      ? `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`
+      : `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`;
+  const pre = await db.prepare(sql).bind(...ids).first<{ n: number }>();
+  const stmts: D1PreparedStatement[] = [];
+  const count = pre?.n ?? 0;
+  if (count > 0) {
+    const guard = fromTrashed ? 'AND deleted_at IS NOT NULL' : 'AND deleted_at IS NULL';
+    const message = fromTrashed ? '恢复' : '移入回收站';
+    const setSql = fromTrashed ? 'deleted_at = NULL' : `deleted_at = datetime('now')`;
+    for (const id of ids) {
+      stmts.push(trashVersionStmt(db, id, message, guard));
+      stmts.push(
+        db.prepare(`UPDATE posts SET ${setSql}, updated_at = datetime('now') WHERE id = ? ${guard}`).bind(id),
+      );
+    }
+  }
+  return { stmts, count };
+}
+
+// 移入回收站：保留文章与全部版本；幂等（已删的再次 trash 不计）。
+export async function trashPosts(db: D1Database, ids: number[]): Promise<number> {
+  const { stmts, count } = await trashStateStmts(db, ids, false);
+  if (stmts.length > 0) await db.batch(stmts);
+  return count;
+}
+
+// 恢复：清除 deleted_at，文章回到原状态（含回收期间保持的 slug 与阅读量）。
+export async function restorePosts(db: D1Database, ids: number[]): Promise<number> {
+  const { stmts, count } = await trashStateStmts(db, ids, true);
+  if (stmts.length > 0) await db.batch(stmts);
+  return count;
+}
+
+// 彻底删除：仅回收站文章可 purge（防误删）；版本/关联随 CASCADE 一并清除，随后清理孤儿标签。
+export async function purgePosts(db: D1Database, ids: number[]): Promise<number> {
+  const pre = await db
+    .prepare(`SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`)
+    .bind(...ids)
+    .first<{ n: number }>();
+  const stmts = ids.map((id) =>
+    db.prepare('DELETE FROM posts WHERE id = ? AND deleted_at IS NOT NULL').bind(id),
+  );
+  stmts.push(purgeOrphanTagsStmt(db));
+  await db.batch(stmts);
+  return pre?.n ?? 0;
+}
+
 export async function incrementViewCount(db: D1Database, id: number): Promise<number> {
   const row = await db
     .prepare(`UPDATE posts SET view_count = view_count + 1 WHERE id = ? RETURNING view_count`)
@@ -332,7 +406,7 @@ export async function listArchivedPosts(
   db: D1Database,
   opts: { limit?: number; offset?: number } = {},
 ): Promise<PostRow[]> {
-  let sql = `SELECT * FROM posts WHERE status = 'published' ORDER BY created_at ASC`;
+  let sql = `SELECT * FROM posts WHERE status = 'published' AND deleted_at IS NULL ORDER BY created_at ASC`;
   if (opts.limit) {
     sql += ` LIMIT ?`;
     if (opts.offset) sql += ` OFFSET ?`;
@@ -347,7 +421,7 @@ export async function listArchivedPosts(
 
 export async function countArchivedPosts(db: D1Database): Promise<number> {
   const row = await db
-    .prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'published'`)
+    .prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'published' AND deleted_at IS NULL`)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
@@ -367,7 +441,7 @@ export async function getAdjacentPosts(
                 LAG(p.id) OVER (ORDER BY p.created_at ASC, p.id ASC) AS global_prev_id,
                 LEAD(p.id) OVER (ORDER BY p.created_at ASC, p.id ASC) AS global_next_id
          FROM posts p
-         WHERE p.status = 'published'
+         WHERE p.status = 'published' AND p.deleted_at IS NULL
        )
        SELECT * FROM ranked WHERE id = ?`,
     )

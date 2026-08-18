@@ -166,7 +166,7 @@ export async function listAllTagCounts(db: D1Database): Promise<TagCountRow[]> {
       `SELECT t.id, t.name, t.created_at,
               (SELECT COUNT(*) FROM collection_tags ct WHERE ct.tag_id = t.id) AS collections,
               (SELECT COUNT(*) FROM post_tags pt JOIN posts p ON p.id = pt.post_id
-                 WHERE pt.tag_id = t.id AND p.status = 'published'
+                 WHERE pt.tag_id = t.id AND p.status = 'published' AND p.deleted_at IS NULL
                    AND NOT EXISTS (
                      SELECT 1 FROM collection_tags ct2
                      WHERE ct2.tag_id = pt.tag_id AND ct2.collection_id = p.collection_id
@@ -220,8 +220,8 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
   const [collections, posts, collectionPosts] = await Promise.all([
     db
       .prepare(
-        `SELECT DISTINCT c.*,
-                (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published') AS post_count
+        `         SELECT DISTINCT c.*,
+                (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published' AND p.deleted_at IS NULL) AS post_count
          FROM collections c
          WHERE 1=1${tagIds.length > 0
            ? ` AND (SELECT COUNT(DISTINCT ct.tag_id) FROM collection_tags ct
@@ -234,9 +234,9 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
     tagIds.length > 0
       ? db
           .prepare(
-            `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
+             `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
              LEFT JOIN collections c ON c.id = p.collection_id
-             WHERE p.status = 'published'
+             WHERE p.status = 'published' AND p.deleted_at IS NULL
                AND (SELECT COUNT(DISTINCT t3.tag_id) FROM (
                      SELECT tag_id FROM post_tags WHERE post_id = p.id
                      UNION SELECT tag_id FROM collection_tags WHERE collection_id = p.collection_id
@@ -256,7 +256,7 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
       : db
           .prepare(
             `SELECT DISTINCT p.*, NULL AS collection_slug FROM posts p
-             WHERE p.status = 'published' AND p.collection_id IS NULL${kwPost}
+             WHERE p.status = 'published' AND p.deleted_at IS NULL AND p.collection_id IS NULL${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
 .bind(...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))
@@ -265,7 +265,7 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
       .prepare(
         `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
          JOIN collections c ON c.id = p.collection_id
-         WHERE p.status = 'published'
+         WHERE p.status = 'published' AND p.deleted_at IS NULL
            AND (${tagIds.length > 0
              ? `(SELECT COUNT(DISTINCT t3.tag_id) FROM (
                   SELECT tag_id FROM post_tags WHERE post_id = p.id

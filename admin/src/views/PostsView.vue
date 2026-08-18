@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api';
 import { fmtDate } from '../lib/format';
@@ -12,11 +12,14 @@ const router = useRouter();
 const posts = ref<Post[]>([]);
 const collections = ref<Collection[]>([]);
 const loaded = ref(false);
-const filter = ref<'all' | 'published' | 'draft'>('all');
+const filter = ref<'all' | 'published' | 'draft' | 'trash'>('all');
 const filterCol = ref<number | ''>('');
 
 async function load() {
-  const [p, c] = await Promise.all([api.posts(), api.collections()]);
+  const [p, c] = await Promise.all([
+    api.posts(filter.value === 'trash' ? '&trash=1' : ''),
+    api.collections(),
+  ]);
   posts.value = p.posts;
   collections.value = c.collections;
   loaded.value = true;
@@ -24,10 +27,17 @@ async function load() {
 onMounted(() => {
   load().catch((e) => emit('notify', (e as Error).message, true));
 });
+watch(filter, () => {
+  selected.value = new Set();
+  moveCol.value = '';
+  load().catch((e) => emit('notify', (e as Error).message, true));
+});
+
+const inTrash = computed(() => filter.value === 'trash');
 
 const shown = computed(() =>
   posts.value.filter((p) => {
-    if (filter.value !== 'all' && p.status !== filter.value) return false;
+    if (filter.value !== 'all' && filter.value !== 'trash' && p.status !== filter.value) return false;
     if (filterCol.value !== '' && p.collection_id !== filterCol.value) return false;
     return true;
   }),
@@ -65,11 +75,32 @@ async function toggleStatus(p: Post) {
   }
 }
 
-async function remove(p: Post) {
-  if (!confirm(`确要焚毁「${p.title}」？不可复原。`)) return;
+async function trash(p: Post) {
+  if (!confirm(`把「${p.title}」移入回收站？可随时恢复。`)) return;
   try {
     await api.deletePost(p.id);
-    emit('notify', '文章已删');
+    emit('notify', '已移入回收站');
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
+}
+
+async function restoreOne(p: Post) {
+  try {
+    const { count = 0 } = await api.batchPosts({ action: 'restore', ids: [p.id] });
+    emit('notify', count > 0 ? '已恢复' : '该文章不在回收站');
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
+}
+
+async function purgeOne(p: Post) {
+  if (!confirm(`确要焚毁「${p.title}」？其版本历史与标签关联将一并清除，不可复原。`)) return;
+  try {
+    const { count = 0 } = await api.batchPosts({ action: 'purge', ids: [p.id] });
+    emit('notify', count > 0 ? '已彻底删除' : '该文章不在回收站');
     await load();
   } catch (e) {
     emit('notify', (e as Error).message, true);
@@ -88,10 +119,11 @@ function toggleAll() {
       : new Set(all);
 }
 
-async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
+async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move') {
   const ids = [...selected.value];
   if (ids.length === 0) return;
-  if (action === 'delete' && !confirm(`确要焚毁选中的 ${ids.length} 篇？不可复原。`)) return;
+  if (action === 'delete' && !confirm(`确要移入回收站选中的 ${ids.length} 篇？可随时恢复。`)) return;
+  if (action === 'purge' && !confirm(`确要焚毁回收站中选中的 ${ids.length} 篇？不可复原！`)) return;
   if (action === 'move' && moveCol.value === '') {
     emit('notify', '请先选择目标文集', true);
     return;
@@ -132,33 +164,40 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
     <div class="card-head">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button
-          v-for="f in (['all', 'published', 'draft'] as const)"
+          v-for="f in (['all', 'published', 'draft', 'trash'] as const)"
           :key="f"
           class="btn btn-ghost mini"
           :style="filter === f ? 'border-color:var(--cinnabar);color:var(--cinnabar);' : ''"
           @click="filter = f"
         >
-          {{ f === 'all' ? '全部' : f === 'published' ? '已刊' : '草稿' }}
+          {{ f === 'all' ? '全部' : f === 'published' ? '已刊' : f === 'draft' ? '草稿' : '回收站' }}
         </button>
         <select v-model="filterCol" class="select" style="width:auto;padding:6px 10px;font-size:0.8rem;">
           <option :value="''">全部文集</option>
           <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
         </select>
       </div>
-      <button class="btn btn-primary" @click="create">写新篇</button>
+      <button v-if="!inTrash" class="btn btn-primary" @click="create">写新篇</button>
     </div>
 
     <div class="bulk-bar" v-if="selected.size > 0">
       <span style="color:var(--ink-light);font-size:0.85rem;">已选 {{ selected.size }} 篇</span>
-      <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('publish')">批量刊发</button>
-      <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('draft')">批量撤稿</button>
-      <select v-model="moveCol" class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;">
-        <option :value="''">移入文集…</option>
-        <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
-      </select>
-      <button class="btn btn-ghost mini" :disabled="busy || moveCol === ''" @click="bulk('move')">移动</button>
-      <span style="flex:1"></span>
-      <button class="btn btn-danger mini" :disabled="busy" @click="bulk('delete')">批量删除</button>
+      <template v-if="!inTrash">
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('publish')">批量刊发</button>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('draft')">批量撤稿</button>
+        <select v-model="moveCol" class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;">
+          <option :value="''">移入文集…</option>
+          <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
+        </select>
+        <button class="btn btn-ghost mini" :disabled="busy || moveCol === ''" @click="bulk('move')">移动</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('delete')">移入回收站</button>
+      </template>
+      <template v-else>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('restore')">恢复</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-danger mini" :disabled="busy" @click="bulk('purge')">彻底删除</button>
+      </template>
     </div>
 
     <div class="table-wrap">
@@ -191,14 +230,14 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
             </td>
             <td class="title-cell">
               <router-link
-                v-if="p.status === 'draft'"
+                v-if="!inTrash && p.status === 'draft'"
                 :to="{ path: '/editor', query: { id: p.id } }"
                 style="color:var(--ink-deep);text-decoration:none;"
               >
                 {{ p.title }}
               </router-link>
               <a
-                v-else
+                v-else-if="!inTrash"
                 :href="postUrl(p)"
                 target="_blank"
                 rel="noopener"
@@ -206,31 +245,39 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
               >
                 {{ p.title }}
               </a>
+              <span v-else style="color:var(--ink-light);">{{ p.title }}</span>
             </td>
             <td>
               <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
               {{ colName(p.collection_id) }}
             </td>
             <td>
-              <span class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
+              <span v-if="inTrash" class="tag tag-draft">已回收</span>
+              <span v-else class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
                 {{ p.status === 'published' ? '已刊' : '草稿' }}
               </span>
             </td>
             <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
-            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmtDate(p.created_at) }}</td>
+            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmtDate(p.deleted_at ?? p.created_at) }}</td>
             <td>
               <div class="actions">
-                <button class="btn btn-ghost mini" @click="edit(p)">改</button>
-                <button class="btn btn-ghost mini" @click="toggleStatus(p)">
-                  {{ p.status === 'published' ? '撤稿' : '刊发' }}
-                </button>
-                <button class="btn btn-danger mini" @click="remove(p)">删</button>
+                <template v-if="!inTrash">
+                  <button class="btn btn-ghost mini" @click="edit(p)">改</button>
+                  <button class="btn btn-ghost mini" @click="toggleStatus(p)">
+                    {{ p.status === 'published' ? '撤稿' : '刊发' }}
+                  </button>
+                  <button class="btn btn-danger mini" @click="trash(p)">回收</button>
+                </template>
+                <template v-else>
+                  <button class="btn btn-ghost mini" @click="restoreOne(p)">恢复</button>
+                  <button class="btn btn-danger mini" @click="purgeOne(p)">焚毁</button>
+                </template>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-if="!shown.length" class="empty">此间无文。</div>
+    <div v-if="!shown.length" class="empty">{{ inTrash ? '回收站空空如也。' : '此间无文。' }}</div>
   </div>
 </template>

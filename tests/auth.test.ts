@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { APIContext } from 'astro';
-import { __setEnvResolver } from '../src/lib/db.ts';
+import { __setEnvResolver } from '../src/lib/db/index.ts';
 import { checkPassword, requireAuth, signToken, verifyToken } from '../src/lib/auth.ts';
 
 function mockEnv(): Env {

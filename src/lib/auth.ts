@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf } from './db.ts';
+import { envOf } from './db/index.ts';
 
 const COOKIE_NAME = 'blog_session';
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;

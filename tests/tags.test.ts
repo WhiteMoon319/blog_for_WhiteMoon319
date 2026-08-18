@@ -20,7 +20,7 @@ import {
   isValidTagName,
   parseTagNames,
   searchPublishedPosts,
-} from '../src/lib/db.ts';
+} from '../src/lib/db/index.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
 const handle = await makeTestDb();

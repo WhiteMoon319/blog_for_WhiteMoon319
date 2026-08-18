@@ -1,6 +1,6 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getAdjacentPosts, type PostRow } from '../src/lib/db.ts';
+import { getAdjacentPosts, type PostRow } from '../src/lib/db/index.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
 const handle = await makeTestDb();

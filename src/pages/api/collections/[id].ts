@@ -11,13 +11,9 @@ import {
 } from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
+import { parseId } from '../../../lib/api/validate';
 
 export const prerender = false;
-
-function parseId(raw: string | undefined): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 export async function GET(ctx: APIContext): Promise<Response> {
   const id = parseId(ctx.params.id);

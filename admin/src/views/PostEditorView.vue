@@ -7,11 +7,12 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { marked } from 'marked';
-import TurndownService from 'turndown';
-import { diffLines, diffWords } from 'diff';
 import { api } from '../api';
-import type { Collection, MediaFile, PostVersion } from '../types';
+import type { Collection, MediaFile } from '../types';
 import TagChips from '../components/TagChips.vue';
+import VersionPanel from '../components/VersionPanel.vue';
+import MediaPickerModal from '../components/MediaPickerModal.vue';
+import { createTurndown, checkContentRisk } from '../lib/editor';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -43,15 +44,8 @@ const imageFileInput = ref<HTMLInputElement | null>(null);
 
 // 编辑器不支持的结构提示：加载/保存时检测 markdown 表格与块级 HTML，避免往返后静默丢失
 const contentRisk = ref('');
-const TABLE_RE = /^\s*\|[^\n]*\|\s*$/m;
-const RAW_HTML_RE = /<(table|div|details|section|article|aside|header|footer|nav|main|figure|dl|iframe|style|script|form)[\s>]/i;
-function checkContentRisk(md: string): string {
-  if (TABLE_RE.test(md)) return '正文包含 Markdown 表格，编辑器会将其摊平为纯文本后保存，结构将丢失。';
-  if (RAW_HTML_RE.test(md)) return '正文包含块级 HTML（表格/布局标签等），编辑器会剥掉这些结构，保存后内容可能改变。';
-  return '';
-}
 
-const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
+const turndown = createTurndown();
 
 const uploadingKeys = new Set<string>();
 
@@ -109,9 +103,9 @@ const editor = useEditor({
   },
 });
 
-function parseId(raw: unknown): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
+function currentMarkdown(): string {
+  if (!editor.value) return '';
+  return turndown.turndown(editor.value.getHTML());
 }
 
 async function load() {
@@ -147,12 +141,13 @@ async function load() {
     form.tags = [];
     form.inherited_tags = [];
     const cid = parseId(route.query.collection);
-    form.collection_id = collections.value.some((c) => c.id === cid) ? cid : null;
+    if (cid && collections.value.some((c) => c.id === cid)) form.collection_id = cid;
+    contentRisk.value = '';
     if (editor.value) editor.value.commands.setContent('');
   }
-  loading.value = false;
 }
 
+// 文集切换时刷新继承标签提示
 watch(
   () => form.collection_id,
   async (id) => {
@@ -169,26 +164,28 @@ watch(
   },
 );
 
-onMounted(() => {
-  load().catch((e) => emit('notify', (e as Error).message, true));
-  api.tags().then((r) => (suggestions.value = r.tags.map((t) => t.name))).catch(() => {});
+function parseId(raw: unknown): number | null {
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+watch(() => [route.query.id, route.query.collection] as const, async ([id, collection]) => {
+  if (loading.value) return;
+  const next = parseId(id);
+  if (next !== null && next === loadedId.value) return;
+  loading.value = true;
+  try {
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+    loading.value = false;
+  }
 });
 
-watch(
-  () => [route.query.id, route.query.collection] as const,
-  async ([id, collection]) => {
-    if (loading.value) return;
-    const next = parseId(id);
-    if (next !== null && next === loadedId.value) return;
-    loading.value = true;
-    try {
-      await load();
-    } catch (e) {
-      emit('notify', (e as Error).message, true);
-      loading.value = false;
-    }
-  },
-);
+onMounted(() => {
+  void load().catch((e) => emit('notify', (e as Error).message, true)).finally(() => (loading.value = false));
+  api.tags().then((r) => (suggestions.value = r.tags.map((t) => t.name))).catch(() => {});
+});
 
 onBeforeUnmount(() => {
   editor.value?.destroy();
@@ -199,7 +196,7 @@ async function save() {
   if (!editor.value) return;
   saving.value = true;
   try {
-    const content_md = turndown.turndown(editor.value.getHTML());
+    const content_md = currentMarkdown();
     contentRisk.value = checkContentRisk(content_md);
     const payload = {
       title: form.title.trim(),
@@ -264,27 +261,11 @@ function setLink() {
 }
 
 const showPicker = ref(false);
-const pickerFiles = ref<MediaFile[]>([]);
-const pickerCursor = ref<string | undefined>(undefined);
-const pickerBusy = ref(false);
-
-async function pickerLoad() {
-  if (pickerBusy.value) return;
-  pickerBusy.value = true;
-  try {
-    const res = await api.media(pickerCursor.value);
-    pickerFiles.value.push(...res.files);
-    pickerCursor.value = res.cursor;
-  } catch (e) {
-    emit('notify', (e as Error).message, true);
-  } finally {
-    pickerBusy.value = false;
-  }
-}
+const pickerRef = ref<InstanceType<typeof MediaPickerModal> | null>(null);
 
 function openPicker() {
-  if (pickerFiles.value.length === 0) void pickerLoad();
   showPicker.value = true;
+  void pickerRef.value?.load();
 }
 
 function insertMedia(url: string) {
@@ -292,127 +273,11 @@ function insertMedia(url: string) {
   showPicker.value = false;
 }
 
-interface DiffSeg {
-  kind: 'add' | 'del' | 'ctx';
-  paired: boolean;
-  line: string;
-  words: Array<{ kind: 'add' | 'del' | 'keep'; text: string }>;
-}
-
 const showVersions = ref(false);
-const versions = ref<PostVersion[]>([]);
-const versionsBusy = ref(false);
-const selVersion = ref<number | null>(null);
-const cmpTarget = ref<number | 'current'>('current');
-const diffSegs = ref<DiffSeg[] | null>(null);
-const diffMeta = ref('');
 
-function currentMarkdown(): string {
-  if (!editor.value) return '';
-  return turndown.turndown(editor.value.getHTML());
-}
-
-function computeDiff(a: string, b: string): DiffSeg[] {
-  const parts = diffLines(a, b);
-  const segs: DiffSeg[] = [];
-  let dels: string[] = [];
-  let adds: string[] = [];
-  const splitLines = (v: string) => {
-    const lines = v.split('\n');
-    if (lines[lines.length - 1] === '') lines.pop();
-    return lines;
-  };
-  const flushPair = () => {
-    while (dels.length > 0 && adds.length > 0) {
-      const d = dels.shift()!;
-      const ad = adds.shift()!;
-      const words = diffWords(d, ad).map((w) => ({
-        kind: w.removed ? ('del' as const) : w.added ? ('add' as const) : ('keep' as const),
-        text: w.value,
-      }));
-      segs.push({ kind: 'del', line: d, words, paired: true });
-      segs.push({ kind: 'add', line: ad, words, paired: true });
-    }
-    for (const d of dels) segs.push({ kind: 'del', line: d, words: [], paired: false });
-    for (const ad of adds) segs.push({ kind: 'add', line: ad, words: [], paired: false });
-    dels = [];
-    adds = [];
-  };
-  for (const p of parts) {
-    if (p.removed) dels.push(...splitLines(p.value));
-    else if (p.added) adds.push(...splitLines(p.value));
-    else {
-      flushPair();
-      for (const l of splitLines(p.value)) segs.push({ kind: 'ctx', line: l, words: [], paired: false });
-    }
-  }
-  flushPair();
-  return segs;
-}
-
-function metaOf(v: PostVersion, label: string): string {
-  const bits = [`v${v.version} · ${label}`, v.status === 'published' ? '已刊' : '草稿'];
-  if (v.collection_id !== null) bits.push(`文集#${v.collection_id}`);
-  if (v.slug) bits.push(v.slug);
-  if (v.summary) bits.push('有摘要');
-  if (v.cover_url) bits.push('有封面');
-  return bits.join('　');
-}
-
-async function refreshDiff() {
-  if (selVersion.value === null) {
-    diffSegs.value = null;
-    diffMeta.value = '';
-    return;
-  }
-  const base = versions.value.find((v) => v.version === selVersion.value);
-  if (!base) return;
-  if (cmpTarget.value === 'current') {
-    diffSegs.value = computeDiff(base.content_md, currentMarkdown());
-    diffMeta.value = metaOf(base, '基线') + '\n→ 当前工作区（未保存）';
-  } else {
-    const other = versions.value.find((v) => v.version === cmpTarget.value);
-    if (!other) return;
-    diffSegs.value = computeDiff(base.content_md, other.content_md);
-    diffMeta.value = metaOf(base, '基线') + '\n→ ' + metaOf(other, '对比');
-  }
-}
-
-async function openVersions() {
+function openVersions() {
   if (loadedId.value === null) return;
   showVersions.value = true;
-  versionsBusy.value = true;
-  try {
-    const res = await api.postVersions(loadedId.value);
-    versions.value = res.versions;
-    const first = res.versions[0];
-    selVersion.value = first ? first.version : null;
-    cmpTarget.value = 'current';
-    await refreshDiff();
-  } catch (e) {
-    emit('notify', (e as Error).message, true);
-  } finally {
-    versionsBusy.value = false;
-  }
-}
-
-async function restoreVersion(v: PostVersion) {
-  if (loadedId.value === null) return;
-  if (!confirm(`确认回滚到 v${v.version}（${v.created_at.slice(0, 10)}）？当前内容将被覆盖，并生成一条新版本记录。`)) return;
-  versionsBusy.value = true;
-  try {
-    await api.restorePostVersion(loadedId.value, v.version);
-    emit('notify', `已回滚至 v${v.version}`);
-    await load();
-    const res = await api.postVersions(loadedId.value);
-    versions.value = res.versions;
-    selVersion.value = res.versions[0]?.version ?? null;
-    await refreshDiff();
-  } catch (e) {
-    emit('notify', (e as Error).message, true);
-  } finally {
-    versionsBusy.value = false;
-  }
 }
 </script>
 
@@ -538,94 +403,22 @@ async function restoreVersion(v: PostVersion) {
     </form>
   </div>
 
-  <div v-if="showPicker" class="media-mask" @click.self="showPicker = false">
-    <div class="media-modal">
-      <div class="media-modal-head">
-        <span>从相册取图</span>
-        <button class="btn btn-ghost mini" @click="showPicker = false">关</button>
-      </div>
-      <div class="media-modal-body">
-        <div v-if="pickerFiles.length" class="media-modal-grid">
-          <button
-            v-for="f in pickerFiles"
-            :key="f.key"
-            class="media-thumb"
-            :title="f.key"
-            @click="insertMedia(f.url)"
-          >
-            <img :src="f.url" :alt="f.key" loading="lazy" />
-          </button>
-        </div>
-        <div v-else class="empty">相册空空…</div>
-        <div v-if="pickerCursor" style="text-align:center;padding-top:12px;">
-          <button class="btn btn-ghost mini" :disabled="pickerBusy" @click="pickerLoad">
-            {{ pickerBusy ? '载入中…' : '加载更多' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <MediaPickerModal
+    v-if="showPicker"
+    ref="pickerRef"
+    @close="showPicker = false"
+    @notify="emit('notify', $event)"
+    @pick="insertMedia"
+  />
 
-  <div v-if="showVersions" class="media-mask" @click.self="showVersions = false">
-    <div class="media-modal" style="width:min(1080px, 96vw);">
-      <div class="media-modal-head">
-        <span>版本史（每次保存自动留档，可对比与回滚）</span>
-        <button class="btn btn-ghost mini" @click="showVersions = false">关</button>
-      </div>
-      <div class="versions-body">
-        <aside class="versions-list">
-          <div v-if="versionsBusy" class="empty">载入中…</div>
-          <template v-else>
-            <div
-              v-for="v in versions"
-              :key="v.version"
-              class="ver-item"
-              :class="{ on: selVersion === v.version }"
-              @click="selVersion = v.version; refreshDiff()"
-            >
-              <div class="ver-head">
-                <span class="ver-no">v{{ v.version }}</span>
-                <span class="ver-date">{{ v.created_at.slice(0, 16).replace('T', ' ') }}</span>
-              </div>
-              <div class="ver-msg">{{ v.message || '自动保存' }}</div>
-              <div class="ver-title">{{ v.title }}</div>
-              <div class="ver-foot">
-                <span class="tag" :class="v.status === 'published' ? 'tag-published' : 'tag-draft'">
-                  {{ v.status === 'published' ? '已刊' : '草稿' }}
-                </span>
-                <button class="btn btn-danger mini" :disabled="versionsBusy" @click.stop="restoreVersion(v)">
-                  回滚到此
-                </button>
-              </div>
-            </div>
-            <div v-if="versions.length === 0" class="empty">尚无版本。</div>
-          </template>
-        </aside>
-        <section class="versions-diff">
-          <div class="diff-toolbar">
-            <select v-model="selVersion" class="select" @change="refreshDiff" style="width:auto;">
-              <option v-for="v in versions" :key="v.version" :value="v.version">基线 v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
-            </select>
-            <span class="diff-arrow">→</span>
-            <select v-model="cmpTarget" class="select" @change="refreshDiff" style="width:auto;">
-              <option value="current">当前工作区（未保存）</option>
-              <option v-for="v in versions" :key="v.version" :value="v.version">v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
-            </select>
-            <span class="diff-legend">
-              <span class="lg lg-add">＋新增</span>
-              <span class="lg lg-del">－删除</span>
-            </span>
-          </div>
-          <pre class="diff-view" v-if="diffSegs">
-<template v-for="(seg, i) in diffSegs" :key="i"><span class="diff-line" :class="[seg.kind, seg.paired ? 'pair' : 'full']"><span class="diff-mark">{{ seg.kind === 'add' ? '+' : seg.kind === 'del' ? '-' : ' ' }}</span><span v-if="seg.words.length" class="diff-words"><template v-for="(w, j) in seg.words" :key="j"><span :class="'dw ' + w.kind">{{ w.text }}</span></template></span><template v-else>{{ seg.line }}</template></span>
-</template>
-</pre>
-          <div v-else class="empty">选择基线后显示差异。</div>
-          <div class="diff-meta" v-if="diffMeta">{{ diffMeta }}</div>
-        </section>
-      </div>
-    </div>
-  </div>
+  <VersionPanel
+    v-if="showVersions && loadedId !== null"
+    :post-id="loadedId"
+    :current-markdown="currentMarkdown"
+    @close="showVersions = false"
+    @notify="emit('notify', $event)"
+    @restored="load"
+  />
 </template>
 
 <style scoped>
@@ -638,203 +431,5 @@ async function restoreVersion(v: PostVersion) {
   background: #fdf3d8;
   border: 1px solid #e8d3a0;
   border-radius: 6px;
-}
-.media-mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 18, 16, 0.5);
-  display: grid;
-  place-items: center;
-  z-index: 60;
-}
-.media-modal {
-  width: min(760px, 92vw);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--paper-card);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.media-modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--hairline);
-  font-family: var(--font-serif);
-  color: var(--ink-deep);
-}
-.media-modal-body {
-  padding: 16px;
-  overflow-y: auto;
-}
-.media-modal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
-}
-.media-thumb {
-  padding: 0;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  background: none;
-}
-.media-thumb img {
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  display: block;
-}
-.media-thumb:hover {
-  border-color: var(--cinnabar);
-}
-
-.versions-body {
-  display: flex;
-  min-height: 380px;
-  max-height: 70vh;
-}
-.versions-list {
-  width: 280px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--hairline);
-  overflow-y: auto;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ver-item {
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  padding: 10px 12px;
-  cursor: pointer;
-  background: var(--paper-card);
-}
-.ver-item.on {
-  border-color: var(--cinnabar);
-  background: color-mix(in srgb, var(--cinnabar) 6%, var(--paper-card));
-}
-.ver-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.ver-no {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  color: var(--cinnabar);
-}
-.ver-date {
-  font-size: 0.72rem;
-  color: var(--ink-light);
-}
-.ver-msg {
-  margin-top: 6px;
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ver-title {
-  margin-top: 2px;
-  font-size: 0.8rem;
-  color: var(--ink-deep);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ver-foot {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.versions-diff {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.diff-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--hairline);
-}
-.diff-arrow {
-  color: var(--ink-light);
-}
-.diff-legend {
-  margin-left: auto;
-  display: flex;
-  gap: 10px;
-  font-size: 0.75rem;
-}
-.lg {
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-.lg-add {
-  background: rgba(45, 106, 79, 0.14);
-  color: #2d6a4f;
-}
-.lg-del {
-  background: rgba(194, 58, 48, 0.14);
-  color: #c23a30;
-}
-.diff-view {
-  flex: 1;
-  margin: 0;
-  padding: 14px 16px;
-  overflow: auto;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.diff-line {
-  display: block;
-}
-.diff-line.del.full {
-  background: rgba(194, 58, 48, 0.12);
-  color: #9c2f26;
-}
-.diff-line.add.full {
-  background: rgba(45, 106, 79, 0.12);
-  color: #1f5c40;
-}
-.diff-line.pair {
-  background: transparent;
-}
-.diff-line.ctx {
-  color: var(--ink-soft);
-}
-.diff-mark {
-  display: inline-block;
-  width: 1.2em;
-  user-select: none;
-}
-.dw.add {
-  background: rgba(45, 106, 79, 0.3);
-}
-.dw.del {
-  background: rgba(194, 58, 48, 0.3);
-}
-.diff-meta {
-  padding: 10px 16px;
-  border-top: 1px solid var(--hairline);
-  font-size: 0.75rem;
-  color: var(--ink-light);
-  white-space: pre-wrap;
 }
 </style>

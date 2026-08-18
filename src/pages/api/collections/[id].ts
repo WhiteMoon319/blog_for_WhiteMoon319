@@ -2,12 +2,11 @@ import type { APIContext } from 'astro';
 import {
   envOf,
   getCollectionById,
-  updateCollection,
+  updateCollectionWithTags,
   deleteCollection,
   listCollectionTags,
-  setCollectionTags,
-  parseTagNames,
   isSlugConflict,
+  parseTagsStrict,
 } from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
@@ -62,14 +61,15 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     patch.post_order = body.post_order;
   }
 
+  // 携带 tags 时严格校验（非法/超限 400）；未携带则不动标签
+  const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);
+  if (parsedTags !== null && !parsedTags.ok) return json({ error: parsedTags.error }, 400);
+
   try {
     const env = await envOf();
-    const updated = await updateCollection(env.DB, id, patch);
+    const updated = await updateCollectionWithTags(env.DB, id, patch, parsedTags === null ? null : parsedTags.tags);
     if (!updated) return json({ error: 'not found' }, 404);
-    const tags = Array.isArray(body.tags)
-      ? await setCollectionTags(env.DB, id, parseTagNames(body.tags))
-      : await listCollectionTags(env.DB, id);
-    return json({ collection: updated, tags });
+    return json({ collection: updated.collection, tags: updated.tags });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

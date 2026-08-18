@@ -65,7 +65,7 @@ export const api = {
     }),
 
   updatePost: (id: number, data: Partial<Post>) =>
-    request<{ post: Post; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
 

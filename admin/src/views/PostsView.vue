@@ -97,19 +97,27 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
     return;
   }
   busy.value = true;
+  let done = 0;
+  // 服务端单次批量 ≤50 篇且整批原子：客户端按 50 分块串行提交；
+  // 任一请求失败立即停下并重新拉取列表，避免界面停留在半成功状态。
+  const CHUNK = 50;
   try {
-    const { count = 0 } = await api.batchPosts({
-      action,
-      ids,
-      collection_id: action === 'move' ? (moveCol.value === '' ? null : moveCol.value) : undefined,
-    });
+    for (let start = 0; start < ids.length; start += CHUNK) {
+      const chunk = ids.slice(start, start + CHUNK);
+      const { count = 0 } = await api.batchPosts({
+        action,
+        ids: chunk,
+        collection_id: action === 'move' ? (moveCol.value === '' ? null : moveCol.value) : undefined,
+      });
+      done += count;
+    }
     selected.value = new Set();
-    emit('notify', `已处理 ${count} 篇`);
-    await load();
+    emit('notify', `已处理 ${done} 篇`);
   } catch (e) {
-    emit('notify', (e as Error).message, true);
+    emit('notify', `${(e as Error).message}（已处理 ${done} 篇，列表已刷新）`, true);
   } finally {
     busy.value = false;
+    await load();
   }
 }
 </script>

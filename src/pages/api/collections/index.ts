@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, listCollections, createCollection, setCollectionTags, parseTagNames, isSlugConflict } from '../../../lib/db';
+import { envOf, listCollections, createCollectionWithTags, parseTagsStrict, isSlugConflict } from '../../../lib/db';
 import { json, requireAuth } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -41,19 +41,21 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'invalid theme_color: 需为 #RRGGBB 格式' }, 400);
   }
 
+  const parsedTags = parseTagsStrict(body.tags);
+  if (!parsedTags.ok) return json({ error: parsedTags.error }, 400);
+
   try {
     const env = await envOf();
-    const created = await createCollection(env.DB, {
+    const created = await createCollectionWithTags(env.DB, {
       title: body.title.trim(),
       slug: ensureSlug(slug, body.title, 'collection'),
       summary: typeof body.summary === 'string' ? body.summary : '',
       theme_color: themeColor,
       sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
-    });
+    }, parsedTags.tags);
     if (!created) return json({ error: 'collection create failed' }, 500);
-    const tags = await setCollectionTags(env.DB, created.id, parseTagNames(body.tags));
-    return json({ collection: created, tags }, 201);
+    return json({ collection: created.collection, tags: created.tags }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

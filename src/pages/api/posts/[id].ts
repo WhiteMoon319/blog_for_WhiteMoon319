@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePost, deletePost, listPostOwnTags, setPostOwnTags, parseTagNames, getCollectionById, isSlugConflict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, deletePost, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
@@ -64,20 +64,28 @@ export async function PUT(ctx: APIContext): Promise<Response> {
       ? body.base_version
       : undefined;
 
+  // 携带 tags 时严格校验（非法/超限 400，绝不静默丢弃）；未携带则不动标签
+  const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);
+  if (parsedTags !== null && !parsedTags.ok) return json({ error: parsedTags.error }, 400);
+
   try {
     const env = await envOf();
     if ('collection_id' in patch && patch.collection_id !== null && !(await getCollectionById(env.DB, Number(patch.collection_id)))) {
       return json({ error: 'collection not found' }, 404);
     }
-    const updated = await updatePost(env.DB, id, patch, versionMessage, baseVersion);
+    const updated = await updatePostWithTags(
+      env.DB,
+      id,
+      patch,
+      parsedTags === null ? null : parsedTags.tags,
+      versionMessage,
+      baseVersion,
+    );
     if (updated === 'conflict') {
       return json({ error: '版本冲突：该文章已在别处被修改，请刷新后重试' }, 409);
     }
     if (!updated) return json({ error: 'not found' }, 404);
-    const tags = Array.isArray(body.tags)
-      ? await setPostOwnTags(env.DB, id, parseTagNames(body.tags))
-      : await listPostOwnTags(env.DB, id);
-    return json({ post: updated, tags, version: await getLatestPostVersion(env.DB, id) });
+    return json({ post: updated.post, tags: updated.tags, version: await getLatestPostVersion(env.DB, id) });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

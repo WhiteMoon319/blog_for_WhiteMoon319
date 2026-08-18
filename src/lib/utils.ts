@@ -1,3 +1,8 @@
+export const SLUG_MAX = 63;
+
+// 多标签上限：D1 单语句绑定参数与 SQL 复杂度限制下，20 个标签足够实际使用
+export const MAX_TAGS = 20;
+
 export function slugify(input: string): string {
   const slug = input
     .trim()
@@ -7,9 +12,22 @@ export function slugify(input: string): string {
   return slug;
 }
 
+// slug 基名：截断到 SLUG_MAX 且不以连字符结尾，保证后续追加冲突后缀仍合法
+export function slugBase(input: string): string {
+  const slug = slugify(input);
+  if (slug.length <= SLUG_MAX) return slug;
+  return slug.slice(0, SLUG_MAX).replace(/-+$/, '');
+}
+
+// 冲突后缀名：基数先为后缀预留长度再拼接，最终候选始终 ≤SLUG_MAX 且通过 isValidSlug
+export function slugWithSuffix(base: string, n: number): string {
+  const suffix = `-${n}`;
+  return `${base.slice(0, SLUG_MAX - suffix.length).replace(/-+$/, '')}${suffix}`;
+}
+
 export function ensureSlug(input: string | undefined, title: string, prefix: string): string {
   if (input && input.trim()) return input.trim();
-  const slug = slugify(title).slice(0, 60).replace(/-+$/, '');
+  const slug = slugBase(title);
   return slug || `${prefix}-${Date.now().toString(36)}`;
 }
 

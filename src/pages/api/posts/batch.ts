@@ -8,12 +8,11 @@ import {
   isSlugConflict,
   type PostRow,
 } from '../../../lib/db';
-import { slugify } from '../../../lib/utils';
+import { slugBase, slugWithSuffix } from '../../../lib/utils';
 import {
   parseIds,
   parseCreateItem,
   BATCH_MAX_CREATE,
-  BATCH_MAX_MOVE,
   type BatchCreateItem,
 } from '../../../lib/api/validate';
 import { json, requireAuth } from '../../../lib/auth';
@@ -75,11 +74,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
         results.push({ ok: false, error: item });
         continue;
       }
-      const base = item.slug || slugify(item.title) || `post-${Date.now().toString(36)}`;
+      // 自动 slug：截断到 63 且不以连字符结尾（slugBase），冲突后缀同样受 SLUG_MAX 约束
+      const base = item.slug || slugBase(item.title) || `post-${Date.now().toString(36)}`;
       let created: Awaited<ReturnType<typeof createPost>> = null;
       let lastError = 'slug already exists';
       for (let attempt = 0; attempt < 20; attempt++) {
-        const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
+        const slug = attempt === 0 ? base : slugWithSuffix(base, attempt + 1);
         try {
           created = await createPost(env.DB, { ...item, slug });
           break;
@@ -107,9 +107,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
     }
     if (target !== null && !(await getCollectionById(env.DB, target))) {
       return json({ error: 'collection not found' }, 404);
-    }
-    if (ids.length > BATCH_MAX_MOVE) {
-      return json({ error: `move 单次最多 ${BATCH_MAX_MOVE} 篇` }, 400);
     }
 
     const placeholders = ids.map(() => '?').join(', ');
@@ -178,46 +175,52 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ ok: true, count: found.length });
   }
 
+  // 刊发/撤稿/删除：单请求 id ≤50，整批放进一个 D1 事务（≤100 语句），全成功或全失败。
+  // 状态变更同时写入 post_versions（message 标明批量操作），开放中的旧编辑器将收到 409。
+  // 计数用预检结果而非 meta.changes：D1 batch 内 changes 是会话累计值，无法按语句取增量。
+  const stmts: D1PreparedStatement[] = [];
   if (action === 'delete') {
-    // 先查实际存在的 id，按存在数删除并计数（避免依赖 meta.changes 的级联行数）。
-    // D1 单语句绑定参数上限 100：存在性查询按 50 一批；D1 batch 单次上限 100 条语句：
-    // 删除按 25 篇一批（每篇 2 条：删除 + 孤儿标签清理）。
-    const existing: number[] = [];
-    for (let i = 0; i < ids.length; i += 50) {
-      const chunk = ids.slice(i, i + 50);
-      const rows = await env.DB
-        .prepare(`SELECT id FROM posts WHERE id IN (${chunk.map(() => '?').join(',')})`)
-        .bind(...chunk)
-        .all<{ id: number }>();
-      existing.push(...(rows.results ?? []).map((r) => r.id));
+    const preflight = await env.DB
+      .prepare(`SELECT COUNT(*) AS n FROM posts WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .bind(...ids)
+      .first<{ n: number }>();
+    for (const id of ids) {
+      stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
     }
-    if (existing.length === 0) return json({ ok: true, count: 0 });
-    for (let i = 0; i < existing.length; i += 25) {
-      const chunk = existing.slice(i, i + 25);
-      const stmts: D1PreparedStatement[] = [];
-      for (const id of chunk) {
-        stmts.push(env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id));
-        stmts.push(purgeOrphanTagsStmt(env.DB));
-      }
-      await env.DB.batch(stmts);
-    }
-    return json({ ok: true, count: existing.length });
-  }
-
-  // 批量 publish/draft：每篇 1 条语句，按 100 篇一批（不跨批事务，部分成功可重试）
-  const CHUNK = 100;
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const chunk = ids.slice(i, i + CHUNK);
-    const stmts: D1PreparedStatement[] = [];
-    for (const id of chunk) {
-      stmts.push(
-        env.DB
-          .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ?`)
-          .bind(action === 'publish' ? 'published' : 'draft', id),
-      );
-    }
+    stmts.push(purgeOrphanTagsStmt(env.DB));
     await env.DB.batch(stmts);
+    return json({ ok: true, count: preflight?.n ?? 0 });
   }
 
-  return json({ ok: true, count: ids.length });
+  // publish / draft：仅对实际状态不同的文章留档（已刊发的重复刊发不产生版本）
+  const status = action === 'publish' ? 'published' : 'draft';
+  const preflight = await env.DB
+    .prepare(`SELECT id FROM posts WHERE id IN (${ids.map(() => '?').join(',')}) AND status <> ?`)
+    .bind(...ids, status)
+    .all<{ id: number }>();
+  const changed = (preflight.results ?? []).map((r) => r.id);
+  if (changed.length === 0) return json({ ok: true, count: 0 });
+  const message = action === 'publish' ? '批量刊发' : '批量撤稿';
+  for (const id of changed) {
+    // 版本 INSERT 先于 UPDATE：`status <> ?` 守卫读到的是旧状态（与预检一致），
+    // 并发重复刊发/并发删除时守卫落空，不会产生多余版本；
+    // 版本内容用显式的新 status（此时 posts.status 仍是旧值）。
+    stmts.push(
+      env.DB
+        .prepare(
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+           SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+                  title, slug, collection_id, summary, content_md, cover_url, ?, ?
+           FROM posts WHERE id = ? AND status <> ?`,
+        )
+        .bind(id, id, status, message, id, status),
+    );
+    stmts.push(
+      env.DB
+        .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ? AND status <> ?`)
+        .bind(status, id, status),
+    );
+  }
+  await env.DB.batch(stmts);
+  return json({ ok: true, count: changed.length });
 }

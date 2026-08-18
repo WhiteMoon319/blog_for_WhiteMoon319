@@ -283,57 +283,59 @@ async function submitAll() {
       </div>
     </div>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>来源</th>
-          <th style="min-width: 180px;">标题</th>
-          <th style="min-width: 150px;">slug</th>
-          <th>摘要</th>
-          <th>状态</th>
-          <th style="text-align: right;">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(item, i) in items" :key="item.file + i">
-          <td style="white-space: nowrap; color: var(--ink-light); font-size: 0.8rem;">{{ item.file }}</td>
-          <td>
-            <input v-model="item.title" class="input" style="padding: 6px 10px; font-size: 0.85rem;" />
-          </td>
-          <td>
-            <input
-              v-if="slugMode === 'auto'"
-              :value="slugify(item.title)"
-              class="input"
-              readonly
-              style="padding: 6px 10px; font-size: 0.85rem; background: transparent;"
-            />
-            <input
-              v-else
-              v-model="item.slug"
-              class="input"
-              style="padding: 6px 10px; font-size: 0.85rem;"
-            />
-          </td>
-          <td>
-            <input
-              v-model="item.summary"
-              class="input"
-              style="padding: 6px 10px; font-size: 0.85rem;"
-              :title="item.summary"
-            />
-          </td>
-          <td>
-            <span v-if="item.state === 'done'" class="tag tag-published">完成</span>
-            <span v-else-if="item.state === 'failed'" class="tag tag-draft" :title="item.error">失败</span>
-            <span v-else class="tag">待导入</span>
-          </td>
-          <td style="text-align: right;">
-            <button class="btn btn-danger mini" :disabled="importing" @click="removeItem(i)">移除</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>来源</th>
+            <th style="min-width: 180px;">标题</th>
+            <th style="min-width: 150px;">slug</th>
+            <th>摘要</th>
+            <th>状态</th>
+            <th style="text-align: right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, i) in items" :key="item.file + i">
+            <td style="white-space: nowrap; color: var(--ink-light); font-size: 0.8rem;">{{ item.file }}</td>
+            <td>
+              <input v-model="item.title" class="input" style="padding: 6px 10px; font-size: 0.85rem;" />
+            </td>
+            <td>
+              <input
+                v-if="slugMode === 'auto'"
+                :value="slugify(item.title)"
+                class="input"
+                readonly
+                style="padding: 6px 10px; font-size: 0.85rem; background: transparent;"
+              />
+              <input
+                v-else
+                v-model="item.slug"
+                class="input"
+                style="padding: 6px 10px; font-size: 0.85rem;"
+              />
+            </td>
+            <td>
+              <input
+                v-model="item.summary"
+                class="input"
+                style="padding: 6px 10px; font-size: 0.85rem;"
+                :title="item.summary"
+              />
+            </td>
+            <td>
+              <span v-if="item.state === 'done'" class="tag tag-published">完成</span>
+              <span v-else-if="item.state === 'failed'" class="tag tag-draft" :title="item.error">失败</span>
+              <span v-else class="tag">待导入</span>
+            </td>
+            <td style="text-align: right;">
+              <button class="btn btn-danger mini" :disabled="importing" @click="removeItem(i)">移除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div v-if="items.some((it) => it.state === 'failed')" class="empty" style="text-align: left; color: var(--cinnabar);">
       <div v-for="(item, i) in items" :key="'e' + i">

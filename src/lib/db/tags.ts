@@ -6,9 +6,9 @@ import type {
   TagRow,
   TagsUnionResult,
 } from './types.ts';
+import { MAX_TAGS } from '../utils.ts';
 
-// 多标签交集上限：D1 单语句绑定参数与 SQL 复杂度限制下，20 个标签足够实际使用
-export const MAX_TAGS = 20;
+export { MAX_TAGS } from '../utils.ts';
 
 function cleanTagNames(names: string[]): string[] {
   return [...new Set(names.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))].slice(0, MAX_TAGS);
@@ -38,12 +38,22 @@ export function parseTagNames(raw: unknown): string[] {
   return out;
 }
 
-// 写路径用：按名解析标签 id，不存在的直接创建（管理端打标签）
-async function resolveTagIds(db: D1Database, names: string[]): Promise<number[]> {
-  const unique = cleanTagNames(names);
-  if (unique.length === 0) return [];
-  await db.batch(unique.map((n) => db.prepare('INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO NOTHING').bind(n)));
-  return findTagIds(db, unique);
+// 严格解析（写路径）：超限、超长、非法字符、空标签一律报错，绝不静默丢弃；
+// 允许去重与空白归一化。返回 { ok:false } 时带可读原因，调用方应回 400。
+export function parseTagsStrict(raw: unknown): { ok: true; tags: string[] } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, tags: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: 'tags 需为字符串数组' };
+  const tags: string[] = [];
+  for (const t of raw) {
+    if (typeof t !== 'string') return { ok: false, error: '标签须为字符串' };
+    const name = t.trim().replace(/\s+/g, ' ');
+    if (!name) return { ok: false, error: '标签不可为空' };
+    if (name.length > 32) return { ok: false, error: `标签「${name.slice(0, 12)}…」超过 32 字符` };
+    if (!isValidTagName(name)) return { ok: false, error: `标签「${name}」含非法字符` };
+    if (!tags.includes(name)) tags.push(name);
+    if (tags.length > MAX_TAGS) return { ok: false, error: `标签最多 ${MAX_TAGS} 个` };
+  }
+  return { ok: true, tags };
 }
 
 // 读路径用：只查不写，未创建的标签不产生任何副作用
@@ -98,27 +108,54 @@ export async function listPostEffectiveTags(db: D1Database, postId: number): Pro
     .then((r) => r.results ?? []);
 }
 
+// ---- 原子写批语句构建器：与主体（post/collection）写入放进同一个 D1 batch，保证整体成功或回滚 ----
+
+// 标签 ensure：逐名 INSERT OR IGNORE（同批内前序语句对后续可见）。不用 UNION ALL 复合查询——
+// 超出 D1 复合 SELECT 上限（实测 20 个标签即报 SQLITE_ERROR too many terms in compound SELECT）。
+export function ensureTagsStmts(db: D1Database, names: string[]): D1PreparedStatement[] {
+  const unique = cleanTagNames(names);
+  return unique.map((name) => db.prepare('INSERT OR IGNORE INTO tags (name) VALUES (?)').bind(name));
+}
+
+export function linkPostTagByIdStmt(db: D1Database, postId: number, tagName: string): D1PreparedStatement {
+  return db
+    .prepare(`INSERT INTO post_tags (post_id, tag_id) SELECT ?, id FROM tags WHERE name = ?`)
+    .bind(postId, tagName);
+}
+
+export function linkCollectionTagStmt(db: D1Database, collectionId: number, tagName: string): D1PreparedStatement {
+  return db
+    .prepare(`INSERT INTO collection_tags (collection_id, tag_id) SELECT ?, id FROM tags WHERE name = ?`)
+    .bind(collectionId, tagName);
+}
+
+export function setPostOwnTagsStmts(db: D1Database, postId: number, names: string[]): D1PreparedStatement[] {
+  const unique = cleanTagNames(names);
+  const stmts: D1PreparedStatement[] = [];
+  stmts.push(...ensureTagsStmts(db, unique));
+  stmts.push(db.prepare('DELETE FROM post_tags WHERE post_id = ?').bind(postId));
+  for (const name of unique) stmts.push(linkPostTagByIdStmt(db, postId, name));
+  stmts.push(purgeOrphanTagsStmt(db));
+  return stmts;
+}
+
+export function setCollectionTagsStmts(db: D1Database, collectionId: number, names: string[]): D1PreparedStatement[] {
+  const unique = cleanTagNames(names);
+  const stmts: D1PreparedStatement[] = [];
+  stmts.push(...ensureTagsStmts(db, unique));
+  stmts.push(db.prepare('DELETE FROM collection_tags WHERE collection_id = ?').bind(collectionId));
+  for (const name of unique) stmts.push(linkCollectionTagStmt(db, collectionId, name));
+  stmts.push(purgeOrphanTagsStmt(db));
+  return stmts;
+}
+
 export async function setCollectionTags(db: D1Database, collectionId: number, names: string[]): Promise<TagRow[]> {
-  const ids = await resolveTagIds(db, names);
-  await db.batch([
-    db.prepare('DELETE FROM collection_tags WHERE collection_id = ?').bind(collectionId),
-    ...ids.map((tagId) =>
-      db.prepare('INSERT INTO collection_tags (collection_id, tag_id) VALUES (?, ?)').bind(collectionId, tagId),
-    ),
-    purgeOrphanTagsStmt(db),
-  ]);
+  await db.batch(setCollectionTagsStmts(db, collectionId, names));
   return listCollectionTags(db, collectionId);
 }
 
 export async function setPostOwnTags(db: D1Database, postId: number, names: string[]): Promise<TagRow[]> {
-  const ids = await resolveTagIds(db, names);
-  await db.batch([
-    db.prepare('DELETE FROM post_tags WHERE post_id = ?').bind(postId),
-    ...ids.map((tagId) =>
-      db.prepare('INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)').bind(postId, tagId),
-    ),
-    purgeOrphanTagsStmt(db),
-  ]);
+  await db.batch(setPostOwnTagsStmts(db, postId, names));
   return listPostOwnTags(db, postId);
 }
 

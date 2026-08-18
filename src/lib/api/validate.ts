@@ -1,8 +1,9 @@
 import { isValidSlug } from '../utils.ts';
 
-export const BATCH_MAX_IDS = 200;
+// 批量（刊发/撤稿/删除/移动）单请求上限：保证每篇 2 条语句（更新+版本）也落在
+// D1 batch 100 语句上限内，请求内整批原子执行（全成功或全失败）。
+export const BATCH_MAX_IDS = 50;
 export const BATCH_MAX_CREATE = 50;
-export const BATCH_MAX_MOVE = 50;
 
 export function parseId(raw: string | undefined): number | null {
   const id = Number(raw);

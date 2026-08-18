@@ -435,9 +435,19 @@ test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () =>
     bulkIds.push((await r.json()).post.id as number);
   }
   const bigPub = await c.post('/api/posts/batch', { action: 'publish', ids: bulkIds });
-  assert.equal(bigPub.status, 200, '120 篇批量刊发应分批执行而非超限 500');
+  assert.equal(bigPub.status, 400, '超过 50 篇应整体拒绝（客户端按 50 分块）');
   const bigDel = await c.post('/api/posts/batch', { action: 'delete', ids: bulkIds });
-  assert.equal(bigDel.status, 200, '120 篇批量删除应分批执行而非超限 500');
+  assert.equal(bigDel.status, 400, '超过 50 篇应整体拒绝');
+  // 分批清理（客户端同款分块）
+  const del1 = await c.post('/api/posts/batch', { action: 'delete', ids: bulkIds.slice(0, 50) });
+  assert.equal(del1.status, 200);
+  assert.equal((await del1.json()).count, 50);
+  const del2 = await c.post('/api/posts/batch', { action: 'delete', ids: bulkIds.slice(50, 100) });
+  assert.equal(del2.status, 200);
+  assert.equal((await del2.json()).count, 50);
+  const del3 = await c.post('/api/posts/batch', { action: 'delete', ids: bulkIds.slice(100) });
+  assert.equal(del3.status, 200);
+  assert.equal((await del3.json()).count, 20);
 
   const bad = await c.post('/api/posts/batch', { action: 'nuke', ids: [1] });
   assert.equal(bad.status, 400, '未知动作应拒绝');
@@ -451,7 +461,7 @@ test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () =>
 
   const pub = await c.post('/api/posts/batch', { action: 'publish', ids });
   assert.equal(pub.status, 200);
-  assert.equal((await pub.json()).count, 3);
+  assert.equal((await pub.json()).count, 2, '计数为实际变更数（ids[0] 已被重复刊发测试置为 published）');
 
   const list = await c.get('/api/posts?status=all');
   const body = await list.json();
@@ -813,4 +823,115 @@ test('e2e：搜索单独 # 时展示空态，不按字面检索', async () => {
   const html = await res.text();
   assert.ok(!html.includes('未寻得「#」'), '不得按字面 # 检索');
   assert.ok(html.includes('输入关键字，遍寻全卷'), '应展示空态提示');
+});
+
+test('e2e：批量刊发/撤稿推进版本史，过期编辑器保存 409', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const created = await c.post('/api/posts', {
+    title: '批量版本篇',
+    slug: `bver-${Date.now().toString(36)}`,
+    content_md: '初稿。',
+    status: 'draft',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const fresh = await c.get(`/api/posts/${id}`);
+  assert.equal((await fresh.json()).version, 1, '创建即 v1');
+
+  const pub = await c.post('/api/posts/batch', { action: 'publish', ids: [id] });
+  assert.equal(pub.status, 200);
+  assert.equal((await pub.json()).count, 1, '刊发计数为实际变更数');
+
+  const list1 = await c.get(`/api/posts/${id}/versions`);
+  const vb1 = await list1.json();
+  assert.equal(vb1.versions.length, 2, '批量刊发应留版本');
+  assert.equal(vb1.versions[0].version, 2);
+  assert.equal(vb1.versions[0].message, '批量刊发');
+  assert.equal(vb1.versions[0].status, 'published', '版本应记录新状态');
+
+  const stale = await c.put(`/api/posts/${id}`, { content_md: '过期基线保存。', base_version: 1 });
+  assert.equal(stale.status, 409, '批量操作推进版本后，旧编辑器必须 409');
+
+  const ok = await c.put(`/api/posts/${id}`, { content_md: '刷新后的保存。', base_version: 2 });
+  assert.equal(ok.status, 200, '刷新基线后放行');
+  assert.equal((await ok.json()).version, 3);
+
+  const again = await c.post('/api/posts/batch', { action: 'publish', ids: [id] });
+  assert.equal(again.status, 200);
+  assert.equal((await again.json()).count, 0, '已刊发文章重复刊发不产生版本');
+
+  const draft = await c.post('/api/posts/batch', { action: 'draft', ids: [id] });
+  assert.equal(draft.status, 200);
+  const list2 = await c.get(`/api/posts/${id}/versions`);
+  const vb2 = await list2.json();
+  assert.equal(vb2.versions[0].message, '批量撤稿');
+  assert.equal(vb2.versions[0].status, 'draft');
+  assert.equal(vb2.versions.length, 4, '重复刊发未留档，撤稿留一档');
+
+  await c.del(`/api/posts/${id}`);
+});
+
+test('e2e：批量超过 50 篇整体拒绝且零变更', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const ids: number[] = [];
+  for (let i = 0; i < 51; i++) {
+    const r = await c.post('/api/posts', {
+      title: `超限零变更${i}`,
+      slug: `overcap-${Date.now().toString(36)}-${i}`,
+      status: 'draft',
+    });
+    assert.equal(r.status, 201);
+    ids.push((await r.json()).post.id as number);
+  }
+
+  const pub = await c.post('/api/posts/batch', { action: 'publish', ids });
+  assert.equal(pub.status, 400, '51 篇应整体拒绝');
+  const del = await c.post('/api/posts/batch', { action: 'delete', ids });
+  assert.equal(del.status, 400);
+
+  const list = await c.get('/api/posts?status=all');
+  const body = await list.json();
+  const rows = (body.posts as Array<{ id: number; status: string }>).filter((p) => ids.includes(p.id));
+  assert.equal(rows.length, 51);
+  assert.ok(rows.every((p) => p.status === 'draft'), '拒绝后不得有任何一篇被刊发或删除');
+
+  const clean1 = await c.post('/api/posts/batch', { action: 'delete', ids: ids.slice(0, 50) });
+  assert.equal(clean1.status, 200);
+  const clean2 = await c.post('/api/posts/batch', { action: 'delete', ids: ids.slice(50) });
+  assert.equal(clean2.status, 200);
+});
+
+test('e2e：超长标题自动 slug ≤63 且可继续编辑', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const longTitle = '字'.repeat(120);
+  const res = await c.post('/api/posts/batch', {
+    action: 'create',
+    posts: [
+      { title: longTitle, status: 'draft' },
+      { title: longTitle, status: 'draft' },
+    ],
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(body.results[0].ok && body.results[1].ok, '两篇超长标题都应创建成功');
+  const s1 = body.results[0].post.slug as string;
+  const s2 = body.results[1].post.slug as string;
+  assert.ok(s1.length <= 63, `自动 slug 不得超长：${s1.length}`);
+  assert.ok(s2.length <= 63);
+  assert.ok(/^[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?$/u.test(s1), 'slug 必须合法');
+  assert.notEqual(s1, s2, '同批同名标题 slug 必须避让');
+  assert.ok(s1.startsWith('字') && s2.startsWith('字'), '自动 slug 保留标题内容');
+
+  const edit = await c.put(`/api/posts/${body.results[0].post.id}`, {
+    content_md: '改后正文。',
+    base_version: 1,
+  });
+  assert.equal(edit.status, 200, '63 字符 slug 应能通过 PUT 编辑（不再被校验卡死）');
+
+  await c.del(`/api/posts/${body.results[0].post.id}`);
+  await c.del(`/api/posts/${body.results[1].post.id}`);
 });

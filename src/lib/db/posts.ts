@@ -1,6 +1,12 @@
-import type { PostInput, PostPatch, PostRow, PostWithCollection } from './types.ts';
-import { purgeOrphanTagsStmt } from './tags.ts';
+import type { PostInput, PostPatch, PostRow, PostWithCollection, TagRow } from './types.ts';
+import {
+  ensureTagsStmts,
+  purgeOrphanTagsStmt,
+  setPostOwnTagsStmts,
+  listPostOwnTags,
+} from './tags.ts';
 import { getLatestPostVersion } from './versions.ts';
+import { isValidSlug } from '../utils.ts';
 
 export async function listPublishedPosts(
   db: D1Database,
@@ -109,11 +115,13 @@ export async function getPostById(db: D1Database, id: number): Promise<PostRow |
 }
 
 export async function createPost(db: D1Database, data: PostInput): Promise<PostRow | null> {
+  // 内部兜底：自动生成的 slug 也必须通过校验，非法长度直接拒绝（而非写坏数据）
+  if (!isValidSlug(data.slug)) throw new Error(`invalid slug: ${data.slug}`);
   const results = await db.batch([
     db
       .prepare(
         `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -124,6 +132,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.cover_url ?? '',
         data.status ?? 'draft',
       ),
+    db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
       .prepare(
         `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
@@ -131,7 +140,61 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
          FROM posts WHERE id = last_insert_rowid()`,
       ),
   ]);
-  return results[0].results?.[0] as PostRow | undefined ?? null;
+  return results[1].results?.[0] as PostRow | undefined ?? null;
+}
+
+// 创建 + 打标签原子写：主体、初始版本、标签 ensure/关联、孤儿清理放进同一个 D1 batch。
+// 任一语句失败（如 slug 冲突）整批回滚，标签不会半途落库。
+export async function createPostWithTags(
+  db: D1Database,
+  data: PostInput,
+  tagNames: string[],
+): Promise<{ post: PostRow; tags: TagRow[] } | null> {
+  if (!isValidSlug(data.slug)) throw new Error(`invalid slug: ${data.slug}`);
+  const stmts: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        data.collection_id ?? null,
+        data.title,
+        data.slug,
+        data.summary ?? '',
+        data.content_md ?? '',
+        data.cover_url ?? '',
+        data.status ?? 'draft',
+      ),
+    db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
+    db
+      .prepare(
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, '创建'
+         FROM posts WHERE id = last_insert_rowid()`,
+      ),
+  ];
+  const unique = [...new Set(tagNames.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
+  if (unique.length > 0) {
+    // 新文章尚无 post_tags，无需 DELETE；用 slug+collection 子查询定位（版本 INSERT 已改变 last_insert_rowid）
+    stmts.push(...ensureTagsStmts(db, unique));
+    for (const name of unique) {
+      stmts.push(
+        db
+          .prepare(
+            `INSERT INTO post_tags (post_id, tag_id)
+             SELECT p.id, t.id FROM posts p, tags t
+             WHERE p.collection_id IS ? AND p.slug = ? AND t.name = ?`,
+          )
+          .bind(data.collection_id ?? null, data.slug, name),
+      );
+    }
+    stmts.push(purgeOrphanTagsStmt(db));
+  }
+  const results = await db.batch(stmts);
+  const post = results[1].results?.[0] as PostRow | undefined ?? null;
+  if (!post) return null;
+  return { post, tags: await listPostOwnTags(db, post.id) };
 }
 
 export async function updatePost(
@@ -190,12 +253,71 @@ export async function updatePost(
   return row;
 }
 
+// 更新 + 打标签原子写：正文变更、版本留档、标签替换、孤儿清理在同一 batch。
+// tagNames 为 null 表示请求未携带 tags（不动标签）；携带则严格替换。
+export async function updatePostWithTags(
+  db: D1Database,
+  id: number,
+  patch: PostPatch,
+  tagNames: string[] | null,
+  versionMessage?: string,
+  baseVersion?: number,
+): Promise<{ post: PostRow; tags: TagRow[] } | 'conflict' | null> {
+  const current = await getPostById(db, id);
+  if (!current) return null;
+  const keys = Object.keys(patch).filter((k) =>
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status'].includes(k),
+  );
+  const changed = keys.filter((k) => {
+    const pv = patch[k as keyof PostPatch];
+    const cv = current[k as keyof PostRow];
+    return String(pv ?? null) !== String(cv ?? null);
+  });
+  const tagsOnly = changed.length === 0;
+  if (tagsOnly) {
+    // 无实质变更仍需校验乐观锁基线；仅换标签不产生版本记录（版本史记录的是内容）
+    if (baseVersion !== undefined && (await getLatestPostVersion(db, id)) !== baseVersion) return 'conflict';
+    if (tagNames === null) return { post: current, tags: await listPostOwnTags(db, id) };
+    await db.batch(setPostOwnTagsStmts(db, id, tagNames));
+    return { post: current, tags: await listPostOwnTags(db, id) };
+  }
+  const sets = changed.map((k) => `${k} = ?`).join(', ');
+  const values = changed.map((k) => patch[k as keyof PostPatch]);
+  const versionMatch =
+    baseVersion !== undefined
+      ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
+      : '';
+  const versionArgs = baseVersion !== undefined ? [id, baseVersion] : [];
+  const stmts: D1PreparedStatement[] = [
+    db
+      .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? ${versionMatch} RETURNING *`)
+      .bind(...values, id, ...versionArgs),
+    db
+      .prepare(
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+         SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
+                title, slug, collection_id, summary, content_md, cover_url, status, ?
+         FROM posts WHERE id = ? ${versionMatch}`,
+      )
+      .bind(
+        id,
+        ...(baseVersion !== undefined ? [baseVersion + 1, versionMessage ?? '自动保存'] : [id, versionMessage ?? '自动保存']),
+        id,
+        ...versionArgs,
+      ),
+  ];
+  if (tagNames !== null) stmts.push(...setPostOwnTagsStmts(db, id, tagNames));
+  const results = await db.batch(stmts);
+  const row = results[0].results?.[0] as PostRow | undefined;
+  if (!row) return baseVersion !== undefined ? 'conflict' : null;
+  return { post: row, tags: await listPostOwnTags(db, id) };
+}
+
 export async function deletePost(db: D1Database, id: number): Promise<boolean> {
-  const results = await db.batch([
-    db.prepare('DELETE FROM posts WHERE id = ?').bind(id),
-    purgeOrphanTagsStmt(db),
-  ]);
-  return (results[0].meta.changes ?? 0) > 0;
+  // 先单独删文章行：solo 的 meta.changes 可靠（batch 内为会话累计值，无法判断是否命中）
+  const del = await db.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
+  await purgeOrphanTagsStmt(db).run();
+  return (del.meta.changes ?? 0) > 0;
 }
 
 export async function incrementViewCount(db: D1Database, id: number): Promise<number> {

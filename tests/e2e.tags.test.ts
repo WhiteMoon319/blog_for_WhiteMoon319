@@ -172,3 +172,83 @@ test('e2e：含 % 的标签名经 URL 参数访问不 500（无双重解码）',
   const res2 = await c.get('/tags/100%25/');
   assert.equal(res2.status, 302, '未知标签详情路由应跳 /404 而非 500');
 });
+
+test('e2e：标签严格校验——超限/非法 400 且不落库，恰好 20 成功', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const base = { title: '严格标篇', slug: `stag-${Date.now().toString(36)}`, status: 'draft' };
+
+  const twentyOne = await c.post('/api/posts', {
+    ...base,
+    slug: 'stag-21',
+    tags: Array.from({ length: 21 }, (_, i) => `标${i}`),
+  });
+  assert.equal(twentyOne.status, 400, '21 个标签应 400');
+  assert.ok((await twentyOne.json()).error.includes('20'), '报错应说明上限');
+
+  const illegal = await c.post('/api/posts', { ...base, slug: 'stag-illegal', tags: ['a#b'] });
+  assert.equal(illegal.status, 400, '非法字符应 400');
+  const tooLong = await c.post('/api/posts', { ...base, slug: 'stag-long', tags: ['x'.repeat(33)] });
+  assert.equal(tooLong.status, 400, '超长标签应 400');
+  const empty = await c.post('/api/posts', { ...base, slug: 'stag-empty', tags: ['  '] });
+  assert.equal(empty.status, 400, '空标签应 400');
+  const nonArray = await c.post('/api/posts', { ...base, slug: 'stag-type', tags: '校园' });
+  assert.equal(nonArray.status, 400, '非数组 tags 应 400');
+
+  const tagsApi = await c.get('/api/tags');
+  const tagNames = ((await tagsApi.json()).tags as Array<{ name: string }>).map((t) => t.name);
+  for (const bad of ['a#b', 'x'.repeat(33)]) {
+    assert.ok(!tagNames.includes(bad), '失败请求不得创建标签');
+  }
+
+  const exactly = await c.post('/api/posts', {
+    ...base,
+    slug: 'stag-20',
+    tags: Array.from({ length: 20 }, (_, i) => `恰好标${i}`),
+  });
+  assert.equal(exactly.status, 201, '恰好 20 个应成功');
+  const exactBody = await exactly.json();
+  assert.equal(exactBody.tags.length, 20, '响应 tags 应与提交一致');
+
+  const id = exactBody.post.id as number;
+  const got = await c.get(`/api/posts/${id}`);
+  const gotBody = await got.json();
+  assert.deepEqual(
+    (gotBody.tags as Array<{ name: string }>)
+      .map((t) => t.name)
+      .sort(),
+    Array.from({ length: 20 }, (_, i) => `恰好标${i}`).sort(),
+    '数据库 tags 与响应一致',
+  );
+
+  const dup = await c.put(`/api/posts/${id}`, { tags: [' 恰好标0 ', '恰好标0', '恰好标1 '] });
+  assert.equal(dup.status, 200, '去重与空白归一化允许');
+  const dupBody = await dup.json();
+  assert.equal((dupBody.tags as Array<{ name: string }>).length, 2, '重复标签应归一化去重');
+
+  const putBad = await c.put(`/api/posts/${id}`, { tags: ['合法标', '100%'] });
+  assert.equal(putBad.status, 400, 'PUT 携带非法标签也应 400');
+  const after = await c.get(`/api/posts/${id}`);
+  assert.deepEqual(
+    ((await after.json()).tags as Array<{ name: string }>).map((t) => t.name),
+    ['恰好标0', '恰好标1'],
+    '被拒的 PUT 不得改动标签',
+  );
+
+  const colBad = await c.post('/api/collections', { title: '坏标集', slug: 'stag-col', tags: ['x'.repeat(33)] });
+  assert.equal(colBad.status, 400, '文集创建携带非法标签也应 400');
+  const colOk = await c.post('/api/collections', { title: '好标集', slug: 'stag-col-ok', tags: ['集标好'] });
+  assert.equal(colOk.status, 201);
+  const colId = (await colOk.json()).collection.id as number;
+  const colPutBad = await c.put(`/api/collections/${colId}`, { tags: ['集标坏', 'a/b'] });
+  assert.equal(colPutBad.status, 400, '文集更新携带非法标签也应 400');
+  const colGot = await c.get(`/api/collections/${colId}`);
+  assert.deepEqual(
+    ((await colGot.json()).tags as Array<{ name: string }>).map((t) => t.name),
+    ['集标好'],
+    '被拒的文集 PUT 不得改动标签',
+  );
+
+  await c.del(`/api/posts/${id}`);
+  await c.del(`/api/collections/${colId}`);
+});

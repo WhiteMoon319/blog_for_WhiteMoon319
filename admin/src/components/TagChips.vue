@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { MAX_TAGS } from '../../../src/lib/utils.ts';
 
 const props = defineProps<{
   modelValue: string[];
@@ -12,9 +13,19 @@ const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>();
 const draft = ref('');
 const listId = `tag-suggest-${Math.random().toString(36).slice(2, 8)}`;
 
+const atLimit = computed(() => props.modelValue.length >= MAX_TAGS);
+
 function add() {
   const text = draft.value.trim().replace(/\s+/g, ' ');
-  if (text && !props.modelValue.includes(text)) {
+  if (!text) {
+    draft.value = '';
+    return;
+  }
+  if (atLimit.value) {
+    draft.value = '';
+    return;
+  }
+  if (!props.modelValue.includes(text)) {
     emit('update:modelValue', [...props.modelValue, text]);
   }
   draft.value = '';
@@ -48,11 +59,13 @@ function onBlur() {
     <input
       v-model="draft"
       class="input tag-chip-input"
-      :placeholder="placeholder ?? '回车添加标签'"
+      :placeholder="atLimit ? `已达上限（${MAX_TAGS} 个）` : (placeholder ?? '回车添加标签')"
       :list="listId"
+      :disabled="atLimit"
       @keydown="onKeydown"
       @blur="onBlur"
     />
+    <span v-if="atLimit" class="hint" style="flex-basis:100%;">已达 {{ MAX_TAGS }} 个标签上限，移除后可继续添加。</span>
     <datalist :id="listId">
       <option v-for="s in suggestions ?? []" :key="s" :value="s">{{ s }}</option>
     </datalist>

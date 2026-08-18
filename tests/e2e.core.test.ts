@@ -106,3 +106,17 @@ test('e2e：admin 页面带 CSP 与 no-store', async () => {
   assert.equal(res.headers.get('cache-control'), 'no-store');
   assert.equal(res.headers.get('x-robots-tag'), 'noindex');
 });
+
+test('e2e：站点 CSP 放行 Google Fonts 样式表且无内联 onload', async () => {
+  if (!HAS_BUILD) return;
+  const res = await c.get('/');
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.ok(
+    html.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"),
+    'CSP style-src 必须允许 Google Fonts 样式表',
+  );
+  assert.ok(html.includes('href="https://fonts.googleapis.com/css2?'), '字体样式表 link 应保留');
+  assert.ok(!html.includes('onload="this.media'), '不得再使用被 script-src 拦截的内联 onload');
+  assert.ok(!html.includes('media="print"'), '不得残留 print 占位');
+});

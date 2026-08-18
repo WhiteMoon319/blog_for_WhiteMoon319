@@ -208,13 +208,16 @@ async function save() {
       base_version: baseVersion.value,
     };
     if (loadedId.value !== null) {
-      const { version } = await api.updatePost(loadedId.value, payload);
+      const { version, tags } = await api.updatePost(loadedId.value, payload);
       baseVersion.value = version;
+      // 以服务端归一化结果回填（去重、空白归一化），与数据库保持一致
+      form.tags = tags.map((t) => t.name);
       emit('notify', '篇章已存');
       form.version_message = '';
     } else {
-      const { post, version } = await api.createPost(payload);
+      const { post, tags, version } = await api.createPost(payload);
       baseVersion.value = version;
+      form.tags = tags.map((t) => t.name);
       emit('notify', '新篇已成');
       router.replace({ path: '/editor', query: { id: post.id } });
       loadedId.value = post.id;

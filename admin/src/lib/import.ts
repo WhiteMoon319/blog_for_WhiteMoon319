@@ -1,6 +1,6 @@
-import { slugify } from '../../../src/lib/utils.ts';
+import { slugBase } from '../../../src/lib/utils.ts';
 
-export { slugify };
+export { slugBase as slugify };
 
 export interface ImportItemLike {
   title: string;
@@ -77,7 +77,7 @@ export function buildImportPayloads(
     const title = it.title.trim();
     return {
       title,
-      slug: slugMode === 'auto' ? slugify(title) || undefined : it.slug.trim() || undefined,
+      slug: slugMode === 'auto' ? slugBase(title) || undefined : it.slug.trim() || undefined,
       summary: it.summary.trim(),
       content_md: it.contentMd,
       collection_id: collectionId,

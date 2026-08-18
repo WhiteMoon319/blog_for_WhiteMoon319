@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPost, getCollectionById, setPostOwnTags, parseTagNames, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPostWithTags, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
 import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -62,12 +62,16 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'invalid slug: 仅允许中英文、数字与连字符，且不以连字符起止' }, 400);
   }
 
+  // 严格标签校验：非法/超限一律 400，绝不静默丢弃
+  const parsedTags = parseTagsStrict(body.tags);
+  if (!parsedTags.ok) return json({ error: parsedTags.error }, 400);
+
   try {
     const env = await envOf();
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
       return json({ error: 'collection not found' }, 404);
     }
-    const created = await createPost(env.DB, {
+    const created = await createPostWithTags(env.DB, {
       title: body.title.trim(),
       slug: ensureSlug(slug, body.title, 'post'),
       collection_id: collectionId,
@@ -75,10 +79,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
       content_md: typeof body.content_md === 'string' ? body.content_md : '',
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
       status,
-    });
+    }, parsedTags.tags);
     if (!created) return json({ error: 'post create failed' }, 500);
-    const tags = await setPostOwnTags(env.DB, created.id, parseTagNames(body.tags));
-    return json({ post: created, tags, version: 1 }, 201);
+    return json({ post: created.post, tags: created.tags, version: 1 }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

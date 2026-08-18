@@ -94,33 +94,35 @@ async function remove(c: Collection) {
       <button class="btn btn-primary" @click="openCreate">立新集</button>
     </div>
 
-    <table class="table" v-if="collections.length">
-      <thead>
-        <tr>
-          <th>序</th>
-          <th>文集名</th>
-          <th>简介</th>
-          <th style="text-align:right;">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="c in collections" :key="c.id">
-          <td>{{ c.sort_order }}<span v-if="c.post_order === 'asc'" title="集内文章旧在前（正读）" style="color:var(--ink-light);font-size:0.75rem;">·正读</span></td>
-          <td class="title-cell">
-            <span class="color-dot" :style="{ background: c.theme_color }"></span>{{ c.title }}
-            <span style="color:var(--ink-light);font-size:0.78rem;">/{{ c.slug }}</span>
-          </td>
-          <td style="color:var(--ink-mid);">{{ c.summary || '—' }}</td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-ghost mini" @click="openEdit(c)">改</button>
-              <button class="btn btn-danger mini" @click="remove(c)">撤</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-else class="empty">尚无文集。</div>
+    <div class="table-wrap">
+      <table class="table" v-if="collections.length">
+        <thead>
+          <tr>
+            <th>序</th>
+            <th>文集名</th>
+            <th>简介</th>
+            <th style="text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in collections" :key="c.id">
+            <td>{{ c.sort_order }}<span v-if="c.post_order === 'asc'" title="集内文章旧在前（正读）" style="color:var(--ink-light);font-size:0.75rem;">·正读</span></td>
+            <td class="title-cell">
+              <span class="color-dot" :style="{ background: c.theme_color }"></span>{{ c.title }}
+              <span style="color:var(--ink-light);font-size:0.78rem;">/{{ c.slug }}</span>
+            </td>
+            <td style="color:var(--ink-mid);">{{ c.summary || '—' }}</td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost mini" @click="openEdit(c)">改</button>
+                <button class="btn btn-danger mini" @click="remove(c)">撤</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="!collections.length" class="empty">尚无文集。</div>
   </div>
 
   <div v-if="creating || editing" class="card pad" style="margin-top:20px;">

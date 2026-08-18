@@ -154,74 +154,76 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'move') {
       <button class="btn btn-danger mini" :disabled="busy" @click="bulk('delete')">批量删除</button>
     </div>
 
-    <table class="table" v-if="shown.length">
-      <thead>
-        <tr>
-          <th style="width:32px;">
-            <input
-              type="checkbox"
-              :checked="shown.length > 0 && shown.every((p) => selected.has(p.id))"
-              @change="toggleAll"
-            />
-          </th>
-          <th>篇名</th>
-          <th>文集</th>
-          <th>状态</th>
-          <th>阅读</th>
-          <th>日期</th>
-          <th style="text-align:right;">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in shown" :key="p.id">
-          <td>
-            <input
-              type="checkbox"
-              :checked="selected.has(p.id)"
-              @change="selected.has(p.id) ? selected.delete(p.id) : selected.add(p.id)"
-            />
-          </td>
-          <td class="title-cell">
-            <router-link
-              v-if="p.status === 'draft'"
-              :to="{ path: '/editor', query: { id: p.id } }"
-              style="color:var(--ink-deep);text-decoration:none;"
-            >
-              {{ p.title }}
-            </router-link>
-            <a
-              v-else
-              :href="postUrl(p)"
-              target="_blank"
-              rel="noopener"
-              style="color:var(--ink-deep);text-decoration:none;"
-            >
-              {{ p.title }}
-            </a>
-          </td>
-          <td>
-            <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
-            {{ colName(p.collection_id) }}
-          </td>
-          <td>
-            <span class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
-              {{ p.status === 'published' ? '已刊' : '草稿' }}
-            </span>
-          </td>
-          <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
-          <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmt(p.created_at) }}</td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-ghost mini" @click="edit(p)">改</button>
-              <button class="btn btn-ghost mini" @click="toggleStatus(p)">
-                {{ p.status === 'published' ? '撤稿' : '刊发' }}
-              </button>
-              <button class="btn btn-danger mini" @click="remove(p)">删</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-else class="empty">此间无文。</div>
+    <div class="table-wrap">
+      <table class="table" v-if="shown.length">
+        <thead>
+          <tr>
+            <th style="width:32px;">
+              <input
+                type="checkbox"
+                :checked="shown.length > 0 && shown.every((p) => selected.has(p.id))"
+                @change="toggleAll"
+              />
+            </th>
+            <th>篇名</th>
+            <th>文集</th>
+            <th>状态</th>
+            <th>阅读</th>
+            <th>日期</th>
+            <th style="text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in shown" :key="p.id">
+            <td>
+              <input
+                type="checkbox"
+                :checked="selected.has(p.id)"
+                @change="selected.has(p.id) ? selected.delete(p.id) : selected.add(p.id)"
+              />
+            </td>
+            <td class="title-cell">
+              <router-link
+                v-if="p.status === 'draft'"
+                :to="{ path: '/editor', query: { id: p.id } }"
+                style="color:var(--ink-deep);text-decoration:none;"
+              >
+                {{ p.title }}
+              </router-link>
+              <a
+                v-else
+                :href="postUrl(p)"
+                target="_blank"
+                rel="noopener"
+                style="color:var(--ink-deep);text-decoration:none;"
+              >
+                {{ p.title }}
+              </a>
+            </td>
+            <td>
+              <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
+              {{ colName(p.collection_id) }}
+            </td>
+            <td>
+              <span class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
+                {{ p.status === 'published' ? '已刊' : '草稿' }}
+              </span>
+            </td>
+            <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
+            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmt(p.created_at) }}</td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost mini" @click="edit(p)">改</button>
+                <button class="btn btn-ghost mini" @click="toggleStatus(p)">
+                  {{ p.status === 'published' ? '撤稿' : '刊发' }}
+                </button>
+                <button class="btn btn-danger mini" @click="remove(p)">删</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="!shown.length" class="empty">此间无文。</div>
   </div>
 </template>

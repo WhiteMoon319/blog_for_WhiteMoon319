@@ -377,6 +377,10 @@ textarea {
 }
 
 /* ===== 列表 ===== */
+.table-wrap {
+  overflow-x: auto;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -668,12 +672,38 @@ textarea {
 /* ===== 响应式 ===== */
 @media (max-width: 700px) {
   .admin-main { padding: 28px 16px 80px; }
+  .admin-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    gap: 6px 10px;
+  }
+  .admin-links {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    gap: 2px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .admin-links a {
+    padding: 5px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .admin-nav .nav-ghost {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+  }
   .form-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr; }
-  .admin-links { display: none; }
   .card.pad { padding: 20px; }
   .table th:nth-child(3),
-  .table td:nth-child(3) { display: none; }
+  .table td:nth-child(3),
+  .table th:nth-child(5),
+  .table td:nth-child(5),
+  .table th:nth-child(6),
+  .table td:nth-child(6) { display: none; }
 }
 
 @media (prefers-color-scheme: dark) {

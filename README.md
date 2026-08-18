@@ -7,8 +7,9 @@
 **前台**
 
 - 首页：文集入口 + 最新文章（分页）
-- 文集页 / 文章页：按文集组织文章，旧路径自动 301 到新结构
-- 归档页（按时间轴）、关于页、站内搜索（`/search/`）
+- 文集页 / 文章页：按文集组织文章；已收录文章访问旧路径 `/posts/{slug}/` 302 至 /404
+- 标签：标签云、独立标签页 `/tags/{tag}/`、`/tags/?t=` 多标签交集检索、标签内关键词搜索
+- 归档页（按时间轴）、关于页、站内搜索（`/search/`，`#标签` 前缀自动转跳标签页）
 - 阅读量统计、上一篇/下一篇相邻导航、`/sitemap.xml` 动态生成
 - 古风水墨视觉风格：纸纹背景、印章、毛笔标题、朱砂强调色、深色模式
 
@@ -34,16 +35,19 @@
 ```
 admin/                   Vue 3 管理端 SPA（/admin/ 基路径，Tiptap 编辑器）
   src/views/             Login / Dashboard / Collections / Posts / Editor / Import / Media
+  src/components/        版本历史面板、媒体选择弹窗
+  src/lib/               Turndown 封装、内容风险检查
 db/
-  migrations/            D1 迁移（0001_init ~ 0007_login_attempts）
+  migrations/            D1 迁移（0001_init ~ 0010_tags）
   seed.sql               本地演示种子数据
 scripts/
   cf-config.mjs          由模板 + .env 生成本地 wrangler.jsonc
   merge-admin.mjs        把 admin/dist 合并进 dist/client/admin
 src/
   pages/                 页面与 API 路由（见下方「路由」）
-  lib/                   db 访问、认证、Markdown、限流、上传、工具函数
-tests/                   node:test 单测与 e2e（miniflare 跑构建产物）
+  lib/                   db/（D1 访问，按域拆 9 模块）、api/validate.ts、认证、Markdown、上传等
+  scripts/               collection-anim.ts（文集卡开合动画）
+tests/                   node:test 单测；e2e 按域拆分（core/auth/posts/tags/media）+ helpers/e2e.ts
 wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 .env.example             真实资源 ID 的填法示例（占位符，可提交）
 ```
@@ -57,7 +61,9 @@ wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 | `/collections/{collectionSlug}/{postSlug}/` | 文章页（有文集的文章） |
 | `/posts/{postSlug}/` | 文章页（无文集的文章；有文集的旧路径访问自动 301 到新结构） |
 | `/archive/`、`/about/` | 归档、关于 |
-| `/search/?q=` | 站内搜索 |
+| `/search/?q=` | 站内搜索；`#标签` 开头转跳标签页（多标签交集） |
+| `/tags/` | 标签云（计数分文集/未分类文章） |
+| `/tags/{tag}/` | 独立标签页；`/tags/?t=` 为内联页，多 `t` 取交集，`q` 为标签内关键词 |
 | `/preview/{id}/` | 草稿预览（需登录，`noindex`） |
 | `/sitemap.xml` | 站点地图（动态生成） |
 | `/admin/...` | 管理端 SPA（login / dashboard / posts / editor / collections / import / media） |
@@ -67,11 +73,12 @@ API 一览：
 
 | 方法 | 路径 | 用途 | 鉴权 |
 | --- | --- | --- | --- |
-| POST/GET | `/api/auth/login` `/logout` `/me` | 登录 / 注销 / 校验会话 | 登录 |
+| POST | `/api/auth/login` `logout`，GET `/me` | 登录 / 注销 / 校验会话 | 登录 |
 | GET/POST | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}` | 文集 CRUD | 写需登录 |
-| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published） | 写需登录 |
-| POST | `/api/posts/batch` | 批量操作（如批量删除） | 登录 |
+| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（公开仅 published；PUT 带 `base_version` 乐观锁，过期 409） | 写需登录 |
+| POST | `/api/posts/batch` | 批量创建/刊发/转草稿/移动/删除（slug 自动避让；move 全成功或全失败） | 登录 |
 | GET/POST | `/api/posts/{id}/versions`，GET `/api/posts/{id}/versions/{version}`，POST `.../restore` | 版本历史与回滚 | 登录 |
+| GET | `/api/tags` | 标签建议（云计数） | 公开 |
 | POST | `/api/upload` | 图片上传 → R2（multipart） | 登录 |
 | GET/DELETE | `/api/media` | 媒体库列表 / 删除 R2 对象 | 登录 |
 | GET | `/api/files/[...key]` | R2 图片回源（带缓存头） | 公开 |
@@ -150,7 +157,7 @@ npm run typecheck      # astro check + vue-tsc
 npm test               # 单测 + e2e（需要先 npm run build）
 ```
 
-测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e 用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证、限流、草稿、URL 结构、相邻导航、Markdown 清洗、上传白名单、版本回滚等。
+测试说明：`tests/fallback.test.ts` 校验管理端产物已合并进 `dist/client/admin`；e2e（`tests/e2e.*.test.ts`，公共引导在 `tests/helpers/e2e.ts`）用 miniflare 以全新 D1 应用迁移 + 种子后跑构建产物，覆盖首页、认证与限流、标签与交集检索、草稿预览、URL 结构、相邻导航、分页、Markdown 清洗、上传白名单、批量事务、版本回滚与乐观锁等。
 
 ## 部署
 
@@ -180,5 +187,5 @@ npx wrangler secret put BLOG_SESSION_SECRET
 
 - 迁移：`db/migrations/`，本地用 `npm run cf:db:local`，远程用 `wrangler d1 migrations apply --remote`
 - 种子：`db/seed.sql`（仅本地演示用）
-- 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`login_attempts`（登录限流计数）
-- 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀
+- 核心表：`collections`（文集）、`posts`（文章，含 `view_count`）、`post_versions`（编辑历史，可回滚）、`tags`/`post_tags`（标签：文章自有标签 + 文集继承标签，删除后孤儿标签自动清理）、`login_attempts`（登录限流计数）、`posts_fts`（FTS 全文检索虚拟表，迁移 0009）
+- 文章 `slug` 在文集内唯一；未分类文章由部分唯一索引保证全局唯一（迁移 `0006_uncategorized_slug_unique.sql`）。删除文集时文章 `collection_id` 置空（文章保留，回到 `/posts/` 路径），若与现有未分类文章 slug 冲突，按 `(created_at, id)` 保留最新一篇原 slug，其余确定性追加 `-2`、`-3`… 后缀；文集可设 `post_order`（`asc` 连载序 / `desc` 博客序，迁移 0008）

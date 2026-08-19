@@ -7,10 +7,11 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  keywords?: string;
   noindex?: boolean;
 }
 
-const { title, description = '一座写在 Cloudflare 上的小书斋。', image, noindex = false } = Astro.props;
+const { title, description = '一座写在 Cloudflare 上的小书斋。', image, keywords, noindex = false } = Astro.props;
 const env = await envOf();
 const siteName = env.SITE_NAME;
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
@@ -42,8 +43,10 @@ const navLinks = [
     />
     <title>{title ? `${title}｜${siteName}` : siteName}</title>
     <meta name="description" content={description} />
+    {keywords && <meta name="keywords" content={keywords} />}
     <meta name="theme-color" content="#faf7f2" />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/feed.xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

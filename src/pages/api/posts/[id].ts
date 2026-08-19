@@ -55,6 +55,13 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.summary === 'string') patch.summary = body.summary;
   if (typeof body.content_md === 'string') patch.content_md = body.content_md;
   if (typeof body.cover_url === 'string') patch.cover_url = body.cover_url;
+  if (typeof body.meta_keywords === 'string') {
+    const metaKeywords = body.meta_keywords.trim().replace(/\s+/g, ' ');
+    if (metaKeywords.length > 200) {
+      return json({ error: 'meta_keywords too long: 最多 200 字' }, 400);
+    }
+    patch.meta_keywords = metaKeywords;
+  }
   if (body.status === 'published' || body.status === 'draft') patch.status = body.status;
   if (typeof body.version_message === 'string' && body.version_message.trim()) {
     versionMessage = body.version_message.trim();

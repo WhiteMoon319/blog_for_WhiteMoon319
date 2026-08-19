@@ -2,8 +2,10 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
+import { safeJsonLd } from '../../lib/seo';
 
 const env = await envOf();
+const siteUrl = env.SITE_URL.replace(/\/$/, '');
 const { slug } = Astro.params;
 const post = slug ? await getPublishedPostBySlug(env.DB, slug) : null;
 
@@ -26,9 +28,30 @@ const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);
 const postHref = (s: string, collectionSlug?: string | null) =>
   collectionSlug ? `/collections/${encodeURI(collectionSlug)}/${encodeURI(s)}/` : `/posts/${encodeURI(s)}/`;
+const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
+const postUrl = `${siteUrl}/posts/${encodeURI(post.slug)}/`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.title,
+  description: post.summary || undefined,
+  datePublished: post.created_at,
+  dateModified: post.updated_at,
+  url: postUrl,
+  mainEntityOfPage: postUrl,
+  keywords: post.meta_keywords || undefined,
+  image: post.cover_url
+    ? ABSOLUTE_URL_RE.test(post.cover_url)
+      ? post.cover_url
+      : `${siteUrl}/${post.cover_url.replace(/^\//, '')}`
+    : undefined,
+  author: { '@type': 'Person', name: env.SITE_NAME },
+  publisher: { '@type': 'Organization', name: env.SITE_NAME },
+};
 ---
 
-<BaseLayout title={post.title} description={post.summary}>
+<BaseLayout title={post.title} description={post.summary} keywords={post.meta_keywords}>
+  <script type="application/ld+json" set:html={safeJsonLd(jsonLd)} />
   <div class="page-hero" style="--cc: #c23a30;">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
 

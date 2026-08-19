@@ -18,6 +18,7 @@ export interface Post {
   summary: string;
   content_md: string;
   cover_url: string;
+  meta_keywords: string;
   status: 'draft' | 'published';
   view_count?: number;
   deleted_at?: string | null;
@@ -51,6 +52,7 @@ export interface PostVersion {
   summary: string;
   content_md: string;
   cover_url: string;
+  meta_keywords: string;
   status: 'draft' | 'published';
   message: string;
   created_at: string;

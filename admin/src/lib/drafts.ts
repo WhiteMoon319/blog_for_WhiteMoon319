@@ -10,6 +10,7 @@ export interface DraftSnapshot {
   collection_id: number | null;
   summary: string;
   cover_url: string;
+  meta_keywords: string;
   status: 'draft' | 'published';
   tags: string[];
   content_md: string;

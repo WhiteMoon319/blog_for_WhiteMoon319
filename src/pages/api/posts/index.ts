@@ -69,6 +69,15 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const parsedTags = parseTagsStrict(body.tags);
   if (!parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
+  // SEO 关键词：纯文本、长度受限，超出截断会静默丢数据，因此直接 400
+  const metaKeywords =
+    typeof body.meta_keywords === 'string'
+      ? body.meta_keywords.trim().replace(/\s+/g, ' ')
+      : '';
+  if (metaKeywords.length > 200) {
+    return json({ error: 'meta_keywords too long: 最多 200 字' }, 400);
+  }
+
   try {
     const env = await envOf();
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
@@ -81,6 +90,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       summary: typeof body.summary === 'string' ? body.summary : '',
       content_md: typeof body.content_md === 'string' ? body.content_md : '',
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
+      meta_keywords: metaKeywords,
       status,
     }, parsedTags.tags);
     if (!created) return json({ error: 'post create failed' }, 500);

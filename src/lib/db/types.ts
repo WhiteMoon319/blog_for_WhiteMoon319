@@ -21,6 +21,7 @@ export interface PostRow {
   status: 'draft' | 'published';
   view_count: number;
   deleted_at: string | null;
+  meta_keywords: string;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ export interface PostInput {
   content_md?: string;
   cover_url?: string;
   status?: 'draft' | 'published';
+  meta_keywords?: string;
 }
 
 const POST_FIELDS = [
@@ -45,6 +47,7 @@ const POST_FIELDS = [
   'content_md',
   'cover_url',
   'status',
+  'meta_keywords',
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 
@@ -62,6 +65,7 @@ export interface PostVersionRow {
   content_md: string;
   cover_url: string;
   status: 'draft' | 'published';
+  meta_keywords: string;
   message: string;
   created_at: string;
 }

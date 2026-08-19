@@ -41,6 +41,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
         content_md: ver.content_md,
         cover_url: ver.cover_url,
         status: ver.status,
+        meta_keywords: ver.meta_keywords,
       },
       `回滚至 v${ver.version}`,
     );

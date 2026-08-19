@@ -36,6 +36,7 @@ const form = reactive({
   collection_id: null as number | null,
   summary: '',
   cover_url: '',
+  meta_keywords: '',
   status: 'draft' as 'draft' | 'published',
   version_message: '',
   tags: [] as string[],
@@ -128,6 +129,7 @@ async function load() {
     form.collection_id = post.collection_id;
     form.summary = post.summary;
     form.cover_url = post.cover_url;
+    form.meta_keywords = post.meta_keywords ?? '';
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
     contentRisk.value = checkContentRisk(post.content_md);
@@ -139,6 +141,7 @@ async function load() {
     form.collection_id = null;
     form.summary = '';
     form.cover_url = '';
+    form.meta_keywords = '';
     form.status = 'draft';
     form.version_message = '';
     form.tags = [];
@@ -194,6 +197,7 @@ function currentSnapshot(): DraftSnapshot {
     collection_id: form.collection_id,
     summary: form.summary,
     cover_url: form.cover_url,
+    meta_keywords: form.meta_keywords,
     status: form.status,
     tags: [...form.tags],
     content_md: currentMarkdown(),
@@ -264,6 +268,7 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     snapshot.title !== form.title || snapshot.slug !== form.slug ||
     snapshot.collection_id !== form.collection_id || snapshot.summary !== form.summary ||
     snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
+    snapshot.meta_keywords !== form.meta_keywords ||
     snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
   if (!localDiffers) {
     await clearDraft(key);
@@ -294,6 +299,7 @@ function applySnapshot(s: DraftSnapshot): void {
   form.collection_id = s.collection_id;
   form.summary = s.summary;
   form.cover_url = s.cover_url;
+  form.meta_keywords = s.meta_keywords;
   form.status = s.status;
   form.tags = [...s.tags];
   contentRisk.value = checkContentRisk(s.content_md);
@@ -377,10 +383,6 @@ onMounted(() => {
   api.tags().then((r) => (suggestions.value = r.tags.map((t) => t.name))).catch(() => {});
 });
 
-onBeforeUnmount(() => {
-  editor.value?.destroy();
-});
-
 async function save() {
   if (!form.title.trim()) return emit('notify', '篇名不可为空', true);
   if (!editor.value) return;
@@ -394,6 +396,7 @@ async function save() {
       collection_id: form.collection_id,
       summary: form.summary,
       cover_url: form.cover_url,
+      meta_keywords: form.meta_keywords,
       content_md,
       status: form.status,
       version_message: form.version_message.trim(),
@@ -550,6 +553,11 @@ async function exportMarkdown() {
       <div class="field">
         <label>摘要</label>
         <textarea v-model="form.summary" class="textarea" placeholder="列表卡上的一行小字"></textarea>
+      </div>
+
+      <div class="field">
+        <label>SEO 关键词（meta keywords，逗号分隔，最多 200 字）</label>
+        <input v-model="form.meta_keywords" class="input" maxlength="200" placeholder="文章、随笔、书房" />
       </div>
 
       <div class="field">

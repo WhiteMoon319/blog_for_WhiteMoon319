@@ -124,8 +124,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -135,12 +135,13 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.content_md ?? '',
         data.cover_url ?? '',
         data.status ?? 'draft',
+        data.meta_keywords ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
-         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, '创建'
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
       ),
   ]);
@@ -158,8 +159,8 @@ export async function createPostWithTags(
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -169,12 +170,13 @@ export async function createPostWithTags(
         data.content_md ?? '',
         data.cover_url ?? '',
         data.status ?? 'draft',
+        data.meta_keywords ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
-         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, '创建'
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
       ),
   ];
@@ -211,7 +213,7 @@ export async function updatePost(
   const current = await getPostById(db, id);
   if (!current) return null;
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords'].includes(k),
   );
   if (keys.length === 0) return current;
   const changed = keys.filter((k) => {
@@ -240,9 +242,9 @@ export async function updatePost(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, content_md, cover_url, status, ?
+                title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -270,7 +272,7 @@ export async function updatePostWithTags(
   const current = await getPostById(db, id);
   if (!current) return null;
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords'].includes(k),
   );
   const changed = keys.filter((k) => {
     const pv = patch[k as keyof PostPatch];
@@ -298,9 +300,9 @@ export async function updatePostWithTags(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, content_md, cover_url, status, ?
+                title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -326,9 +328,9 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
 
 // ---- 回收站（软删除）：trash/restore 每篇 2 语句（版本 + 更新），50 篇 = 100 恰好落在 D1 batch 上限内 ----
 
-const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
 SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-       title, slug, collection_id, summary, content_md, cover_url, status, ?
+       title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
 FROM posts WHERE id = ?`;
 
 function trashVersionStmt(db: D1Database, id: number, message: string, guard: string): D1PreparedStatement {

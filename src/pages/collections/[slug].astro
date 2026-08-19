@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Pagination from '../../components/Pagination.astro';
 import { envOf, getCollectionBySlug, listPublishedPosts, countPublishedPosts, fmtDate } from '../../lib/db';
+import { safeJsonLd } from '../../lib/seo';
 import { postHref } from '../../lib/utils';
 
 export const prerender = false;
@@ -26,9 +27,28 @@ const posts = await listPublishedPosts(env.DB, {
   offset: (page - 1) * PAGE_SIZE,
   order: collection.post_order,
 });
+const siteUrl = env.SITE_URL.replace(/\/$/, '');
+const collectionUrl = `${siteUrl}/collections/${encodeURI(collection.slug)}/`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: collection.title,
+  description: collection.summary || undefined,
+  url: collectionUrl,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: posts.map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: p.title,
+      url: `${siteUrl}${postHref(p.slug, collection.slug)}`,
+    })),
+  },
+};
 ---
 
 <BaseLayout title={collection.title} description={collection.summary}>
+  <script type="application/ld+json" set:html={safeJsonLd(jsonLd)} />
   <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
     <a class="page-back reveal in" href="/">← 回到卷首</a>
 

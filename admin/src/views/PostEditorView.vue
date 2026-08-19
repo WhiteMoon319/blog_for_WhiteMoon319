@@ -7,13 +7,14 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { marked } from 'marked';
-import { api } from '../api';
+import { api, download } from '../api';
 import type { Collection } from '../types';
 import TagChips from '../components/TagChips.vue';
 import VersionPanel from '../components/VersionPanel.vue';
 import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
 import { parseId } from '../lib/format';
+import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -131,6 +132,7 @@ async function load() {
     form.tags = tags.map((t) => t.name);
     contentRisk.value = checkContentRisk(post.content_md);
     if (editor.value) editor.value.commands.setContent(marked.parse(post.content_md) as string);
+    await maybeRestoreDraft(`post:${id}`, id, version, post.content_md);
   } else {
     form.title = '';
     form.slug = '';
@@ -145,8 +147,197 @@ async function load() {
     if (cid && collections.value.some((c) => c.id === cid)) form.collection_id = cid;
     contentRisk.value = '';
     if (editor.value) editor.value.commands.setContent('');
+    await maybeRestoreDraft(newDraftKey(), null, 0, '');
+  }
+  // 加载/恢复完成后以当前状态为基线：内容未变时不产生重复快照
+  dirtyDraft.value = false;
+  lastSnapshotJson = snapshotJson();
+}
+
+async function afterVersionRestore() {
+  // 回滚版本后服务器即为最新真相：清掉旧快照，避免"服务器已更新"误报
+  if (draftKey.value) await clearDraft(draftKey.value).catch(() => {});
+  await load();
+}
+
+// ---- 本地草稿自动保存（IndexedDB）：内容变更后 2 秒写入；服务器保存成功才清除 ----
+
+const draftKey = ref<string | null>(null);
+const dirtyDraft = ref(false);
+const autosaveTimer = ref<number | null>(null);
+let unsubscribeTab: (() => void) | null = null;
+let lastSnapshotJson = '';
+const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+// 新建草稿的临时键：sessionStorage 记录当前标签页正在写的新稿键，
+// 刷新/重开后沿用同一键，不会与另一篇新稿混在一起
+const NEW_KEY_SESSION = 'draft-new-key';
+
+function newDraftKey(): string {
+  try {
+    const existing = sessionStorage.getItem(NEW_KEY_SESSION);
+    if (existing && existing.startsWith('new:')) return existing;
+    const key = `new:${crypto.randomUUID()}`;
+    sessionStorage.setItem(NEW_KEY_SESSION, key);
+    return key;
+  } catch {
+    return `new:${crypto.randomUUID()}`;
   }
 }
+
+function currentSnapshot(): DraftSnapshot {
+  return {
+    key: draftKey.value ?? '',
+    post_id: loadedId.value,
+    title: form.title,
+    slug: form.slug,
+    collection_id: form.collection_id,
+    summary: form.summary,
+    cover_url: form.cover_url,
+    status: form.status,
+    tags: [...form.tags],
+    content_md: currentMarkdown(),
+    base_version: baseVersion.value,
+    saved_at: new Date().toISOString(),
+  };
+}
+
+function snapshotJson(): string {
+  return JSON.stringify(currentSnapshot());
+}
+
+async function writeAutosave(): Promise<void> {
+  autosaveTimer.value = null;
+  if (!draftKey.value || !dirtyDraft.value) return;
+  const result = await saveDraft(currentSnapshot());
+  if (result.ok) {
+    markTabActivity(draftKey.value);
+  } else {
+    // 空间不足等：只提示一次，不反复打扰
+    if (!quotaWarned.value) {
+      quotaWarned.value = true;
+      emit('notify', result.error, true);
+    }
+  }
+}
+
+const quotaWarned = ref(false);
+
+function scheduleAutosave(): void {
+  // 与上次已落盘内容一致时不重复写（加载/恢复后表单与快照相同的情况）
+  const j = snapshotJson();
+  if (j === lastSnapshotJson) return;
+  lastSnapshotJson = j;
+  dirtyDraft.value = true;
+  quotaWarned.value = false;
+  if (autosaveTimer.value !== null) window.clearTimeout(autosaveTimer.value);
+  autosaveTimer.value = window.setTimeout(() => void writeAutosave(), AUTOSAVE_DEBOUNCE_MS);
+}
+
+function flushAutosave(): void {
+  if (autosaveTimer.value !== null) {
+    window.clearTimeout(autosaveTimer.value);
+    autosaveTimer.value = null;
+  }
+  if (dirtyDraft.value && draftKey.value) void writeAutosave();
+}
+
+// 打开编辑器时读取本地快照并与服务端比较：
+// - 基线相同且有未保存内容：询问恢复；
+// - 基线已过期：明确告知"服务器已更新"，由用户决定覆盖或保留服务器；
+// - 没有快照：正常打开。
+async function maybeRestoreDraft(key: string, postId: number | null, serverVersion: number, serverContent: string): Promise<void> {
+  draftKey.value = key;
+  const snapshot = await loadDraft(key).catch(() => null);
+  if (!snapshot) return;
+
+  if (postId === null) {
+    if (confirm(`检测到未保存的新稿（保存于 ${snapshot.saved_at.slice(0, 16).replace('T', ' ')}）。恢复继续写？`)) {
+      applySnapshot(snapshot);
+    } else {
+      await clearDraft(key);
+    }
+    return;
+  }
+
+  const localDiffers = snapshot.content_md !== serverContent ||
+    snapshot.title !== form.title || snapshot.slug !== form.slug ||
+    snapshot.collection_id !== form.collection_id || snapshot.summary !== form.summary ||
+    snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
+    snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
+  if (!localDiffers) {
+    await clearDraft(key);
+    return;
+  }
+
+  if (snapshot.base_version === serverVersion) {
+    if (confirm(`检测到未保存的本地修改（保存于 ${snapshot.saved_at.slice(0, 16).replace('T', ' ')}）。恢复本地内容？`)) {
+      applySnapshot(snapshot);
+    } else {
+      await clearDraft(key);
+    }
+  } else {
+    const useLocal = confirm(
+      `服务器上本篇已有更新（本地快照基于 v${snapshot.base_version}，服务器为 v${serverVersion}）。\n\n确定：用本地快照覆盖（保存时仍按服务器最新版本提交，冲突会收到提示）\n取消：保留服务器内容，丢弃本地快照`,
+    );
+    if (useLocal) {
+      applySnapshot(snapshot);
+    } else {
+      await clearDraft(key);
+    }
+  }
+}
+
+function applySnapshot(s: DraftSnapshot): void {
+  form.title = s.title;
+  form.slug = s.slug;
+  form.collection_id = s.collection_id;
+  form.summary = s.summary;
+  form.cover_url = s.cover_url;
+  form.status = s.status;
+  form.tags = [...s.tags];
+  contentRisk.value = checkContentRisk(s.content_md);
+  if (editor.value) editor.value.commands.setContent(marked.parse(s.content_md) as string);
+}
+
+// 内容变更（表单字段 + 编辑器）→ 防抖自动保存
+watch(
+  () => ({
+    title: form.title,
+    slug: form.slug,
+    collection_id: form.collection_id,
+    summary: form.summary,
+    cover_url: form.cover_url,
+    status: form.status,
+    tags: [...form.tags],
+    html: editor.value?.getHTML() ?? '',
+  }),
+  () => {
+    if (loading.value || draftKey.value === null) return;
+    scheduleAutosave();
+  },
+  { deep: true },
+);
+
+// 多标签页同文编辑提示（尽力而为，不宣称解决并发）
+watch(draftKey, (key) => {
+  unsubscribeTab?.();
+  unsubscribeTab = null;
+  if (!key) return;
+  markTabActivity(key);
+  unsubscribeTab = listenTabActivity(key, () => {
+    emit('notify', '另一标签页也在编辑本篇，保存前请注意服务器冲突提示', true);
+  });
+});
+
+onBeforeUnmount(() => {
+  editor.value?.destroy();
+  unsubscribeTab?.();
+  flushAutosave();
+});
+
+// 页面隐藏/刷新前落一次盘
+window.addEventListener('pagehide', flushAutosave);
 
 // 文集切换时刷新继承标签提示
 watch(
@@ -169,6 +360,8 @@ watch(() => [route.query.id, route.query.collection] as const, async ([id, colle
   if (loading.value) return;
   const next = parseId(id);
   if (next !== null && next === loadedId.value) return;
+  // 切换篇目前先落一次盘，避免挂起的防抖把旧键内容写进新键
+  flushAutosave();
   loading.value = true;
   try {
     await load();
@@ -214,11 +407,25 @@ async function save() {
       form.tags = tags.map((t) => t.name);
       emit('notify', '篇章已存');
       form.version_message = '';
+      // 保存成功才清除本地快照；失败/409 时保留，等待下次变更重新写入
+      if (draftKey.value) {
+        await clearDraft(draftKey.value).catch(() => {});
+        dirtyDraft.value = false;
+        lastSnapshotJson = snapshotJson();
+      }
     } else {
       const { post, tags, version } = await api.createPost(payload);
       baseVersion.value = version;
       form.tags = tags.map((t) => t.name);
       emit('notify', '新篇已成');
+      // 新稿快照作废，转入 post:{id} 键；服务端为最新真相，先清掉旧快照再重新自动保存
+      if (draftKey.value) {
+        await clearDraft(draftKey.value).catch(() => {});
+      }
+      sessionStorage.removeItem(NEW_KEY_SESSION);
+      draftKey.value = `post:${post.id}`;
+      dirtyDraft.value = false;
+      lastSnapshotJson = '';
       router.replace({ path: '/editor', query: { id: post.id } });
       loadedId.value = post.id;
     }
@@ -277,6 +484,21 @@ const showVersions = ref(false);
 function openVersions() {
   if (loadedId.value === null) return;
   showVersions.value = true;
+}
+
+const exporting = ref(false);
+
+async function exportMarkdown() {
+  if (loadedId.value === null) return;
+  exporting.value = true;
+  try {
+    await download(`/api/export/posts/${loadedId.value}.md`, `post-${loadedId.value}.md`);
+    emit('notify', 'Markdown 已导出');
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    exporting.value = false;
+  }
 }
 </script>
 
@@ -397,6 +619,9 @@ function openVersions() {
           预览
         </a>
         <button v-if="loadedId !== null" class="btn btn-ghost" type="button" @click="openVersions">版本</button>
+        <button v-if="loadedId !== null" class="btn btn-ghost" type="button" :disabled="exporting" @click="exportMarkdown">
+          {{ exporting ? '导出中…' : '导出 Markdown' }}
+        </button>
         <router-link class="btn btn-ghost" to="/posts">回篇目</router-link>
       </div>
     </form>
@@ -415,7 +640,7 @@ function openVersions() {
     :current-markdown="currentMarkdown"
     @close="showVersions = false"
     @notify="emit('notify', $event)"
-    @restored="load"
+    @restored="afterVersionRestore"
   />
 </template>
 

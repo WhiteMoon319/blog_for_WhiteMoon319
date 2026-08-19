@@ -9,6 +9,7 @@ const router = createRouter({
     { path: '/posts', name: 'posts', component: () => import('./views/PostsView.vue') },
     { path: '/media', name: 'media', component: () => import('./views/MediaView.vue') },
     { path: '/import', name: 'import', component: () => import('./views/ImportView.vue') },
+    { path: '/export', name: 'export', component: () => import('./views/ExportView.vue') },
     { path: '/editor', name: 'editor', component: () => import('./views/PostEditorView.vue') },
   ],
 });

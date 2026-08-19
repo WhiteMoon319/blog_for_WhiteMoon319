@@ -989,3 +989,46 @@ test('e2e：回收站全生命周期——删除即软删、仅管理视图可�
   assert.equal((await c.get('/posts/trash-live-no/')).status, 200, '未被误删');
   await c.del(`/api/posts/${liveId}`);
 });
+
+test('e2e：导出——未登录 401，登录后可取全量快照与单篇 Markdown', async () => {
+  if (!HAS_BUILD) return;
+  const anonJson = await c.anon('/api/export');
+  assert.equal(anonJson.status, 401, '未登录导出 JSON 应 401');
+  const anonMd = await c.anon('/api/export/posts/1.md');
+  assert.equal(anonMd.status, 401, '未登录导出 Markdown 应 401');
+
+  await c.login();
+  const created = await c.post('/api/posts', {
+    title: '导出检查篇',
+    slug: 'export-e2e',
+    summary: '摘要',
+    content_md: '正文。',
+    status: 'published',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const snap = await c.get('/api/export');
+  assert.equal(snap.status, 200);
+  assert.equal(snap.headers.get('cache-control'), 'no-store', '导出响应不得被缓存');
+  assert.ok(String(snap.headers.get('content-disposition')).startsWith('attachment;'), '应提示下载');
+  const body = await snap.json();
+  assert.equal(body.schema_version, 1);
+  assert.ok(body.migration_version.length > 0, '应标注迁移版本');
+  assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'export-e2e'), '快照含新文章');
+  assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'astro-on-cloudflare'), '快照含种子文章');
+  const raw = JSON.stringify(body);
+  assert.ok(!raw.includes('BLOG_SESSION_SECRET') && !raw.includes('admin123'), '导出不得含密钥或口令');
+  assert.ok(!('login_attempts' in body), '快照不含敏感表');
+
+  const md = await c.get(`/api/export/posts/${id}.md`);
+  assert.equal(md.status, 200);
+  assert.ok(String(md.headers.get('content-disposition')).includes('export-e2e.md'), '文件名应为 slug.md');
+  const text = await md.text();
+  assert.ok(text.startsWith('---'), '应带 YAML frontmatter');
+  assert.ok(text.includes('title: "导出检查篇"'));
+  assert.ok(text.includes('正文。'), '正文完整');
+  assert.equal((await c.get('/api/export/posts/99999999.md')).status, 404, '不存在文章应 404');
+
+  await c.del(`/api/posts/${id}`);
+});

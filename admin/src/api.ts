@@ -127,3 +127,22 @@ export const api = {
   deleteMedia: (key: string) =>
     request<{ ok: boolean }>(`/api/media?key=${encodeURIComponent(key)}`, { method: 'DELETE' }),
 };
+
+// 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。
+export async function download(path: string, filename: string): Promise<void> {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (res.status === 401) window.dispatchEvent(new CustomEvent('auth:expired'));
+    throw new ApiError(body?.error ?? `HTTP ${res.status}`, res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

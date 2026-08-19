@@ -6,3 +6,4 @@ export * from './posts.ts';
 export * from './search.ts';
 export * from './tags.ts';
 export * from './versions.ts';
+export * from './export.ts';

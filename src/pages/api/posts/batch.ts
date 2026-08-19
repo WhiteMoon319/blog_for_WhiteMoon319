@@ -7,6 +7,7 @@ import {
   trashPosts,
   restorePosts,
   purgePosts,
+  setPostsPinned,
   isSlugConflict,
   type PostRow,
 } from '../../../lib/db';
@@ -21,7 +22,7 @@ import { json, requireAuth } from '../../../lib/auth';
 
 export const prerender = false;
 
-type Action = 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'create';
+type Action = 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'create' | 'pin' | 'unpin';
 
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
@@ -43,7 +44,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     action !== 'restore' &&
     action !== 'purge' &&
     action !== 'move' &&
-    action !== 'create'
+    action !== 'create' &&
+    action !== 'pin' &&
+    action !== 'unpin'
   ) {
     return json({ error: 'invalid action' }, 400);
   }
@@ -161,9 +164,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
       stmts.push(
         env.DB
           .prepare(
-            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
              SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                    title, slug, ?, summary, content_md, cover_url, status, '自动保存'
+                    title, slug, ?, summary, content_md, cover_url, status, meta_keywords, '自动保存'
              FROM posts WHERE id = ?`,
           )
           .bind(r.id, r.id, target, r.id),
@@ -195,6 +198,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
     const count = await purgePosts(env.DB, ids);
     return json({ ok: true, count });
   }
+  if (action === 'pin' || action === 'unpin') {
+    // 置顶/取消置顶：幂等，仅作用于未删除文章
+    const count = await setPostsPinned(env.DB, ids, action === 'pin');
+    return json({ ok: true, count });
+  }
 
   // publish / draft：仅对实际状态不同且未删除的文章留档（已刊发的重复刊发不产生版本；回收站文章不参与）
   const status = action === 'publish' ? 'published' : 'draft';
@@ -213,9 +221,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     stmts.push(
       env.DB
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, content_md, cover_url, ?, ?
+                  title, slug, collection_id, summary, content_md, cover_url, ?, meta_keywords, ?
            FROM posts WHERE id = ? AND status <> ?`,
         )
         .bind(id, id, status, message, id, status),

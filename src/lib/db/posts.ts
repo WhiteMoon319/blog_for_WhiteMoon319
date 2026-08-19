@@ -10,10 +10,11 @@ import { isValidSlug } from '../utils.ts';
 
 export async function listPublishedPosts(
   db: D1Database,
-  opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc' } = {},
+  opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc'; pinned?: boolean } = {},
 ): Promise<PostRow[]> {
   let sql = `SELECT * FROM posts WHERE status = 'published' AND deleted_at IS NULL`;
   const args: (number | string | null)[] = [];
+  if (opts.pinned) sql += ` AND is_pinned = 1`;
   if (opts.collectionId !== undefined) {
     if (opts.collectionId === null) {
       sql += ` AND collection_id IS NULL`;
@@ -124,8 +125,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -136,6 +137,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.cover_url ?? '',
         data.status ?? 'draft',
         data.meta_keywords ?? '',
+        data.is_pinned ?? 0,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -159,8 +161,8 @@ export async function createPostWithTags(
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -171,6 +173,7 @@ export async function createPostWithTags(
         data.cover_url ?? '',
         data.status ?? 'draft',
         data.meta_keywords ?? '',
+        data.is_pinned ?? 0,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -213,7 +216,7 @@ export async function updatePost(
   const current = await getPostById(db, id);
   if (!current) return null;
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned'].includes(k),
   );
   if (keys.length === 0) return current;
   const changed = keys.filter((k) => {
@@ -272,7 +275,7 @@ export async function updatePostWithTags(
   const current = await getPostById(db, id);
   if (!current) return null;
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned'].includes(k),
   );
   const changed = keys.filter((k) => {
     const pv = patch[k as keyof PostPatch];
@@ -393,6 +396,27 @@ export async function purgePosts(db: D1Database, ids: number[]): Promise<number>
   );
   stmts.push(purgeOrphanTagsStmt(db));
   await db.batch(stmts);
+  return pre?.n ?? 0;
+}
+
+// 置顶/取消置顶：仅作用于未删除文章，目标状态守卫保证幂等（重复操作计数为 0）。
+// 置顶不产生版本记录（版本史记录的是内容快照，置顶属展示性组织信息）。
+export async function setPostsPinned(db: D1Database, ids: number[], pinned: boolean): Promise<number> {
+  const from = pinned ? 0 : 1;
+  const pre = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NULL AND is_pinned = ? AND id IN (${ids.map(() => '?').join(',')})`,
+    )
+    .bind(from, ...ids)
+    .first<{ n: number }>();
+  if ((pre?.n ?? 0) > 0) {
+    await db
+      .prepare(
+        `UPDATE posts SET is_pinned = ?, updated_at = datetime('now') WHERE deleted_at IS NULL AND is_pinned = ? AND id IN (${ids.map(() => '?').join(',')})`,
+      )
+      .bind(pinned ? 1 : 0, from, ...ids)
+      .run();
+  }
   return pre?.n ?? 0;
 }
 

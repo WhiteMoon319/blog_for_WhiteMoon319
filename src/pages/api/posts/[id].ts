@@ -63,6 +63,7 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     patch.meta_keywords = metaKeywords;
   }
   if (body.status === 'published' || body.status === 'draft') patch.status = body.status;
+  if (body.is_pinned === 0 || body.is_pinned === 1) patch.is_pinned = body.is_pinned;
   if (typeof body.version_message === 'string' && body.version_message.trim()) {
     versionMessage = body.version_message.trim();
   }

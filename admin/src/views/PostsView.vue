@@ -107,6 +107,16 @@ async function purgeOne(p: Post) {
   }
 }
 
+async function togglePin(p: Post) {
+  try {
+    const { count = 0 } = await api.batchPosts({ action: p.is_pinned ? 'unpin' : 'pin', ids: [p.id] });
+    emit('notify', count > 0 ? (p.is_pinned ? '已取消置顶' : '已置顶') : '无需变更');
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
+}
+
 const selected = ref<Set<number>>(new Set());
 const busy = ref(false);
 const moveCol = ref<number | ''>('');
@@ -119,7 +129,7 @@ function toggleAll() {
       : new Set(all);
 }
 
-async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move') {
+async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'pin' | 'unpin') {
   const ids = [...selected.value];
   if (ids.length === 0) return;
   if (action === 'delete' && !confirm(`确要移入回收站选中的 ${ids.length} 篇？可随时恢复。`)) return;
@@ -185,6 +195,8 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
       <template v-if="!inTrash">
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('publish')">批量刊发</button>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('draft')">批量撤稿</button>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('pin')">置顶</button>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('unpin')">取消置顶</button>
         <select v-model="moveCol" class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;">
           <option :value="''">移入文集…</option>
           <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
@@ -246,6 +258,7 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
                 {{ p.title }}
               </a>
               <span v-else style="color:var(--ink-light);">{{ p.title }}</span>
+              <span v-if="!inTrash && p.is_pinned" class="tag tag-published" style="margin-left:6px;">置顶</span>
             </td>
             <td>
               <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
@@ -263,6 +276,9 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
               <div class="actions">
                 <template v-if="!inTrash">
                   <button class="btn btn-ghost mini" @click="edit(p)">改</button>
+                  <button class="btn btn-ghost mini" @click="togglePin(p)">
+                    {{ p.is_pinned ? '去顶' : '置顶' }}
+                  </button>
                   <button class="btn btn-ghost mini" @click="toggleStatus(p)">
                     {{ p.status === 'published' ? '撤稿' : '刊发' }}
                   </button>

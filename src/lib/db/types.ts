@@ -20,6 +20,7 @@ export interface PostRow {
   cover_url: string;
   status: 'draft' | 'published';
   view_count: number;
+  is_pinned: number;
   deleted_at: string | null;
   meta_keywords: string;
   created_at: string;
@@ -37,6 +38,7 @@ export interface PostInput {
   cover_url?: string;
   status?: 'draft' | 'published';
   meta_keywords?: string;
+  is_pinned?: number;
 }
 
 const POST_FIELDS = [
@@ -48,6 +50,7 @@ const POST_FIELDS = [
   'cover_url',
   'status',
   'meta_keywords',
+  'is_pinned',
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 

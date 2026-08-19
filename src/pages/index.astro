@@ -5,6 +5,7 @@ import { postHref } from '../lib/utils';
 
 const env = await envOf();
 const collections = await listCollections(env.DB);
+const pinnedPosts = await listPublishedPosts(env.DB, { pinned: true, limit: 5 });
 const latestPosts = await listPublishedPosts(env.DB, { limit: 6 });
 
 const heroSeal = Array.from(env.SITE_NAME)[0] ?? '书';
@@ -51,6 +52,35 @@ const heroSeal = Array.from(env.SITE_NAME)[0] ?? '书';
       )
     }
   </section>
+
+  {
+    pinnedPosts.length > 0 && (
+      <section class="section" id="pinned">
+        <div class="section-head reveal">
+          <span class="kicker">置 顶</span>
+          <h2 class="section-title">置于案头</h2>
+          <p class="section-lead">主人置顶，常读常新。</p>
+        </div>
+
+        <div class="posts-grid">
+          {pinnedPosts.map((p, i) => {
+            const col = collections.find((c) => c.id === p.collection_id);
+            return (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+                {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    )
+  }
 
   <section class="section" id="latest">
     <div class="section-head reveal">

@@ -78,6 +78,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'meta_keywords too long: 最多 200 字' }, 400);
   }
 
+  const isPinned = body.is_pinned === 1 ? 1 : 0;
+
   try {
     const env = await envOf();
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
@@ -91,6 +93,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       content_md: typeof body.content_md === 'string' ? body.content_md : '',
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
       meta_keywords: metaKeywords,
+      is_pinned: isPinned,
       status,
     }, parsedTags.tags);
     if (!created) return json({ error: 'post create failed' }, 500);

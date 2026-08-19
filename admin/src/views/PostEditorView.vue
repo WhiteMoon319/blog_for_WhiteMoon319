@@ -37,6 +37,7 @@ const form = reactive({
   summary: '',
   cover_url: '',
   meta_keywords: '',
+  is_pinned: 0,
   status: 'draft' as 'draft' | 'published',
   version_message: '',
   tags: [] as string[],
@@ -130,6 +131,7 @@ async function load() {
     form.summary = post.summary;
     form.cover_url = post.cover_url;
     form.meta_keywords = post.meta_keywords ?? '';
+    form.is_pinned = post.is_pinned ?? 0;
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
     contentRisk.value = checkContentRisk(post.content_md);
@@ -142,6 +144,7 @@ async function load() {
     form.summary = '';
     form.cover_url = '';
     form.meta_keywords = '';
+    form.is_pinned = 0;
     form.status = 'draft';
     form.version_message = '';
     form.tags = [];
@@ -198,6 +201,7 @@ function currentSnapshot(): DraftSnapshot {
     summary: form.summary,
     cover_url: form.cover_url,
     meta_keywords: form.meta_keywords,
+    is_pinned: form.is_pinned,
     status: form.status,
     tags: [...form.tags],
     content_md: currentMarkdown(),
@@ -268,7 +272,7 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     snapshot.title !== form.title || snapshot.slug !== form.slug ||
     snapshot.collection_id !== form.collection_id || snapshot.summary !== form.summary ||
     snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
-    snapshot.meta_keywords !== form.meta_keywords ||
+    snapshot.meta_keywords !== form.meta_keywords || snapshot.is_pinned !== form.is_pinned ||
     snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
   if (!localDiffers) {
     await clearDraft(key);
@@ -300,6 +304,7 @@ function applySnapshot(s: DraftSnapshot): void {
   form.summary = s.summary;
   form.cover_url = s.cover_url;
   form.meta_keywords = s.meta_keywords;
+  form.is_pinned = s.is_pinned;
   form.status = s.status;
   form.tags = [...s.tags];
   contentRisk.value = checkContentRisk(s.content_md);
@@ -314,6 +319,8 @@ watch(
     collection_id: form.collection_id,
     summary: form.summary,
     cover_url: form.cover_url,
+    meta_keywords: form.meta_keywords,
+    is_pinned: form.is_pinned,
     status: form.status,
     tags: [...form.tags],
     html: editor.value?.getHTML() ?? '',
@@ -397,6 +404,7 @@ async function save() {
       summary: form.summary,
       cover_url: form.cover_url,
       meta_keywords: form.meta_keywords,
+      is_pinned: form.is_pinned,
       content_md,
       status: form.status,
       version_message: form.version_message.trim(),
@@ -559,6 +567,15 @@ async function exportMarkdown() {
         <label>SEO 关键词（meta keywords，逗号分隔，最多 200 字）</label>
         <input v-model="form.meta_keywords" class="input" maxlength="200" placeholder="文章、随笔、书房" />
       </div>
+
+      <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+        <input
+          type="checkbox"
+          :checked="form.is_pinned === 1"
+          @change="form.is_pinned = ($event.target as HTMLInputElement).checked ? 1 : 0"
+        />
+        置顶（首页「置于案头」区展示，列表内仍照常可见）
+      </label>
 
       <div class="field">
         <label>封面</label>

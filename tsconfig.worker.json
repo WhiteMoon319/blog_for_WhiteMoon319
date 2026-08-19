@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["worker/worker.ts", "worker/entry.mjs", "src/lib/db/scheduling.ts", "src/env.d.ts"]
+}

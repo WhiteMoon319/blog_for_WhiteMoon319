@@ -64,6 +64,30 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   }
   if (body.status === 'published' || body.status === 'draft') patch.status = body.status;
   if (body.is_pinned === 0 || body.is_pinned === 1) patch.is_pinned = body.is_pinned;
+  // 定时发布：
+  // - 显式携带（'' / null / 时间串）→ 设置/清空；
+  // - 状态转为 published（手动刊发）→ 服务端强制清空；
+  // - 未携带 → 保持不变（版本回滚、只改标签等不触碰定时）
+  if ('scheduled_at' in body) {
+    const raw = body.scheduled_at;
+    if (raw === null || raw === '' || (typeof raw === 'string' && raw.trim() === '')) {
+      patch.scheduled_at = null;
+    } else if (typeof raw === 'string') {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) {
+        return json({ error: 'invalid scheduled_at: 需要可解析的 ISO 8601 时间' }, 400);
+      }
+      if (patch.status === 'published') {
+        return json({ error: 'scheduled_at 仅在草稿时有意义' }, 400);
+      }
+      if (parsed.getTime() <= Date.now()) {
+        return json({ error: 'scheduled_at 必须晚于当前时间' }, 400);
+      }
+      patch.scheduled_at = parsed.toISOString();
+    } else {
+      return json({ error: 'invalid scheduled_at' }, 400);
+    }
+  }
   if (typeof body.version_message === 'string' && body.version_message.trim()) {
     versionMessage = body.version_message.trim();
   }

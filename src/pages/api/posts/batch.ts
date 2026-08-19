@@ -230,7 +230,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     );
     stmts.push(
       env.DB
-        .prepare(`UPDATE posts SET status = ?, updated_at = datetime('now') WHERE id = ? AND status <> ?`)
+        .prepare(
+          `UPDATE posts SET status = ?, scheduled_at = NULL, updated_at = datetime('now') WHERE id = ? AND status <> ?`,
+        )
         .bind(status, id, status),
     );
   }

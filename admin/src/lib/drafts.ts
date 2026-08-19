@@ -12,6 +12,7 @@ export interface DraftSnapshot {
   cover_url: string;
   meta_keywords: string;
   is_pinned: number;
+  scheduled_at: string;
   status: 'draft' | 'published';
   tags: string[];
   content_md: string;

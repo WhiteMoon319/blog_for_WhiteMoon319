@@ -20,6 +20,7 @@ export interface Post {
   cover_url: string;
   meta_keywords: string;
   is_pinned?: number;
+  scheduled_at?: string | null;
   status: 'draft' | 'published';
   view_count?: number;
   deleted_at?: string | null;

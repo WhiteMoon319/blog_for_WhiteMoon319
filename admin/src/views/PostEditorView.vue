@@ -38,6 +38,8 @@ const form = reactive({
   cover_url: '',
   meta_keywords: '',
   is_pinned: 0,
+  scheduled_enabled: false,
+  scheduled_local: '',
   status: 'draft' as 'draft' | 'published',
   version_message: '',
   tags: [] as string[],
@@ -132,6 +134,8 @@ async function load() {
     form.cover_url = post.cover_url;
     form.meta_keywords = post.meta_keywords ?? '';
     form.is_pinned = post.is_pinned ?? 0;
+    form.scheduled_enabled = !!post.scheduled_at;
+    form.scheduled_local = post.scheduled_at ? toLocalInputValue(post.scheduled_at) : '';
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
     contentRisk.value = checkContentRisk(post.content_md);
@@ -145,6 +149,8 @@ async function load() {
     form.cover_url = '';
     form.meta_keywords = '';
     form.is_pinned = 0;
+    form.scheduled_enabled = false;
+    form.scheduled_local = '';
     form.status = 'draft';
     form.version_message = '';
     form.tags = [];
@@ -175,6 +181,17 @@ let unsubscribeTab: (() => void) | null = null;
 let lastSnapshotJson = '';
 const AUTOSAVE_DEBOUNCE_MS = 2000;
 
+// 定时发布：scheduled_at 统一按 UTC ISO 存储；datetime-local 用浏览器本地时区展示
+function scheduledIso(): string {
+  return form.scheduled_enabled && form.scheduled_local ? new Date(form.scheduled_local).toISOString() : '';
+}
+
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // 新建草稿的临时键：sessionStorage 记录当前标签页正在写的新稿键，
 // 刷新/重开后沿用同一键，不会与另一篇新稿混在一起
 const NEW_KEY_SESSION = 'draft-new-key';
@@ -198,10 +215,11 @@ function currentSnapshot(): DraftSnapshot {
     title: form.title,
     slug: form.slug,
     collection_id: form.collection_id,
-    summary: form.summary,
+summary: form.summary,
     cover_url: form.cover_url,
     meta_keywords: form.meta_keywords,
     is_pinned: form.is_pinned,
+    scheduled_at: scheduledIso(),
     status: form.status,
     tags: [...form.tags],
     content_md: currentMarkdown(),
@@ -273,6 +291,7 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     snapshot.collection_id !== form.collection_id || snapshot.summary !== form.summary ||
     snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
     snapshot.meta_keywords !== form.meta_keywords || snapshot.is_pinned !== form.is_pinned ||
+    snapshot.scheduled_at !== scheduledIso() ||
     snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
   if (!localDiffers) {
     await clearDraft(key);
@@ -305,6 +324,8 @@ function applySnapshot(s: DraftSnapshot): void {
   form.cover_url = s.cover_url;
   form.meta_keywords = s.meta_keywords;
   form.is_pinned = s.is_pinned;
+  form.scheduled_enabled = !!s.scheduled_at;
+  form.scheduled_local = s.scheduled_at ? toLocalInputValue(s.scheduled_at) : '';
   form.status = s.status;
   form.tags = [...s.tags];
   contentRisk.value = checkContentRisk(s.content_md);
@@ -321,6 +342,8 @@ watch(
     cover_url: form.cover_url,
     meta_keywords: form.meta_keywords,
     is_pinned: form.is_pinned,
+    scheduled_enabled: form.scheduled_enabled,
+    scheduled_local: form.scheduled_local,
     status: form.status,
     tags: [...form.tags],
     html: editor.value?.getHTML() ?? '',
@@ -405,6 +428,7 @@ async function save() {
       cover_url: form.cover_url,
       meta_keywords: form.meta_keywords,
       is_pinned: form.is_pinned,
+      scheduled_at: scheduledIso(),
       content_md,
       status: form.status,
       version_message: form.version_message.trim(),
@@ -576,6 +600,32 @@ async function exportMarkdown() {
         />
         置顶（首页「置于案头」区展示，列表内仍照常可见）
       </label>
+
+      <div class="field">
+        <label>定时发布（到点自动刊发；仅草稿可设）</label>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+            <input
+              type="checkbox"
+              v-model="form.scheduled_enabled"
+              :disabled="form.status === 'published'"
+            />
+            启用
+          </label>
+          <input
+            v-if="form.scheduled_enabled"
+            v-model="form.scheduled_local"
+            type="datetime-local"
+            step="60"
+            class="input"
+            style="width:auto;"
+          />
+        </div>
+        <div class="hint" style="margin-top:8px;">
+          按本机时区展示，提交后转为 UTC 存储；cron 每 5 分钟轮询，到点可能略有延迟，不承诺秒级准点。
+          手动刊发会清空定时。
+        </div>
+      </div>
 
       <div class="field">
         <label>封面</label>

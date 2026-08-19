@@ -266,9 +266,12 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
             </td>
             <td>
               <span v-if="inTrash" class="tag tag-draft">已回收</span>
-              <span v-else class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
-                {{ p.status === 'published' ? '已刊' : '草稿' }}
-              </span>
+              <template v-else>
+                <span class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
+                  {{ p.status === 'published' ? '已刊' : '草稿' }}
+                </span>
+                <span v-if="p.scheduled_at" class="tag tag-draft" style="margin-left:4px;">定 {{ fmtDate(p.scheduled_at) }}</span>
+              </template>
             </td>
             <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
             <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmtDate(p.deleted_at ?? p.created_at) }}</td>

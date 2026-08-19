@@ -125,8 +125,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -138,6 +138,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.status ?? 'draft',
         data.meta_keywords ?? '',
         data.is_pinned ?? 0,
+        data.scheduled_at ?? null,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -161,8 +162,8 @@ export async function createPostWithTags(
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -174,6 +175,7 @@ export async function createPostWithTags(
         data.status ?? 'draft',
         data.meta_keywords ?? '',
         data.is_pinned ?? 0,
+        data.scheduled_at ?? null,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -215,8 +217,12 @@ export async function updatePost(
 ): Promise<PostRow | 'conflict' | null> {
   const current = await getPostById(db, id);
   if (!current) return null;
+  // 手动刊发：scheduled_at 仅在草稿时有意义，强制清空定时值
+  if (patch.status === 'published' && !('scheduled_at' in patch)) {
+    patch.scheduled_at = null;
+  }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at'].includes(k),
   );
   if (keys.length === 0) return current;
   const changed = keys.filter((k) => {
@@ -274,8 +280,12 @@ export async function updatePostWithTags(
 ): Promise<{ post: PostRow; tags: TagRow[] } | 'conflict' | null> {
   const current = await getPostById(db, id);
   if (!current) return null;
+  // 手动刊发：scheduled_at 仅在草稿时有意义，强制清空定时值
+  if (patch.status === 'published' && !('scheduled_at' in patch)) {
+    patch.scheduled_at = null;
+  }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at'].includes(k),
   );
   const changed = keys.filter((k) => {
     const pv = patch[k as keyof PostPatch];

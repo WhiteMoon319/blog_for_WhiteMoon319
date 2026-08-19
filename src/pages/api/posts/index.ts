@@ -80,6 +80,22 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   const isPinned = body.is_pinned === 1 ? 1 : 0;
 
+  // 定时发布：仅在草稿时有意义；提交已刊发的文章带定时值直接 400
+  let scheduledAt: string | null = null;
+  if (typeof body.scheduled_at === 'string' && body.scheduled_at.trim() !== '') {
+    const parsed = new Date(body.scheduled_at);
+    if (Number.isNaN(parsed.getTime())) {
+      return json({ error: 'invalid scheduled_at: 需要可解析的 ISO 8601 时间' }, 400);
+    }
+    if (status === 'published') {
+      return json({ error: 'scheduled_at 仅在草稿时有意义' }, 400);
+    }
+    if (parsed.getTime() <= Date.now()) {
+      return json({ error: 'scheduled_at 必须晚于当前时间' }, 400);
+    }
+    scheduledAt = parsed.toISOString();
+  }
+
   try {
     const env = await envOf();
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
@@ -94,6 +110,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
       meta_keywords: metaKeywords,
       is_pinned: isPinned,
+      scheduled_at: scheduledAt,
       status,
     }, parsedTags.tags);
     if (!created) return json({ error: 'post create failed' }, 500);

@@ -14,6 +14,9 @@
   // 不会误指向其他资源。
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "blog",
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "compatibility_date": "2025-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {

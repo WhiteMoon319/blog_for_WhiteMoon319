@@ -27,6 +27,10 @@ export function requireBuild(): void {
   for (const dir of ['src', 'admin/src', 'scripts', 'db']) walk(dir);
 
   let distNewest = statSync(resolve(SERVER_DIR, 'entry.mjs')).mtimeMs;
+  const workerEntry = resolve(SERVER_DIR, 'scheduled-worker.mjs');
+  if (!existsSync(workerEntry)) throw new Error('dist/server/scheduled-worker.mjs 缺失，请先运行 pnpm run build');
+  const t = statSync(workerEntry).mtimeMs;
+  if (t > distNewest) distNewest = t;
   const adminDir = resolve('dist/client/admin');
   if (existsSync(adminDir)) {
     for (const f of readdirSync(adminDir)) {
@@ -71,12 +75,16 @@ export interface E2eClient {
   login(): Promise<void>;
   setSession(cookieValue: string): void;
   multipart(files: UploadFile[]): { body: Uint8Array<ArrayBuffer>; contentType: string };
+  triggerScheduled(): Promise<void>;
+  sql(stmt: string, ...binds: (string | number | null)[]): Promise<{ results: Record<string, unknown>[] }>;
   dispose(): Promise<void>;
 }
 
 function loadModules(): Record<string, { type: 'esm'; contents: string }> {
   const modules: Record<string, { type: 'esm'; contents: string }> = {};
-  for (const file of ['entry.mjs', 'virtual_astro_middleware.mjs']) {
+  // 生产入口为 dist/server/scheduled-worker.mjs（包装 Astro entry + scheduled 处理器，
+  // 由 scripts/build-worker.mjs 在构建末尾生成）；entry.mjs 等为它的模块清单依赖。
+  for (const file of ['scheduled-worker.mjs', 'entry.mjs', 'virtual_astro_middleware.mjs']) {
     modules[file] = { type: 'esm', contents: readFileSync(resolve(SERVER_DIR, file), 'utf8') };
   }
   for (const f of readdirSync(resolve(SERVER_DIR, 'chunks'))) {
@@ -88,6 +96,7 @@ function loadModules(): Record<string, { type: 'esm'; contents: string }> {
 export async function makeE2e(): Promise<E2eClient> {
   requireBuild();
   const mf = new Miniflare({
+    unsafeTriggerHandlers: true,
     workers: [
       {
         config: {
@@ -95,7 +104,8 @@ export async function makeE2e(): Promise<E2eClient> {
           name: 'e2e-blog',
           compatibilityDate: '2025-08-01',
           compatibilityFlags: ['nodejs_compat'],
-          manifest: { mainModule: 'entry.mjs', modules: loadModules() },
+          manifest: { mainModule: 'scheduled-worker.mjs', modules: loadModules() },
+          triggers: [{ type: 'scheduled', schedule: '*/5 * * * *' }],
           assets: {
             directory: resolve('dist/client'),
             runWorkerFirst: true,
@@ -184,6 +194,19 @@ export async function makeE2e(): Promise<E2eClient> {
     },
     setSession(cookieValue: string) {
       cookie = cookieValue;
+    },
+    async triggerScheduled() {
+      // 与 wrangler dev --test-scheduled / vite 插件同机制：route-override 头把
+      // /cdn-cgi/local/scheduled 路由到本 worker，触发其 scheduled 处理器
+      const res = await mf.dispatchFetch('http://e2e.test/cdn-cgi/local/scheduled', {
+        method: 'POST',
+        headers: { 'MF-Route-Override': 'e2e-blog' },
+      });
+      if (!res.ok) throw new Error(`triggerScheduled failed: ${res.status} ${await res.text()}`);
+    },
+    async sql(stmt: string, ...binds: (string | number | null)[]) {
+      // 直接操作测试数据库：用于制造 API 无法表达的状态（如把定时回拨到过去）
+      return db.prepare(stmt).bind(...binds).all();
     },
     multipart(files) {
       const boundary = `----e2eBoundary${Math.random().toString(36).slice(2)}`;

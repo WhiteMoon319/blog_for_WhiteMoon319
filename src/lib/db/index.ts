@@ -7,3 +7,16 @@ export * from './search.ts';
 export * from './tags.ts';
 export * from './versions.ts';
 export * from './export.ts';
+export { getAllSettings, saveSettings } from './settings.ts';
+export type { SettingKey } from './settings.ts';
+export {
+  hashPassword,
+  verifyPasswordHash,
+  getCredentials,
+  getSessionVersion,
+  setCredentials,
+  incrementSessionVersion,
+  __setCredentialsOverride,
+  __setVersionOverride,
+} from './credentials.ts';
+export type { CredentialRow } from './credentials.ts';

@@ -126,6 +126,17 @@ export const api = {
 
   deleteMedia: (key: string) =>
     request<{ ok: boolean }>(`/api/media?key=${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+  settings: () => request<Record<string, string>>('/api/settings'),
+
+  saveSettings: (data: Record<string, string>) =>
+    request<{ ok: boolean; saved?: string[] }>('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ ok: boolean; message?: string }>('/api/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    }),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

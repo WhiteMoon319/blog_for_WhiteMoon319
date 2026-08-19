@@ -159,14 +159,14 @@ export async function makeE2e(): Promise<E2eClient> {
     async post(path, body) {
       return fetchOf(path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
+        headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS, ...(cookie ? { cookie } : {}) },
         body: JSON.stringify(body),
       });
     },
     async put(path, body) {
       return fetchOf(path, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
+        headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS, ...(cookie ? { cookie } : {}) },
         body: JSON.stringify(body),
       });
     },
@@ -185,10 +185,10 @@ export async function makeE2e(): Promise<E2eClient> {
       if (cookie) return;
       const res = await mf.dispatchFetch(BASE + '/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: BASE, 'Sec-Fetch-Site': 'same-origin' },
         body: JSON.stringify({ password: 'admin123' }),
       });
-      if (res.status !== 200) throw new Error('e2e login failed');
+      if (res.status !== 200) throw new Error('e2e login failed: ' + res.status);
       const setCookie = res.headers.get('set-cookie') ?? '';
       cookie = setCookie.split(';')[0];
     },

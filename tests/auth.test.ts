@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { APIContext } from 'astro';
 import { __setEnvResolver } from '../src/lib/db/index.ts';
+import { __setCredentialsOverride, __setVersionOverride } from '../src/lib/db/credentials.ts';
 import { checkPassword, requireAuth, signToken, verifyToken } from '../src/lib/auth.ts';
+
+const SESSION_VERSION = 7;
 
 function mockEnv(): Env {
   return {
@@ -23,6 +26,10 @@ function mockEnv(): Env {
 
 const env = mockEnv();
 __setEnvResolver(async () => env);
+
+// 默认无 DB 凭据，回退到 env 明文比对
+__setCredentialsOverride(async () => null);
+__setVersionOverride(async () => SESSION_VERSION);
 
 function mockCtx(cookie?: string): APIContext {
   const cookies = {
@@ -46,35 +53,66 @@ test('requireAuth：无会话拒绝写操作', async () => {
 });
 
 test('requireAuth：篡改签名被拒绝', async () => {
-  const token = (await signToken(env.BLOG_SESSION_SECRET, 'admin')) + 'x';
+  const token = (await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION)) + 'x';
   const r = await requireAuth(mockCtx(token));
   assert.equal(r.ok, false);
 });
 
 test('requireAuth：合法签名放行', async () => {
-  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin');
+  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION);
   const r = await requireAuth(mockCtx(token));
   assert.equal(r.ok, true);
 });
 
+test('requireAuth：旧版本会话被拒绝（改密码后失效）', async () => {
+  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION - 1);
+  const r = await requireAuth(mockCtx(token));
+  assert.equal(r.ok, false);
+});
+
 test('signToken/verifyToken：往返一致且 sub 正确', async () => {
-  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin');
-  const session = await verifyToken(env.BLOG_SESSION_SECRET, token);
+  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION);
+  const session = await verifyToken(env.BLOG_SESSION_SECRET, token, SESSION_VERSION);
   assert.ok(session);
   assert.equal(session.sub, 'admin');
+  assert.equal(session.ver, SESSION_VERSION);
   assert.ok(session.exp > Math.floor(Date.now() / 1000));
 });
 
-test('verifyToken：换密钥后签名失效', async () => {
-  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin');
-  const session = await verifyToken('other-secret-00000000000000000000000000000000', token);
+test('verifyToken：版本不匹配拒绝', async () => {
+  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION);
+  const session = await verifyToken(env.BLOG_SESSION_SECRET, token, SESSION_VERSION + 1);
   assert.equal(session, null);
 });
 
-test('checkPassword：正确口令通过、错误口令拒绝、弱口令被拒', () => {
-  assert.equal(checkPassword(env, 'admin123'), true);
-  assert.equal(checkPassword(env, 'wrong'), false);
+test('verifyToken：换密钥后签名失效', async () => {
+  const token = await signToken(env.BLOG_SESSION_SECRET, 'admin', SESSION_VERSION);
+  const session = await verifyToken('other-secret-00000000000000000000000000000000', token, SESSION_VERSION);
+  assert.equal(session, null);
+});
+
+test('checkPassword：DB 无凭据时回退 env 明文比对', async () => {
+  assert.equal(await checkPassword(env, 'admin123'), true);
+  assert.equal(await checkPassword(env, 'wrong'), false);
   const weak = mockEnv();
+  __setEnvResolver(async () => weak);
   weak.BLOG_ADMIN_PASSWORD = 'abc';
-  assert.equal(checkPassword(weak, 'abc'), false);
+  assert.equal(await checkPassword(weak, 'abc'), false);
+  __setEnvResolver(async () => env);
+});
+
+test('hashPassword / verifyPasswordHash：往返一致', async () => {
+  const { hashPassword, verifyPasswordHash } = await import('../src/lib/db/credentials.ts');
+  const hash = await hashPassword('my-secret-pw-123');
+  assert.ok(hash.startsWith('v=1,alg=pbkdf2-sha512,iter=100000,'));
+  assert.equal(await verifyPasswordHash('my-secret-pw-123', hash), true);
+  assert.equal(await verifyPasswordHash('wrong-password', hash), false);
+  assert.equal(await verifyPasswordHash('', hash), false);
+});
+
+test('hashPassword / verifyPasswordHash：空密码处理', async () => {
+  const { hashPassword, verifyPasswordHash } = await import('../src/lib/db/credentials.ts');
+  const hash = await hashPassword('a');
+  assert.equal(await verifyPasswordHash('a', hash), true);
+  assert.equal(await verifyPasswordHash('b', hash), false);
 });

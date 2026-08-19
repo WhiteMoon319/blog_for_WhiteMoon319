@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { checkPassword, json, setSessionCookie } from '../../../lib/auth';
+import { checkPassword, checkCsrf, json, setSessionCookie } from '../../../lib/auth';
 import { envOf } from '../../../lib/db';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
@@ -17,6 +17,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) {
+    return json({ error: 'forbidden: invalid origin' }, 403);
+  }
+
   const attempt = await consumeLoginAttempt(env.DB, clientIp(ctx.request), {
     max: env.LOGIN_RATE_LIMIT_MAX,
     windowSec: env.LOGIN_RATE_LIMIT_WINDOW,
@@ -28,7 +32,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
     });
   }
 
-  if (!checkPassword(env, body.password)) {
+  if (!(await checkPassword(env, body.password))) {
     return json({ error: 'invalid credentials' }, 401);
   }
   await setSessionCookie(ctx, 'admin');

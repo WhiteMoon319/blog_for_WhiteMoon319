@@ -156,6 +156,16 @@ export const api = {
 
   deletePage: (id: number) =>
     request<{ ok: boolean }>(`/api/pages/${id}`, { method: 'DELETE' }),
+
+  stats: (days = 30) =>
+    request<{
+      days: number;
+      start_day: string;
+      end_day: string;
+      total_views: number;
+      daily: Array<{ day: string; views: number }>;
+      top_posts: Array<{ id: number; title: string; slug: string; views: number }>;
+    }>(`/api/stats?days=${days}`),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

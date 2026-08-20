@@ -21,3 +21,4 @@ export {
 } from './credentials.ts';
 export type { CredentialRow } from './credentials.ts';
 export * from './pages.ts';
+export * from './stats.ts';

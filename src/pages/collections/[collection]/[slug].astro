@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, listPostEffectiveTags, fmtDate } from '../../../lib/db';
+import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, fmtDate } from '../../../lib/db';
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
 
@@ -14,6 +14,7 @@ if (!collection || !post) {
 }
 
 const viewCount = await incrementViewCount(env.DB, post.id);
+await recordDailyView(env.DB, post.id, Astro.request);
 const effectiveTags = await listPostEffectiveTags(env.DB, post.id);
 const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);

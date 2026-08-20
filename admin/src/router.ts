@@ -12,6 +12,7 @@ const router = createRouter({
     { path: '/export', name: 'export', component: () => import('./views/ExportView.vue') },
     { path: '/settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
     { path: '/pages', name: 'pages', component: () => import('./views/PagesView.vue') },
+    { path: '/stats', name: 'stats', component: () => import('./views/StatsView.vue') },
     { path: '/editor', name: 'editor', component: () => import('./views/PostEditorView.vue') },
   ],
 });

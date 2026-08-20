@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
+import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
 import { safeJsonLd } from '../../lib/seo';
 
@@ -23,6 +23,7 @@ if (!post) {
 }
 
 const viewCount = await incrementViewCount(env.DB, post.id);
+await recordDailyView(env.DB, post.id, Astro.request);
 const effectiveTags = await listPostEffectiveTags(env.DB, post.id);
 const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);

@@ -19,6 +19,7 @@ const DAY_OPTIONS = [7, 30, 90, 365];
 
 const stats = ref<TrendStats | null>(null);
 const loaded = ref(false);
+const corpusLoading = ref(false);
 const days = ref(30);
 const collections = ref<CollectionLite[]>([]);
 const scope = ref<number | 'none' | undefined>(undefined);
@@ -44,17 +45,14 @@ const corpusText = computed(() => {
         : String(n);
   return {
     num: text,
-    label: `${scopeName.value}总字数 · ${c.post_count} 篇（已刊 ${c.published_chars.toLocaleString()} 字）`,
+    label: `${scopeName.value} · ${c.post_count} 篇（已刊 ${c.published_chars.toLocaleString()} 字）`,
   };
 });
 
-async function load() {
+async function loadTrends() {
   loaded.value = false;
   try {
-    const [s, cols] = await Promise.all([
-      api.stats(days.value, scope.value),
-      api.collections(),
-    ]);
+    const [s, cols] = await Promise.all([api.stats(days.value), api.collections()]);
     stats.value = s;
     collections.value = cols.collections.map((c) => ({ id: c.id, title: c.title }));
   } catch {
@@ -62,6 +60,22 @@ async function load() {
   } finally {
     loaded.value = true;
   }
+}
+
+async function loadCorpus() {
+  corpusLoading.value = true;
+  try {
+    const corpus = await api.statsCorpus(scope.value);
+    if (stats.value) stats.value = { ...stats.value, corpus };
+  } catch {
+    // 保持旧值，避免打断观感
+  } finally {
+    corpusLoading.value = false;
+  }
+}
+
+async function load() {
+  await Promise.all([loadTrends(), loadCorpus()]);
 }
 onMounted(load);
 </script>
@@ -76,7 +90,7 @@ onMounted(load);
         :key="d"
         class="btn btn-ghost mini"
         :class="{ active: days === d }"
-        @click="days = d; load()"
+        @click="days = d; loadTrends()"
       >
         {{ d }} 日
       </button>
@@ -99,16 +113,12 @@ onMounted(load);
         <div class="num">{{ stats.daily.filter((d) => d.views > 0).length }}</div>
         <div class="label">有阅读天数</div>
       </div>
-      <div class="card stat-card" style="--pc: var(--ink);">
-        <div class="num">{{ corpusText.num }}</div>
-        <div class="label">{{ corpusText.label }}</div>
-      </div>
     </div>
 
     <div class="card pad" style="margin-top:20px;">
       <div class="card-head">
         <h2>字数统计</h2>
-        <select v-model="scope" class="select" style="margin-left:auto;max-width:260px;" @change="load()">
+        <select v-model="scope" class="select" style="margin-left:auto;max-width:260px;" @change="loadCorpus()">
           <option :value="undefined">全站</option>
           <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
           <option value="none">未分类</option>

@@ -1,5 +1,12 @@
 import type { Collection, MediaFile, Post, PostVersion, Tag } from './types';
 
+export interface CorpusStats {
+  total_chars: number;
+  published_chars: number;
+  post_count: number;
+  collection_id?: number | null;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -165,13 +172,12 @@ export const api = {
       total_views: number;
       daily: Array<{ day: string; views: number }>;
       top_posts: Array<{ id: number; title: string; slug: string; views: number }>;
-      corpus: {
-        total_chars: number;
-        published_chars: number;
-        post_count: number;
-        collection_id?: number | null;
-      };
+      corpus: CorpusStats;
     }>(`/api/stats?days=${days}${collection !== undefined ? `&collection=${collection}` : ''}`),
+  statsCorpus: (collection?: number | 'none') =>
+    request<CorpusStats>(
+      `/api/stats/corpus${collection !== undefined ? `?collection=${collection}` : ''}`,
+    ),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

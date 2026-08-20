@@ -157,7 +157,7 @@ export const api = {
   deletePage: (id: number) =>
     request<{ ok: boolean }>(`/api/pages/${id}`, { method: 'DELETE' }),
 
-  stats: (days = 30) =>
+  stats: (days = 30, collection?: number | 'none') =>
     request<{
       days: number;
       start_day: string;
@@ -165,7 +165,13 @@ export const api = {
       total_views: number;
       daily: Array<{ day: string; views: number }>;
       top_posts: Array<{ id: number; title: string; slug: string; views: number }>;
-    }>(`/api/stats?days=${days}`),
+      corpus: {
+        total_chars: number;
+        published_chars: number;
+        post_count: number;
+        collection_id?: number | null;
+      };
+    }>(`/api/stats?days=${days}${collection !== undefined ? `&collection=${collection}` : ''}`),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

@@ -4,6 +4,7 @@ import { api } from '../api';
 
 interface DailyPoint { day: string; views: number }
 interface TopPost { id: number; title: string; slug: string; views: number }
+interface CollectionLite { id: number; title: string }
 interface TrendStats {
   days: number;
   start_day: string;
@@ -11,6 +12,7 @@ interface TrendStats {
   total_views: number;
   daily: DailyPoint[];
   top_posts: TopPost[];
+  corpus: { total_chars: number; published_chars: number; post_count: number; collection_id?: number | null };
 }
 
 const DAY_OPTIONS = [7, 30, 90, 365];
@@ -18,16 +20,43 @@ const DAY_OPTIONS = [7, 30, 90, 365];
 const stats = ref<TrendStats | null>(null);
 const loaded = ref(false);
 const days = ref(30);
+const collections = ref<CollectionLite[]>([]);
+const scope = ref<number | 'none' | undefined>(undefined);
 
 const maxViews = computed(() => Math.max(1, ...(stats.value?.daily.map((d) => d.views) ?? [0])));
 const avgPerDay = computed(() =>
   stats.value ? Math.round((stats.value.total_views / stats.value.days) * 10) / 10 : 0,
 );
+const scopeName = computed(() => {
+  if (scope.value === 'none') return '未分类文章';
+  const c = collections.value.find((x) => x.id === scope.value);
+  return c ? `文集「${c.title}」` : '全站';
+});
+const corpusText = computed(() => {
+  const c = stats.value?.corpus;
+  if (!c) return { num: '—', label: `${scopeName.value}总字数` };
+  const n = c.total_chars;
+  const text =
+    n >= 10000
+      ? `${(n / 10000).toFixed(1)} 万`
+      : n >= 1000
+        ? `${(n / 1000).toFixed(1)} 千`
+        : String(n);
+  return {
+    num: text,
+    label: `${scopeName.value}总字数 · ${c.post_count} 篇（已刊 ${c.published_chars.toLocaleString()} 字）`,
+  };
+});
 
 async function load() {
   loaded.value = false;
   try {
-    stats.value = await api.stats(days.value);
+    const [s, cols] = await Promise.all([
+      api.stats(days.value, scope.value),
+      api.collections(),
+    ]);
+    stats.value = s;
+    collections.value = cols.collections.map((c) => ({ id: c.id, title: c.title }));
   } catch {
     stats.value = null;
   } finally {
@@ -69,6 +98,35 @@ onMounted(load);
       <div class="card stat-card" style="--pc: var(--amber);">
         <div class="num">{{ stats.daily.filter((d) => d.views > 0).length }}</div>
         <div class="label">有阅读天数</div>
+      </div>
+      <div class="card stat-card" style="--pc: var(--ink);">
+        <div class="num">{{ corpusText.num }}</div>
+        <div class="label">{{ corpusText.label }}</div>
+      </div>
+    </div>
+
+    <div class="card pad" style="margin-top:20px;">
+      <div class="card-head">
+        <h2>字数统计</h2>
+        <select v-model="scope" class="select" style="margin-left:auto;max-width:260px;" @change="load()">
+          <option :value="undefined">全站</option>
+          <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
+          <option value="none">未分类</option>
+        </select>
+      </div>
+      <div class="corpus-row">
+        <div class="corpus-item">
+          <span class="corpus-num">{{ corpusText.num }}</span>
+          <span class="muted">{{ scopeName }}正文总字数（含草稿）</span>
+        </div>
+        <div class="corpus-item">
+          <span class="corpus-num">{{ stats.corpus.post_count }}</span>
+          <span class="muted">{{ scopeName }}文章数</span>
+        </div>
+        <div class="corpus-item">
+          <span class="corpus-num">{{ stats.corpus.published_chars.toLocaleString() }}</span>
+          <span class="muted">{{ scopeName }}已刊字数</span>
+        </div>
       </div>
     </div>
 
@@ -172,5 +230,29 @@ onMounted(load);
 }
 .title-link:hover {
   color: var(--cinnabar);
+}
+.corpus-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  padding-top: 8px;
+}
+.corpus-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.corpus-num {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
 }
 </style>

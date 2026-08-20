@@ -87,6 +87,48 @@ export interface TrendStats {
   top_posts: TopPostViews[];
 }
 
+export interface CorpusStats {
+  total_chars: number;
+  published_chars: number;
+  post_count: number;
+  collection_id?: number | null;
+}
+
+// 正文字数统计（content_md 字符数，不含回收站文章）。
+// 传 collection_id 时仅统计该文集；collection_id = null 表示未分类文章；不传表示全站。
+// SQLite LENGTH() 对 TEXT 按字符计数，中文按 1 字计。
+export async function getCorpusStats(
+  db: D1Database,
+  collectionId?: number | null,
+): Promise<CorpusStats> {
+  const where =
+    collectionId === undefined
+      ? 'deleted_at IS NULL'
+      : collectionId === null
+        ? 'deleted_at IS NULL AND collection_id IS NULL'
+        : 'deleted_at IS NULL AND collection_id = ?';
+  const all = await db
+    .prepare(
+      `SELECT COALESCE(SUM(LENGTH(content_md)), 0) AS chars, COUNT(*) AS n
+       FROM posts WHERE ${where}`,
+    )
+    .bind(...(collectionId !== undefined && collectionId !== null ? [collectionId] : []))
+    .first<{ chars: number; n: number }>();
+  const published = await db
+    .prepare(
+      `SELECT COALESCE(SUM(LENGTH(content_md)), 0) AS chars
+       FROM posts WHERE status = 'published' AND ${where}`,
+    )
+    .bind(...(collectionId !== undefined && collectionId !== null ? [collectionId] : []))
+    .first<{ chars: number }>();
+  return {
+    total_chars: all?.chars ?? 0,
+    published_chars: published?.chars ?? 0,
+    post_count: all?.n ?? 0,
+    collection_id: collectionId,
+  };
+}
+
 // 近 N 日趋势汇总：全站日浏览序列（缺日补 0）+ 热文 TOP 10（关联文章标题，软删除/彻底删除的文章仍保留统计）。
 export async function getTrendStats(db: D1Database, days: number): Promise<TrendStats> {
   const n = Math.min(Math.max(days, 1), 365);

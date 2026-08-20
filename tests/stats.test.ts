@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { makeTestDb, type TestDbHandle } from './helpers/d1.ts';
 import { createPostWithTags } from '../src/lib/db/posts.ts';
 import {
+  getCorpusStats,
   getTrendStats,
   isBotRequest,
   lastNDays,
@@ -102,4 +103,61 @@ test('趋势：软删除文章统计保留且标题标注', async () => {
   await h.db.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?").bind(created.post.id).run();
   const s = await getTrendStats(h.db, 30);
   assert.ok(s.top_posts.some((t) => t.id === created.post.id), '回收站文章仍保留在热文统计');
+});
+
+test('字数：全站与文集维度统计', async () => {
+  const colA = await h.db
+    .prepare("INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集甲', 'stats-col-a', '', '#888888', 1, 'asc')")
+    .run();
+  const colB = await h.db
+    .prepare("INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集乙', 'stats-col-b', '', '#888888', 2, 'asc')")
+    .run();
+  const colIdA = colA.meta.last_row_id;
+  const colIdB = colB.meta.last_row_id;
+  assert.ok(colIdA > 0 && colIdB > 0);
+
+  // 共享库有其他用例的文章：用「增量」断言隔离影响
+  const wholeBefore = await getCorpusStats(h.db);
+  const unassignedBefore = await getCorpusStats(h.db, null);
+  const inABefore = await getCorpusStats(h.db, colIdA);
+  const inBBefore = await getCorpusStats(h.db, colIdB);
+
+  const [a, b, c, d] = await Promise.all([
+    createPostWithTags(h.db, { title: '字数甲', slug: 'stats-char-a', status: 'published', content_md: '甲'.repeat(100) }, []),
+    createPostWithTags(h.db, { title: '字数乙', slug: 'stats-char-b', status: 'draft', content_md: '乙'.repeat(50) }, []),
+    createPostWithTags(h.db, { title: '字数丙', slug: 'stats-char-c', status: 'published', content_md: '丙'.repeat(30) }, []),
+    createPostWithTags(h.db, { title: '字数丁', slug: 'stats-char-d', status: 'published', content_md: '丁'.repeat(10) }, []),
+  ]);
+  assert.ok(a && b && c && d);
+  await h.db
+    .prepare('UPDATE posts SET collection_id = ? WHERE id IN (?, ?)')
+    .bind(colIdA, a.post.id, b.post.id)
+    .run();
+  await h.db
+    .prepare('UPDATE posts SET collection_id = ? WHERE id = ?')
+    .bind(colIdB, c.post.id)
+    .run();
+
+  const whole = await getCorpusStats(h.db);
+  assert.equal(whole.total_chars - wholeBefore.total_chars, 190, '全站增量 100+50+30+10');
+  assert.equal(whole.published_chars - wholeBefore.published_chars, 140, '已刊增量 100+30+10');
+  assert.equal(whole.post_count - wholeBefore.post_count, 4);
+
+  const inA = await getCorpusStats(h.db, colIdA);
+  assert.equal(inA.total_chars - inABefore.total_chars, 150, '文集甲增量 100+50');
+  assert.equal(inA.published_chars - inABefore.published_chars, 100);
+  assert.equal(inA.post_count - inABefore.post_count, 2);
+
+  const inB = await getCorpusStats(h.db, colIdB);
+  assert.equal(inB.total_chars - inBBefore.total_chars, 30);
+
+  const unassigned = await getCorpusStats(h.db, null);
+  assert.equal(unassigned.total_chars - unassignedBefore.total_chars, 10, '未分类仅 丁');
+  assert.equal(unassigned.post_count - unassignedBefore.post_count, 1);
+
+  const deleted = await createPostWithTags(h.db, { title: '字数废', slug: 'stats-char-x', status: 'published', content_md: 'x'.repeat(99) }, []);
+  assert.ok(deleted);
+  await h.db.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?").bind(deleted.post.id).run();
+  const after = await getCorpusStats(h.db);
+  assert.equal(after.total_chars - wholeBefore.total_chars, 190, '回收站不计入字数');
 });

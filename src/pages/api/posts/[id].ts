@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
-import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
+import { getSession, json, requireAuth, isAdmin, checkCsrf } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
@@ -26,6 +26,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
 export async function PUT(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
@@ -101,7 +103,6 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (parsedTags !== null && !parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
   try {
-    const env = await envOf();
     if ('collection_id' in patch && patch.collection_id !== null && !(await getCollectionById(env.DB, Number(patch.collection_id)))) {
       return json({ error: 'collection not found' }, 404);
     }
@@ -127,12 +128,13 @@ export async function PUT(ctx: APIContext): Promise<Response> {
 export async function DELETE(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
 
   // 单篇删除 = 移入回收站（软删除），可经回收站恢复；彻底删除走批量 API 的 purge
-  const env = await envOf();
   const count = await trashPosts(env.DB, [id]);
   if (count === 0) return json({ error: 'not found' }, 404);
   return json({ ok: true });

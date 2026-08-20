@@ -1,12 +1,14 @@
 import type { APIContext } from 'astro';
 import { envOf, getPostById, getPostVersion, getCollectionById, updatePost, isSlugConflict } from '../../../../../../lib/db';
-import { json, requireAuth } from '../../../../../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../../../../../lib/auth';
 
 export const prerender = false;
 
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const id = Number(ctx.params.id);
   const version = Number(ctx.params.version);
@@ -14,7 +16,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ error: 'invalid id or version' }, 400);
   }
 
-  const env = await envOf();
   const post = await getPostById(env.DB, id);
   if (!post) return json({ error: 'not found' }, 404);
 

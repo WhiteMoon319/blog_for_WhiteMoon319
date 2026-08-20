@@ -8,7 +8,7 @@ import {
   isSlugConflict,
   parseTagsStrict,
 } from '../../../lib/db';
-import { json, requireAuth } from '../../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
@@ -27,6 +27,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
 export async function PUT(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
@@ -66,7 +68,6 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (parsedTags !== null && !parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
   try {
-    const env = await envOf();
     const updated = await updateCollectionWithTags(env.DB, id, patch, parsedTags === null ? null : parsedTags.tags);
     if (!updated) return json({ error: 'not found' }, 404);
     return json({ collection: updated.collection, tags: updated.tags });
@@ -79,11 +80,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
 export async function DELETE(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const env = await envOf();
   const deleted = await deleteCollection(env.DB, id);
   if (!deleted) return json({ error: 'not found' }, 404);
   return json({ ok: true });

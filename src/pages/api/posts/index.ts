@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { envOf, listPosts, createPostWithTags, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
-import { getSession, json, requireAuth, isAdmin } from '../../../lib/auth';
+import { getSession, json, requireAuth, isAdmin, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
 export const prerender = false;
@@ -42,6 +42,10 @@ export async function GET(ctx: APIContext): Promise<Response> {
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) {
+    return json({ error: 'forbidden: invalid origin' }, 403);
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -97,7 +101,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   try {
-    const env = await envOf();
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
       return json({ error: 'collection not found' }, 404);
     }

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { json, requireAuth } from '../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../lib/auth';
 import { envOf } from '../../lib/db';
 import { publicBase } from '../../lib/utils';
 import { detectImageType, EXT_BY_TYPE, type AllowedImageType } from '../../lib/upload';
@@ -12,6 +12,8 @@ const SNIFF_BYTES = 12;
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const form = await ctx.request.formData().catch(() => null);
   const file = form?.get('file');
@@ -36,7 +38,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const key = `uploads/${y}/${m}/${crypto.randomUUID()}${EXT_BY_TYPE[type]}`;
 
-  const env = await envOf();
   await env.IMAGES.put(key, file.stream(), {
     httpMetadata: { contentType: type },
   });

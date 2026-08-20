@@ -18,7 +18,7 @@ import {
   BATCH_MAX_CREATE,
   type BatchCreateItem,
 } from '../../../lib/api/validate';
-import { json, requireAuth } from '../../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 
 export const prerender = false;
 
@@ -27,6 +27,8 @@ type Action = 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | '
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   let body: Record<string, unknown>;
   try {
@@ -50,8 +52,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
   ) {
     return json({ error: 'invalid action' }, 400);
   }
-
-  const env = await envOf();
 
   if (action === 'create') {
     const rawPosts = body.posts;

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { json, requireAuth } from '../../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { envOf } from '../../../lib/db';
 import { publicBase } from '../../../lib/utils';
 
@@ -34,13 +34,14 @@ export async function GET(ctx: APIContext): Promise<Response> {
 export async function DELETE(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const key = ctx.url.searchParams.get('key') ?? '';
   if (!key.startsWith('uploads/')) {
     return json({ error: 'invalid key' }, 400);
   }
 
-  const env = await envOf();
   await env.IMAGES.delete(key);
   return json({ ok: true });
 }

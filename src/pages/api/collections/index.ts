@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { envOf, listCollections, createCollectionWithTags, parseTagsStrict, isSlugConflict } from '../../../lib/db';
-import { json, requireAuth } from '../../../lib/auth';
+import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
 export const prerender = false;
@@ -14,6 +14,8 @@ export async function GET(_ctx: APIContext): Promise<Response> {
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
   if (!auth.ok) return auth.response;
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   let body: Record<string, unknown>;
   try {

@@ -1,29 +1,44 @@
----
+﻿---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { envOf } from '../lib/db';
+import { getPageBySlug } from '../lib/db/pages.ts';
+import { renderMarkdown } from '../lib/markdown.ts';
 
 const env = await envOf();
+const dbPage = await getPageBySlug(env.DB, 'about');
+
+const pageTitle = dbPage?.title || '关于';
+const pageDesc = `关于「${env.SITE_NAME}」`;
+const bodyHtml = dbPage?.published === 1
+  ? renderMarkdown(dbPage.content_md).html
+  : null;
 ---
 
-<BaseLayout title="关于" description={`关于「${env.SITE_NAME}」`}>
+<BaseLayout title={pageTitle} description={pageDesc}>
   <div class="page-hero">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
     <div class="page-hero-card reveal in">
       <p class="character-kicker">跋</p>
-      <h1>关于此间</h1>
+      <h1>{pageTitle}</h1>
       <p class="lead">{env.SITE_SLOGAN}</p>
     </div>
   </div>
 
   <article class="article">
-    <div class="article-body reveal in">
-      <p>
-        吾名江逐月，亦可称吾江榫。闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
-      </p>
-      <blockquote>希君生羽翼，一化北溟鱼。</blockquote>
-      <p>
-        如若相谈，可联系 <a href="mailto:3287047638@qq.com">3287047638@qq.com</a>。
-      </p>
-    </div>
+    {
+      bodyHtml ? (
+        <div class="article-body reveal in" set:html={bodyHtml} />
+      ) : (
+        <div class="article-body reveal in">
+          <p>
+            吾名江逐月，亦可称吾江榫。闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
+          </p>
+          <blockquote>希君生羽翼，一化北溟鱼。</blockquote>
+          <p>
+            如若相谈，可联系 <a href="mailto:3287047638@qq.com">3287047638@qq.com</a>。
+          </p>
+        </div>
+      )
+    }
   </article>
 </BaseLayout>

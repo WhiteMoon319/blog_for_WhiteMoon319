@@ -137,6 +137,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
     }),
+
+  pages: (all = false) =>
+    request<{ pages: Array<{ id: number; slug: string; title: string; content_md: string; published: number; updated_at: string }> }>(
+      `/api/pages${all ? '?all=1' : ''}`,
+    ),
+
+  page: (id: number) =>
+    request<{ page: { id: number; slug: string; title: string; content_md: string; published: number; updated_at: string } }>(
+      `/api/pages/${id}`,
+    ),
+
+  createPage: (data: { slug: string; title: string; content_md?: string; published?: number }) =>
+    request<{ page: { id: number } }>('/api/pages', { method: 'POST', body: JSON.stringify(data) }),
+
+  updatePage: (id: number, data: { slug?: string; title?: string; content_md?: string; published?: number }) =>
+    request<{ page: { id: number } }>(`/api/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deletePage: (id: number) =>
+    request<{ ok: boolean }>(`/api/pages/${id}`, { method: 'DELETE' }),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

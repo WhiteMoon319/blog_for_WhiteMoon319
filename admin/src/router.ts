@@ -11,6 +11,7 @@ const router = createRouter({
     { path: '/import', name: 'import', component: () => import('./views/ImportView.vue') },
     { path: '/export', name: 'export', component: () => import('./views/ExportView.vue') },
     { path: '/settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
+    { path: '/pages', name: 'pages', component: () => import('./views/PagesView.vue') },
     { path: '/editor', name: 'editor', component: () => import('./views/PostEditorView.vue') },
   ],
 });

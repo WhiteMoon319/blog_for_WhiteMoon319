@@ -20,3 +20,4 @@ export {
   __setVersionOverride,
 } from './credentials.ts';
 export type { CredentialRow } from './credentials.ts';
+export * from './pages.ts';

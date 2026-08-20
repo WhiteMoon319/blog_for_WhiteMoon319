@@ -1,0 +1,24 @@
+---
+import { envOf } from '../../lib/db/index.ts';
+import { getPageBySlug } from '../../lib/db/pages.ts';
+import { renderMarkdown } from '../../lib/markdown.ts';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export const prerender = false;
+
+const env = await envOf();
+const page = await getPageBySlug(env.DB, Astro.params.slug!);
+
+if (!page || page.published !== 1) return new Response(null, { status: 404 });
+
+const { html } = renderMarkdown(page.content_md);
+---
+
+<BaseLayout title={page.title}>
+  <article class="page-content">
+    <div class="page-head">
+      <h1>{page.title}</h1>
+    </div>
+    <Fragment set:html={html} />
+  </article>
+</BaseLayout>

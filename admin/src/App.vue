@@ -58,6 +58,7 @@ async function logout() {
         <router-link to="/posts">文章</router-link>
         <router-link to="/media">媒体</router-link>
         <router-link to="/import">导入</router-link>
+        <router-link to="/pages">页面</router-link>
         <router-link to="/export">导出</router-link>
         <router-link to="/settings">设置</router-link>
         <router-link to="/editor">写新篇</router-link>

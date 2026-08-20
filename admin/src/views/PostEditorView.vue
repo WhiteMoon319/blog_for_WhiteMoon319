@@ -27,6 +27,11 @@ import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
 import { parseId } from '../lib/format';
 import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github-dark.css';
+import mermaid from 'mermaid';
+import { Transformer } from 'markmap-lib';
+import { Markmap } from 'markmap-view';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -132,6 +137,7 @@ const sourceMarkdown = ref('');
 const previewHtml = ref('');
 const previewing = ref(false);
 const cmHost = ref<HTMLDivElement | null>(null);
+const previewHost = ref<HTMLDivElement | null>(null);
 let cmView: EditorView | null = null;
 let cmLang = new Compartment();
 
@@ -172,11 +178,53 @@ async function runPreview() {
   previewing.value = true;
   try {
     const { html } = await api.render(md);
-    if (md === sourceMarkdown.value) previewHtml.value = html; // 丢弃过期响应
+    if (md === sourceMarkdown.value) {
+      previewHtml.value = html; // 丢弃过期响应
+      void renderDiagrams();
+    }
   } catch {
     // 预览失败保留上一次成功结果
   } finally {
     previewing.value = false;
+  }
+}
+
+// 与公开站点 ArticleEnhancer 同链路：对预览 HTML 中的 mermaid/markmap 容器做客户端渲染
+async function renderDiagrams() {
+  const host = previewHost.value;
+  if (!host) return;
+
+  const mermaidEls = Array.from(host.querySelectorAll<HTMLElement>('.diagram.mermaid'));
+  if (mermaidEls.length > 0) {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
+    await Promise.all(
+      mermaidEls.map(async (el, i) => {
+        try {
+          const { svg } = await mermaid.render(`pm-${i}-${Date.now()}`, el.textContent ?? '');
+          el.innerHTML = svg;
+          el.classList.add('diagram-rendered');
+        } catch {
+          el.classList.add('diagram-error');
+        }
+      }),
+    );
+  }
+
+  const markmapEls = Array.from(host.querySelectorAll<HTMLElement>('.diagram.markmap'));
+  if (markmapEls.length > 0) {
+    const transformer = new Transformer();
+    markmapEls.forEach((el) => {
+      try {
+        const { root } = transformer.transform(el.textContent ?? '');
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'markmap-svg');
+        el.appendChild(svg);
+        Markmap.create(svg, { autoFit: true, initialExpandLevel: 2 }, root);
+        el.classList.add('diagram-rendered');
+      } catch {
+        el.classList.add('diagram-error');
+      }
+    });
   }
 }
 
@@ -818,7 +866,7 @@ async function exportMarkdown() {
           </div>
           <div v-show="mode === 'source'" class="source-area">
             <div ref="cmHost" class="cm-host" />
-            <div class="source-preview" :class="{ refreshing: previewing }">
+            <div ref="previewHost" class="source-preview" :class="{ refreshing: previewing }">
               <p v-if="previewing" class="preview-hint">渲染中…</p>
               <div v-html="previewHtml" />
             </div>
@@ -941,6 +989,39 @@ async function exportMarkdown() {
 .source-preview td {
   padding: 0.4em 0.8em;
   border: 1px solid var(--hairline);
+}
+
+.source-preview .katex-display {
+  margin: 1.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.source-preview .katex-error {
+  color: var(--cinnabar);
+  font-style: italic;
+}
+
+.source-preview .diagram {
+  margin: 1.6em auto;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--paper-card);
+  overflow-x: auto;
+  text-align: center;
+}
+
+.source-preview .diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.source-preview .diagram.diagram-error {
+  color: var(--cinnabar);
+  font-style: italic;
+  text-align: left;
+  white-space: pre-wrap;
 }
 
 .preview-hint {

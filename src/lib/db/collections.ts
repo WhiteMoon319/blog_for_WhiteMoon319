@@ -6,6 +6,7 @@ import {
   listCollectionTags,
 } from './tags.ts';
 import { slugWithSuffix } from '../utils.ts';
+import { planForPostId, type VersionContentPlan } from './versions.ts';
 
 export async function listCollections(db: D1Database): Promise<CollectionRow[]> {
   return db
@@ -188,16 +189,22 @@ async function assignMemberSlugs(db: D1Database, members: Array<{ id: number; sl
 // 单成员迁移：转未分类 + 版本留档（记录 collection_id/slug 变化，开放中的旧编辑器将收到 409）。
 // 版本 INSERT 先于 UPDATE：`collection_id = ?` 守卫读到的是迁移前状态，并发重复执行时守卫落空，
 // 不会二次改写或重复留档；slug 显式绑定新值（此时 posts.slug 仍是旧值）。
-function memberMigrateStmts(db: D1Database, postId: number, newSlug: string, collectionId: number): D1PreparedStatement[] {
+function memberMigrateStmts(
+  db: D1Database,
+  postId: number,
+  newSlug: string,
+  collectionId: number,
+  plan: VersionContentPlan,
+): D1PreparedStatement[] {
   return [
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, message)
          SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                title, ?, NULL, summary, content_md, cover_url, status, '文集删除迁移'
+                title, ?, NULL, summary, ?, ?, ?, cover_url, status, '文集删除迁移'
          FROM posts WHERE id = ? AND collection_id = ?`,
       )
-      .bind(postId, postId, newSlug, postId, collectionId),
+      .bind(postId, postId, newSlug, plan.content_md, plan.content_md_patch, plan.base_version, postId, collectionId),
     db
       .prepare(
         `UPDATE posts SET collection_id = NULL, slug = ?, updated_at = datetime('now')
@@ -232,7 +239,8 @@ export async function deleteCollection(db: D1Database, id: number): Promise<bool
     const assigned = await assignMemberSlugs(db, members);
     const stmts: D1PreparedStatement[] = [];
     for (const m of members.length <= FINAL_CHUNK ? members : members.slice(0, MIGRATE_CHUNK)) {
-      stmts.push(...memberMigrateStmts(db, m.id, assigned.get(m.id)!, id));
+      const plan = await planForPostId(db, m.id);
+      stmts.push(...memberMigrateStmts(db, m.id, assigned.get(m.id)!, id, plan));
     }
     if (members.length <= FINAL_CHUNK) {
       // 尾批原子：剩余成员迁移 + 删文集 + 清账本 + 清孤儿标签

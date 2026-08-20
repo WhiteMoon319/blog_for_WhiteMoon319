@@ -15,6 +15,8 @@ import {
   listPosts,
   listPostVersions,
   getPostVersion,
+  trashPosts,
+  restorePosts,
 } from '../src/lib/db/index.ts';
 import { makeTestDb } from './helpers/d1.ts';
 
@@ -321,6 +323,89 @@ test('集内文章排序：post_order 控制旧在前（asc）或新在前（des
     ['丙帖', '乙帖', '甲帖'],
     '博客集应最新在前',
   );
+});
+
+test('版本史：增量存储——小改存补丁、大改重新全量、读取时透明重建', async () => {
+  const created = await createPost(db, {
+    title: '增量试炼',
+    slug: 'inc-probe',
+    content_md: '第一版正文。\n\n这段文字保持原样，作为补丁的上下文。\n\n结尾为后续修改预留一些空间。',
+    status: 'draft',
+  });
+  assert.ok(created);
+  const id = created.id;
+
+  // 创建即 v1 全量
+  const raw1 = await db.prepare('SELECT content_md, base_version, content_md_patch FROM post_versions WHERE post_id = ? AND version = 1').bind(id).first<{ content_md: string; base_version: number | null; content_md_patch: string }>();
+  assert.equal(raw1?.base_version, null, 'v1 应是全量快照');
+  assert.ok((raw1?.content_md ?? '').includes('第一版正文'));
+
+  // v2：小改一行 → 增量补丁，content_md 置空
+  await updatePost(db, id, { content_md: '第二版正文。\n\n这段文字保持原样，作为补丁的上下文。\n\n结尾为后续修改预留一些空间。' }, '小改');
+  const raw2 = await db.prepare('SELECT content_md, base_version, content_md_patch FROM post_versions WHERE post_id = ? AND version = 2').bind(id).first<{ content_md: string; base_version: number | null; content_md_patch: string }>();
+  assert.equal(raw2?.base_version, 1, 'v2 应指向基准 v1');
+  assert.equal(raw2?.content_md, '', '增量行正文置空');
+  assert.ok((raw2?.content_md_patch ?? '').includes('@@'), '增量行应存 unified diff');
+
+  // 读取重建：list/get 应还原完整全文
+  let vers = await listPostVersions(db, id);
+  assert.equal(vers.length, 2);
+  assert.equal(vers[0].content_md, '第二版正文。\n\n这段文字保持原样，作为补丁的上下文。\n\n结尾为后续修改预留一些空间。');
+  const got2 = await getPostVersion(db, id, 2);
+  assert.equal(got2?.content_md, '第二版正文。\n\n这段文字保持原样，作为补丁的上下文。\n\n结尾为后续修改预留一些空间。');
+  const got1 = await getPostVersion(db, id, 1);
+  assert.equal(got1?.content_md, '第一版正文。\n\n这段文字保持原样，作为补丁的上下文。\n\n结尾为后续修改预留一些空间。');
+
+  // v3：大幅度重写 → 补丁超过阈值，重新全量作为新基准
+  const big = Array.from({ length: 60 }, (_, i) => `第 ${i} 段：全新内容，毫无保留地重写这里。`).join('\n');
+  await updatePost(db, id, { content_md: big }, '大改');
+  const raw3 = await db.prepare('SELECT content_md, base_version, content_md_patch FROM post_versions WHERE post_id = ? AND version = 3').bind(id).first<{ content_md: string; base_version: number | null; content_md_patch: string }>();
+  assert.equal(raw3?.base_version, null, '大改应重新全量');
+  assert.ok((raw3?.content_md ?? '').includes('全新内容'));
+  assert.equal(raw3?.content_md_patch, '');
+
+  // v4：在大改基础上小改 → 基准应为最新全量 v3
+  await updatePost(db, id, { content_md: `${big}\n\n末尾追加一行。` }, '在 v3 基础上小改');
+  const raw4 = await db.prepare('SELECT content_md, base_version FROM post_versions WHERE post_id = ? AND version = 4').bind(id).first<{ content_md: string; base_version: number | null }>();
+  assert.equal(raw4?.base_version, 3, '增量基准应指向最近一次全量 v3');
+  assert.equal(raw4?.content_md, '');
+
+  vers = await listPostVersions(db, id);
+  assert.equal(vers[0].version, 4);
+  assert.equal(vers[0].content_md, `${big}\n\n末尾追加一行。`, '增量行应重建回完整全文');
+  assert.equal(vers[1].version, 3);
+  assert.equal(vers[1].content_md, big, '全量行直接可读');
+
+// v5：正文未变的元数据变更（如标题）→ 仍以最近全量为基准存增量，重建当量=当前正文
+  await updatePost(db, id, { title: '增量试炼（改题）' }, '改题');
+  const raw5 = await db.prepare('SELECT message, content_md, base_version FROM post_versions WHERE post_id = ? AND version = 5').bind(id).first<{ message: string; content_md: string; base_version: number | null }>();
+  assert.equal(raw5?.base_version, 3, '标题变更的版本仍指向最近全量 v3');
+  assert.equal(raw5?.content_md, '', '正文未变时增量行正文置空');
+  const got5 = await getPostVersion(db, id, 5);
+  assert.equal(got5?.content_md, `${big}\n\n末尾追加一行。`, '标题变更版本重建正文应与当前正文一致');
+});
+
+test('版本史：移入回收站/恢复的增量留档不丢正文', async () => {
+  const created = await createPost(db, {
+    title: '回收增量',
+    slug: 'trash-inc',
+    content_md: '回收前正文。\n\n第二段。',
+    status: 'published',
+  });
+  assert.ok(created);
+  const id = created.id;
+
+  await trashPosts(db, [id]);
+  const raw = await db.prepare('SELECT message, content_md, base_version FROM post_versions WHERE post_id = ? AND version = 2').bind(id).first<{ message: string; content_md: string; base_version: number | null }>();
+  assert.equal(raw?.message, '移入回收站');
+  assert.equal(raw?.content_md, '', '状态类留档走增量');
+  const got = await getPostVersion(db, id, 2);
+  assert.equal(got?.content_md, '回收前正文。\n\n第二段。', '回收版本应重建出完整正文');
+
+  await restorePosts(db, [id]);
+  const got3 = await getPostVersion(db, id, 3);
+  assert.equal(got3?.message, '恢复');
+  assert.equal(got3?.content_md, '回收前正文。\n\n第二段。');
 });
 
 test('并发创建：版本必须挂在各自文章上，不得错配', async () => {

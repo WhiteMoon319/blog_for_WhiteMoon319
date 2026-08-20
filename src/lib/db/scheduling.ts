@@ -6,6 +6,8 @@
 // - 以 status='draft' + scheduled_at <= now 为守卫，重复触发/与手动刊发并发时只有成功改状态的一方生效；
 // - 每轮最多处理 50 篇（每篇 2 语句，恰好 100 语句上限），超出留给下一轮。
 
+import { planForPostId } from './versions.ts';
+
 export const SCHEDULED_BATCH_MAX = 50;
 
 export interface PublishDueResult {
@@ -33,18 +35,19 @@ export async function publishDuePosts(
 
   const stmts: D1PreparedStatement[] = [];
   for (const id of ids) {
+    const plan = await planForPostId(db, id);
     // 版本 INSERT 先于 UPDATE：守卫在两条语句中都生效，
     // 与手动刊发并发时，后执行的 UPDATE 因 status 已非 draft 而不命中；
     // 版本 SELECT 显式携带新 status（此时 posts.status 仍是 draft）。
     stmts.push(
       db
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, content_md, cover_url, 'published', meta_keywords, '定时刊发'
+                  title, slug, collection_id, summary, ?, ?, ?, cover_url, 'published', meta_keywords, '定时刊发'
            FROM posts WHERE id = ? AND ${DUE_GUARD}`,
         )
-        .bind(id, id, id, nowIso),
+        .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, id, nowIso),
     );
     stmts.push(
       db

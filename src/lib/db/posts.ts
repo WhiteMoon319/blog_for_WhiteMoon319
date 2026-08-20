@@ -5,7 +5,7 @@ import {
   setPostOwnTagsStmts,
   listPostOwnTags,
 } from './tags.ts';
-import { getLatestPostVersion } from './versions.ts';
+import { getLatestPostVersion, planForNewContent, planForPostId, type VersionContentPlan } from './versions.ts';
 import { isValidSlug } from '../utils.ts';
 
 export async function listPublishedPosts(
@@ -237,6 +237,9 @@ export async function updatePost(
   }
   const sets = changed.map((k) => `${k} = ?`).join(', ');
   const values = changed.map((k) => patch[k as keyof PostPatch]);
+  // 版本内容增量决策：以最近一次全量快照为基准，正文变化小则存 unified diff，大则重新全量。
+  const nextContent = 'content_md' in patch ? String(patch.content_md ?? '') : current.content_md;
+  const plan = await planForNewContent(db, id, nextContent);
   // 文章更新与版本留档放入同一个 D1 事务（batch 原子执行）：
   // 版本写入失败时文章更新一并回滚；版本号由同一事务内 MAX(version)+1 计算，写事务串行化保证不冲突。
   // baseVersion 提供时做乐观锁：当前版本不匹配则整批不生效并返回 'conflict'。
@@ -251,14 +254,16 @@ export async function updatePost(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
         id,
-        ...(baseVersion !== undefined ? [baseVersion + 1, versionMessage ?? '自动保存'] : [id, versionMessage ?? '自动保存']),
+        ...(baseVersion !== undefined
+          ? [baseVersion + 1, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']
+          : [id, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']),
         id,
         ...versionArgs,
       ),
@@ -302,6 +307,8 @@ export async function updatePostWithTags(
   }
   const sets = changed.map((k) => `${k} = ?`).join(', ');
   const values = changed.map((k) => patch[k as keyof PostPatch]);
+  const nextContent = 'content_md' in patch ? String(patch.content_md ?? '') : current.content_md;
+  const plan = await planForNewContent(db, id, nextContent);
   const versionMatch =
     baseVersion !== undefined
       ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
@@ -313,14 +320,16 @@ export async function updatePostWithTags(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
         id,
-        ...(baseVersion !== undefined ? [baseVersion + 1, versionMessage ?? '自动保存'] : [id, versionMessage ?? '自动保存']),
+        ...(baseVersion !== undefined
+          ? [baseVersion + 1, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']
+          : [id, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']),
         id,
         ...versionArgs,
       ),
@@ -341,15 +350,21 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
 
 // ---- 回收站（软删除）：trash/restore 每篇 2 语句（版本 + 更新），50 篇 = 100 恰好落在 D1 batch 上限内 ----
 
-const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
 SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-       title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, ?
+       title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
 FROM posts WHERE id = ?`;
 
-function trashVersionStmt(db: D1Database, id: number, message: string, guard: string): D1PreparedStatement {
+function trashVersionStmt(
+  db: D1Database,
+  id: number,
+  message: string,
+  guard: string,
+  plan: VersionContentPlan,
+): D1PreparedStatement {
   // 版本 INSERT 先于 UPDATE：guard（deleted_at 旧状态）读到的是变更前状态；
   // 并发重复执行时 guard 落空，不会重复留档。
-  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, message, id);
+  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, message, id);
 }
 
 // trash（fromTrashed=false）/restore（fromTrashed=true）共用：预检计数 + 每篇 [版本留档, 状态更新]。
@@ -372,7 +387,8 @@ async function trashStateStmts(
     const message = fromTrashed ? '恢复' : '移入回收站';
     const setSql = fromTrashed ? 'deleted_at = NULL' : `deleted_at = datetime('now')`;
     for (const id of ids) {
-      stmts.push(trashVersionStmt(db, id, message, guard));
+      const plan = await planForPostId(db, id);
+      stmts.push(trashVersionStmt(db, id, message, guard, plan));
       stmts.push(
         db.prepare(`UPDATE posts SET ${setSql}, updated_at = datetime('now') WHERE id = ? ${guard}`).bind(id),
       );

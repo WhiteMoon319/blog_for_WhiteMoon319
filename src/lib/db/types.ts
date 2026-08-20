@@ -74,6 +74,8 @@ export interface PostVersionRow {
   meta_keywords: string;
   message: string;
   created_at: string;
+  base_version: number | null;
+  content_md_patch: string;
 }
 
 export interface TagRow {

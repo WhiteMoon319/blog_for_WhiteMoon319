@@ -9,6 +9,7 @@ import {
   purgePosts,
   setPostsPinned,
   isSlugConflict,
+  planForPostId,
   type PostRow,
 } from '../../../lib/db';
 import { slugBase, slugWithSuffix } from '../../../lib/utils';
@@ -156,6 +157,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
     const stmts: D1PreparedStatement[] = [];
     for (const r of found) {
+      const plan = await planForPostId(env.DB, r.id);
       stmts.push(
         env.DB
           .prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`)
@@ -164,12 +166,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
       stmts.push(
         env.DB
           .prepare(
-            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
              SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                    title, slug, ?, summary, content_md, cover_url, status, meta_keywords, '自动保存'
+                    title, slug, ?, summary, ?, ?, ?, cover_url, status, meta_keywords, '自动保存'
              FROM posts WHERE id = ?`,
           )
-          .bind(r.id, r.id, target, r.id),
+          .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id),
       );
     }
     try {
@@ -215,18 +217,19 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const message = action === 'publish' ? '批量刊发' : '批量撤稿';
   const stmts: D1PreparedStatement[] = [];
   for (const id of changed) {
+    const plan = await planForPostId(env.DB, id);
     // 版本 INSERT 先于 UPDATE：`status <> ?` 守卫读到的是旧状态（与预检一致），
     // 并发重复刊发/并发删除时守卫落空，不会产生多余版本；
     // 版本内容用显式的新 status（此时 posts.status 仍是旧值）。
     stmts.push(
       env.DB
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, content_md, cover_url, ?, meta_keywords, ?
+                  title, slug, collection_id, summary, ?, ?, ?, cover_url, ?, meta_keywords, ?
            FROM posts WHERE id = ? AND status <> ?`,
         )
-        .bind(id, id, status, message, id, status),
+        .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, status),
     );
     stmts.push(
       env.DB

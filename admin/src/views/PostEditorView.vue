@@ -6,7 +6,19 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { createLowlight, common } from 'lowlight';
+const lowlight = createLowlight(common);
 import { marked } from 'marked';
+import { EditorView, keymap } from '@codemirror/view';
+import { EditorState, Compartment } from '@codemirror/state';
+import { markdown as markdownLang, markdownLanguage } from '@codemirror/lang-markdown';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { api, download } from '../api';
 import type { Collection } from '../types';
 import TagChips from '../components/TagChips.vue';
@@ -88,10 +100,15 @@ function filesFromEvent(e: ClipboardEvent | DragEvent): File[] {
 const editor = useEditor({
   content: '',
   extensions: [
-    StarterKit,
+    StarterKit.configure({ codeBlock: false }),
     Link.configure({ openOnClick: false, autolink: true }),
     Image,
     Placeholder.configure({ placeholder: '落笔于此，墨韵自生……' }),
+    Table.configure({ resizable: true, HTMLAttributes: { class: 'tip-table' } }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    CodeBlockLowlight.configure({ lowlight }),
   ],
   editorProps: {
     handlePaste(view, event) {
@@ -109,9 +126,102 @@ const editor = useEditor({
   },
 });
 
+// ---- 源码模式：CodeMirror 编辑 + 实时预览（debounced 调 /api/render，与公开站点同链路） ----
+const mode = ref<'wysiwyg' | 'source'>('wysiwyg');
+const sourceMarkdown = ref('');
+const previewHtml = ref('');
+const previewing = ref(false);
+const cmHost = ref<HTMLDivElement | null>(null);
+let cmView: EditorView | null = null;
+let cmLang = new Compartment();
+
+function buildCmState(md: string): EditorState {
+  return EditorState.create({
+    doc: md,
+    extensions: [
+      cmLang.of([markdownLang({ base: markdownLanguage })]),
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          sourceMarkdown.value = update.state.doc.toString();
+          schedulePreview();
+        }
+      }),
+    ],
+  });
+}
+
+function mountSourceEditor() {
+  if (!cmHost.value) return;
+  cmView = new EditorView({ state: buildCmState(sourceMarkdown.value), parent: cmHost.value });
+  cmView.focus();
+}
+
+let previewTimer: number | null = null;
+let previewSeq = 0;
+async function schedulePreview() {
+  if (previewTimer !== null) window.clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => void runPreview(), 400);
+}
+
+async function runPreview() {
+  const md = sourceMarkdown.value;
+  previewing.value = true;
+  try {
+    const { html } = await api.render(md);
+    if (md === sourceMarkdown.value) previewHtml.value = html; // 丢弃过期响应
+  } catch {
+    // 预览失败保留上一次成功结果
+  } finally {
+    previewing.value = false;
+  }
+}
+
+function switchToSource() {
+  if (mode.value === 'source') return;
+  sourceMarkdown.value = currentMarkdown();
+  mode.value = 'source';
+  requestAnimationFrame(() => {
+    if (!cmView) mountSourceEditor();
+    void runPreview();
+  });
+}
+
+function switchToWysiwyg() {
+  if (mode.value === 'wysiwyg') return;
+  if (editor.value) editor.value.commands.setContent(marked.parse(sourceMarkdown.value) as string);
+  contentRisk.value = checkContentRisk(sourceMarkdown.value);
+  mode.value = 'wysiwyg';
+}
+
+function insertSnippet(before: string, after = '', placeholder = ''): void {
+  const view = cmView;
+  if (!view) return;
+  const { from, to } = view.state.selection.main;
+  const text = view.state.doc.toString();
+  const insert = `${before}${placeholder}${after}`;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + before.length, head: from + before.length + placeholder.length },
+  });
+  view.focus();
+}
+
+function insertBlock(block: string) {
+  const view = cmView;
+  if (!view) return;
+  const text = view.state.doc.toString();
+  const insert = `\n\n${block}\n\n`;
+  view.dispatch({ changes: { from: 0, to: text.length, insert: text.trim() ? text.replace(/\n+$/, '') + insert : insert } });
+  view.focus();
+}
+
 function currentMarkdown(): string {
-  if (!editor.value) return '';
-  return turndown.turndown(editor.value.getHTML());
+  if (mode.value === 'source') return sourceMarkdown.value;
+  return turndown.turndown(editor.value?.getHTML() ?? '');
 }
 
 async function load() {
@@ -347,6 +457,7 @@ watch(
     status: form.status,
     tags: [...form.tags],
     html: editor.value?.getHTML() ?? '',
+    source: mode.value === 'source' ? sourceMarkdown.value : '',
   }),
   () => {
     if (loading.value || draftKey.value === null) return;
@@ -368,6 +479,7 @@ watch(draftKey, (key) => {
 
 onBeforeUnmount(() => {
   editor.value?.destroy();
+  cmView?.destroy();
   unsubscribeTab?.();
   flushAutosave();
 });
@@ -649,28 +761,68 @@ async function exportMarkdown() {
         <div v-if="contentRisk" class="risk-banner">{{ contentRisk }}</div>
         <div class="editor-shell">
           <div class="editor-toolbar">
-            <button type="button" :class="{ 'is-active': editor?.isActive('bold') }" @click="editor?.chain().focus().toggleBold().run()"><b>B</b></button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('italic') }" @click="editor?.chain().focus().toggleItalic().run()"><i>I</i></button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('strike') }" @click="editor?.chain().focus().toggleStrike().run()"><s>S</s></button>
+            <button type="button" class="mode-toggle" :class="{ active: mode === 'wysiwyg' }" @click="switchToWysiwyg">可视化</button>
+            <button type="button" class="mode-toggle" :class="{ active: mode === 'source' }" @click="switchToSource">源码</button>
             <span class="sep"></span>
-            <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }" @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()">H3</button>
-            <span class="sep"></span>
-            <button type="button" :class="{ 'is-active': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()">• 列表</button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()">1. 列表</button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('blockquote') }" @click="editor?.chain().focus().toggleBlockquote().run()">引文</button>
-            <button type="button" :class="{ 'is-active': editor?.isActive('codeBlock') }" @click="editor?.chain().focus().toggleCodeBlock().run()">代码</button>
-            <span class="sep"></span>
-            <button type="button" :class="{ 'is-active': editor?.isActive('link') }" @click="setLink">链</button>
-            <button type="button" @click="imageFileInput?.click()" :disabled="uploading">{{ uploading ? '…' : '图' }}</button>
-            <input ref="imageFileInput" type="file" accept="image/*" hidden @change="onImagePick" />
-            <button type="button" @click="openPicker" title="从媒体库选择">库</button>
-            <button type="button" @click="editor?.chain().focus().setHorizontalRule().run()">—</button>
-            <span class="sep"></span>
-            <button type="button" @click="editor?.chain().focus().undo().run()">↩</button>
-            <button type="button" @click="editor?.chain().focus().redo().run()">↪</button>
+
+            <template v-if="mode === 'wysiwyg'">
+              <button type="button" :class="{ 'is-active': editor?.isActive('bold') }" @click="editor?.chain().focus().toggleBold().run()"><b>B</b></button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('italic') }" @click="editor?.chain().focus().toggleItalic().run()"><i>I</i></button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('strike') }" @click="editor?.chain().focus().toggleStrike().run()"><s>S</s></button>
+              <span class="sep"></span>
+              <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }" @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()">H3</button>
+              <span class="sep"></span>
+              <button type="button" :class="{ 'is-active': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()">• 列表</button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()">1. 列表</button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('blockquote') }" @click="editor?.chain().focus().toggleBlockquote().run()">引文</button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('codeBlock') }" @click="editor?.chain().focus().toggleCodeBlock().run()">代码</button>
+              <span class="sep"></span>
+              <button type="button" :class="{ 'is-active': editor?.isActive('table') }" @click="editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">表</button>
+              <button type="button" :class="{ 'is-active': editor?.isActive('link') }" @click="setLink">链</button>
+              <button type="button" @click="imageFileInput?.click()" :disabled="uploading">{{ uploading ? '…' : '图' }}</button>
+              <input ref="imageFileInput" type="file" accept="image/*" hidden @change="onImagePick" />
+              <button type="button" @click="openPicker" title="从媒体库选择">库</button>
+              <button type="button" @click="editor?.chain().focus().setHorizontalRule().run()">—</button>
+              <span class="sep"></span>
+              <button type="button" @click="editor?.chain().focus().undo().run()">↩</button>
+              <button type="button" @click="editor?.chain().focus().redo().run()">↪</button>
+            </template>
+
+            <template v-else>
+              <button type="button" title="粗体" @click="insertSnippet('**', '**', '文本')"><b>B</b></button>
+              <button type="button" title="斜体" @click="insertSnippet('*', '*', '文本')"><i>I</i></button>
+              <button type="button" title="删除线" @click="insertSnippet('~~', '~~', '文本')"><s>S</s></button>
+              <span class="sep"></span>
+              <button type="button" title="标题" @click="insertSnippet('## ', '', '小标题')">H2</button>
+              <button type="button" title="链接" @click="insertSnippet('[', '](https://)', '链接文字')">链</button>
+              <button type="button" title="图片" @click="insertSnippet('![', '](https://)', '描述')">图</button>
+              <span class="sep"></span>
+              <button type="button" title="引文" @click="insertBlock('> 引用文字')">引文</button>
+              <button type="button" title="无序列表" @click="insertSnippet('- 条目')">• 列表</button>
+              <button type="button" title="有序列表" @click="insertSnippet('1. 条目')">1. 列表</button>
+              <span class="sep"></span>
+              <button type="button" title="代码块" @click="insertBlock('```\n代码…\n```')">代码</button>
+              <button type="button" title="表格" @click="insertBlock('| 列一 | 列二 |\n| --- | --- |\n| 单元格 | 单元格 |')">表</button>
+              <span class="sep"></span>
+              <button type="button" title="行内公式" @click="insertSnippet('$', '$', 'E = mc^2')">∑ 行内</button>
+              <button type="button" title="块级公式" @click="insertBlock('$$\nE = mc^2\n$$')">∑ 公式</button>
+              <span class="sep"></span>
+              <button type="button" title="Mermaid 图表" @click="insertBlock('```mermaid\ngraph TD\n  A[起点] --> B{判断}\n  B -->|是| C[结果]\n  B -->|否| D[另一路径]\n```')">Mermaid</button>
+              <button type="button" title="Markmap 脑图" @click="insertBlock('```markmap\n# 脑图标题\n## 分支一\n### 子分支\n## 分支二\n```')">Markmap</button>
+            </template>
           </div>
-          <EditorContent :editor="editor" />
+
+          <div v-show="mode === 'wysiwyg'" class="wysiwyg-area">
+            <EditorContent :editor="editor" />
+          </div>
+          <div v-show="mode === 'source'" class="source-area">
+            <div ref="cmHost" class="cm-host" />
+            <div class="source-preview" :class="{ refreshing: previewing }">
+              <p v-if="previewing" class="preview-hint">渲染中…</p>
+              <div v-html="previewHtml" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -729,5 +881,97 @@ async function exportMarkdown() {
   background: #fdf3d8;
   border: 1px solid #e8d3a0;
   border-radius: 6px;
+}
+
+.source-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 420px;
+}
+
+.cm-host {
+  overflow: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: #fbfaf8;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.cm-host .cm-editor {
+  min-height: 420px;
+  outline: none;
+}
+
+.source-preview {
+  overflow: auto;
+  padding: 16px 20px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--paper-card);
+}
+
+.source-preview h1,
+.source-preview h2,
+.source-preview h3 {
+  line-height: 1.4;
+}
+
+.source-preview pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: var(--ink-black);
+  color: #e8e4dc;
+}
+
+.source-preview code {
+  font-family: Consolas, 'SF Mono', Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.source-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.source-preview th,
+.source-preview td {
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--hairline);
+}
+
+.preview-hint {
+  color: var(--ink-light);
+  font-size: 0.8rem;
+}
+
+.source-preview.refreshing {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.mode-toggle {
+  padding: 4px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-light);
+  cursor: pointer;
+  font: inherit;
+}
+
+.mode-toggle.active {
+  background: var(--cinnabar);
+  color: #fff;
+  border-color: var(--cinnabar);
+}
+
+@media (max-width: 900px) {
+  .source-area {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

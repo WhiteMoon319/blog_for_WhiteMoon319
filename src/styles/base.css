@@ -813,6 +813,67 @@ body {
   line-height: 1.8;
 }
 
+/* ---- 正文扩展结构：表格 / 公式 / 图表 ---- */
+
+.article-body table {
+  margin: 1.6em 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  display: block;
+}
+
+.article-body th,
+.article-body td {
+  padding: 0.5em 0.9em;
+  border: 1px solid var(--hairline);
+  text-align: left;
+}
+
+.article-body th {
+  background: color-mix(in srgb, var(--cinnabar) 6%, var(--paper-card));
+  font-weight: 600;
+}
+
+.article-body tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--ink-deep) 3%, transparent);
+}
+
+.article-body .katex-display {
+  margin: 1.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.article-body .katex-error {
+  color: var(--cinnabar);
+  font-style: italic;
+}
+
+.article-body .diagram {
+  margin: 1.6em auto;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--paper-card);
+  overflow-x: auto;
+  text-align: center;
+}
+
+.article-body .diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.article-body .diagram.diagram-error {
+  color: var(--cinnabar);
+  font-style: italic;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
 .article-body ul,
 .article-body ol {
   margin: 0 0 1.4em;

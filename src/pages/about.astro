@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { envOf } from '../lib/db';
 import { getPageBySlug } from '../lib/db/pages.ts';
 import { renderMarkdown } from '../lib/markdown.ts';
+import ArticleEnhancer from '../components/ArticleEnhancer.astro';
 
 const env = await envOf();
 const dbPage = await getPageBySlug(env.DB, 'about');
@@ -41,4 +42,5 @@ const bodyHtml = dbPage?.published === 1
       )
     }
   </article>
+  <ArticleEnhancer />
 </BaseLayout>

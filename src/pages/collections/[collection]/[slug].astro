@@ -3,6 +3,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, fmtDate } from '../../../lib/db';
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
+import ArticleEnhancer from '../../../components/ArticleEnhancer.astro';
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
@@ -68,4 +69,5 @@ const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
       {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
     </nav>
   </article>
+  <ArticleEnhancer />
 </BaseLayout>

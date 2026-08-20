@@ -3,6 +3,7 @@ import { envOf } from '../../lib/db/index.ts';
 import { getPageBySlug } from '../../lib/db/pages.ts';
 import { renderMarkdown } from '../../lib/markdown.ts';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleEnhancer from '../../components/ArticleEnhancer.astro';
 
 export const prerender = false;
 
@@ -21,4 +22,5 @@ const { html } = renderMarkdown(page.content_md);
     </div>
     <Fragment set:html={html} />
   </article>
+  <ArticleEnhancer />
 </BaseLayout>

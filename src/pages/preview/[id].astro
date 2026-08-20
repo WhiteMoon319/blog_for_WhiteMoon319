@@ -4,6 +4,7 @@ import { envOf, getPostById, getCollectionById, fmtDate } from '../../lib/db';
 import { postHref } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { getSession, isAdmin } from '../../lib/auth';
+import ArticleEnhancer from '../../components/ArticleEnhancer.astro';
 
 export const prerender = false;
 
@@ -83,6 +84,7 @@ const theme = collection?.theme_color ?? '#8a6d3b';
       )}
     </nav>
   </article>
+  <ArticleEnhancer />
 </BaseLayout>
 
 <style>

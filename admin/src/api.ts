@@ -39,6 +39,12 @@ export const api = {
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
+  render: (md: string) =>
+    request<{ html: string; toc: Array<{ id: string; text: string; level: number }> }>('/api/render', {
+      method: 'POST',
+      body: JSON.stringify({ md }),
+    }),
+
   collections: () => request<{ collections: Collection[] }>('/api/collections'),
 
   tags: () => request<{ tags: Tag[] }>('/api/tags'),

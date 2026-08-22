@@ -158,11 +158,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
     const stmts: D1PreparedStatement[] = [];
     for (const r of found) {
       const plan = await planForPostId(env.DB, r.id);
-      stmts.push(
-        env.DB
-          .prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`)
-          .bind(target, r.id),
-      );
+      // 版本 INSERT 先于 UPDATE：UPDATE 读到的是迁移前状态，与预检一致；
+      // 版本显式绑定新 collection_id，仍记录迁移后的归属。
       stmts.push(
         env.DB
           .prepare(
@@ -172,6 +169,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
              FROM posts WHERE id = ?`,
           )
           .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id),
+      );
+      stmts.push(
+        env.DB
+          .prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(target, r.id),
       );
     }
     try {

@@ -70,7 +70,11 @@ export async function planForPostId(db: D1Database, postId: number): Promise<Ver
 function rebuildContent(baseFull: string, patch: string): string {
   if (!patch) return baseFull;
   const res = applyPatch(baseFull, patch);
-  return typeof res === 'string' ? res : baseFull;
+  if (typeof res !== 'string') {
+    console.warn('applyPatch failed for version, falling back to base content');
+    return baseFull;
+  }
+  return res;
 }
 
 // 批量重建增量行的 full content_md。base 均为全量快照；base 可能不在本次列表内（如列表截断），
@@ -86,21 +90,24 @@ export async function materializeVersions(
     ...new Set(rows.filter((r) => r.base_version !== null).map((r) => r.base_version as number)),
   ].filter((v) => !fulls.has(v));
   if (missing.length > 0) {
-    for (const v of missing) {
-      const f = await db
-        .prepare(
-          `SELECT version, content_md FROM post_versions
-           WHERE post_id = ? AND version = ? AND base_version IS NULL`,
-        )
-        .bind(postId, v)
-        .first<{ version: number; content_md: string }>();
-      if (f) fulls.set(f.version, f.content_md);
-    }
+    const placeholders = missing.map(() => '?').join(',');
+    const fetched = await db
+      .prepare(
+        `SELECT version, content_md FROM post_versions
+         WHERE post_id = ? AND version IN (${placeholders}) AND base_version IS NULL`,
+      )
+      .bind(postId, ...missing)
+      .all<{ version: number; content_md: string }>();
+    for (const f of fetched.results ?? []) fulls.set(f.version, f.content_md);
   }
   for (const r of rows) {
     if (r.base_version !== null) {
       const baseFull = fulls.get(r.base_version);
-      if (baseFull !== undefined) r.content_md = rebuildContent(baseFull, r.content_md_patch);
+      if (baseFull !== undefined) {
+        r.content_md = rebuildContent(baseFull, r.content_md_patch);
+      } else {
+        console.warn(`materializeVersions: missing base version ${r.base_version} for post ${postId}, version ${r.version}`);
+      }
     }
   }
   return rows;

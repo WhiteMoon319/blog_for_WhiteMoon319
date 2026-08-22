@@ -37,6 +37,12 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 const turndown = createTurndown();
 
+const importedIds = ref<number[]>([]);
+const generatingAi = ref(false);
+const aiResults = ref<Record<number, string>>({});
+
+// 从 localStorage 恢复上次导入的 ID
+const IMPORTED_IDS_KEY = 'imported_post_ids';
 onMounted(async () => {
   try {
     const c = await api.collections();
@@ -44,6 +50,10 @@ onMounted(async () => {
   } catch (e) {
     emit('notify', (e as Error).message, true);
   }
+  try {
+    const saved = localStorage.getItem(IMPORTED_IDS_KEY);
+    if (saved) importedIds.value = JSON.parse(saved);
+  } catch {}
 });
 
 async function onFiles(e: Event) {
@@ -186,6 +196,7 @@ async function submitAll() {
         if (r.ok && r.post) {
           item.state = 'done';
           item.slug = r.post.slug;
+          importedIds.value.push(r.post.id);
           ok++;
         } else {
           item.state = 'failed';
@@ -193,6 +204,8 @@ async function submitAll() {
           fail++;
         }
       });
+      // 持久化导入 ID
+      localStorage.setItem(IMPORTED_IDS_KEY, JSON.stringify(importedIds.value));
     } catch (e) {
       for (const item of chunk) {
         item.state = 'failed';
@@ -202,7 +215,36 @@ async function submitAll() {
     }
   }
   importing.value = false;
+  // 持久化导入成功的 ID
+  const successIds = items.value.filter((it) => it.state === 'done').map((it) => {
+    // 从 items 中找 post id — 需要从 batch 结果反向映射
+    return null as number | null;
+  }).filter((id): id is number => id !== null);
+  // 实际上 batch API 返回的 post id 在 results 中，需要从循环中收集
   emit('notify', `导入完成：成功 ${ok} 篇，失败 ${fail} 篇`, fail > 0);
+}
+
+async function generateAiSummaries() {
+  if (generatingAi.value || importedIds.value.length === 0) return;
+  generatingAi.value = true;
+  aiResults.value = {};
+  const CHUNK = 5;
+  for (let start = 0; start < importedIds.value.length; start += CHUNK) {
+    const chunk = importedIds.value.slice(start, start + CHUNK);
+    try {
+      const res = await api.aiBatchSummary(chunk);
+      for (const r of res.results) {
+        aiResults.value[r.id] = r.status;
+        if (r.status === 'failed') {
+          emit('notify', `文章 #${r.id} 摘要生成失败：${r.error ?? '未知错误'}`, true);
+        }
+      }
+    } catch (e) {
+      emit('notify', `批量摘要出错：${(e as Error).message}`, true);
+    }
+  }
+  generatingAi.value = false;
+  emit('notify', 'AI 摘要批量生成完成');
 }
 </script>
 
@@ -281,6 +323,16 @@ async function submitAll() {
           {{ importing ? '导入中…' : '全部导入' }}
         </button>
       </div>
+    </div>
+    <div v-if="importedIds.length > 0" style="padding:8px 16px;border-bottom:1px solid var(--hairline);display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:0.82rem;color:var(--ink-light);">已导入 {{ importedIds.length }} 篇</span>
+      <button class="btn btn-ghost mini" :disabled="generatingAi" @click="generateAiSummaries">
+        {{ generatingAi ? '生成中…' : 'AI 生成摘要' }}
+      </button>
+      <span v-if="Object.keys(aiResults).length" style="font-size:0.78rem;color:var(--ink-light);">
+        {{ Object.values(aiResults).filter(s => s === 'generated').length }} 篇成功，
+        {{ Object.values(aiResults).filter(s => s === 'failed').length }} 篇失败
+      </span>
     </div>
 
     <div class="table-wrap">

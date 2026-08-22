@@ -184,6 +184,33 @@ export const api = {
     request<CorpusStats>(
       `/api/stats/corpus${collection !== undefined ? `?collection=${collection}` : ''}`,
     ),
+
+  aiModels: () => request<{ models: string[] }>('/api/ai/models'),
+
+  aiSummary: (md: string, collectionId?: number, postId?: number) =>
+    request<{ summaries: string[] }>('/api/ai/summary', {
+      method: 'POST',
+      body: JSON.stringify({ content_md: md, collection_id: collectionId, post_id: postId }),
+    }),
+
+  aiTest: (config: {
+    provider?: string;
+    base_url?: string;
+    model?: string;
+    reasoning_effort?: string;
+    api_key?: string;
+  }) => request<{ ok: boolean; saved?: boolean; error?: string; api_key_configured?: boolean; api_key_masked?: string | boolean }>('/api/ai/test', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  }),
+
+  aiBatchSummary: (ids: number[]) =>
+    request<{ results: Array<{ id: number; status: string; error?: string }> }>('/api/ai/batch-summary', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  deleteAiKey: () => request<{ ok: boolean }>('/api/settings/ai-key', { method: 'DELETE' }),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

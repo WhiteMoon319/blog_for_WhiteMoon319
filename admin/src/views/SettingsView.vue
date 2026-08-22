@@ -11,6 +11,17 @@ interface SiteSettings {
   SITE_URL: string;
 }
 
+interface AiSettings {
+  ai_provider: string;
+  ai_base_url: string;
+  ai_model: string;
+  ai_reasoning_effort: string;
+  ai_multi_summary: string;
+  ai_candidate_count: string;
+  ai_api_key_configured?: boolean;
+  ai_api_key_masked?: string | boolean;
+}
+
 const form = reactive<SiteSettings>({
   SITE_NAME: '',
   SITE_SLOGAN: '',
@@ -24,6 +35,32 @@ const original = reactive<SiteSettings>({
   SITE_POEM: '',
   SITE_URL: '',
 });
+
+const aiForm = reactive({
+  provider: 'deepseek',
+  baseUrl: 'https://api.deepseek.com',
+  model: 'deepseek-v4-flash',
+  reasoningEffort: '',
+  multiSummary: false,
+  candidateCount: 3,
+  apiKey: '',
+});
+
+const aiOriginal = reactive({
+  provider: 'deepseek',
+  baseUrl: 'https://api.deepseek.com',
+  model: 'deepseek-v4-flash',
+  reasoningEffort: '',
+  multiSummary: false,
+  candidateCount: 3,
+});
+
+const aiKeyConfigured = ref(false);
+const aiKeyMasked = ref('');
+const modelList = ref<string[]>([]);
+const fetchingModels = ref(false);
+const testingAi = ref(false);
+const aiSaving = ref(false);
 
 const saving = ref(false);
 const loading = ref(true);
@@ -42,10 +79,28 @@ function applyToForm(s: SiteSettings) {
   original.SITE_URL = s.SITE_URL;
 }
 
+function applyAiSettings(s: AiSettings) {
+  aiForm.provider = s.ai_provider || 'deepseek';
+  aiForm.baseUrl = s.ai_base_url || 'https://api.deepseek.com';
+  aiForm.model = s.ai_model || 'deepseek-v4-flash';
+  aiForm.reasoningEffort = s.ai_reasoning_effort || '';
+  aiForm.multiSummary = s.ai_multi_summary === '1';
+  aiForm.candidateCount = Number(s.ai_candidate_count) || 3;
+  aiOriginal.provider = aiForm.provider;
+  aiOriginal.baseUrl = aiForm.baseUrl;
+  aiOriginal.model = aiForm.model;
+  aiOriginal.reasoningEffort = aiForm.reasoningEffort;
+  aiOriginal.multiSummary = aiForm.multiSummary;
+  aiOriginal.candidateCount = aiForm.candidateCount;
+  aiKeyConfigured.value = !!s.ai_api_key_configured;
+  aiKeyMasked.value = typeof s.ai_api_key_masked === 'string' ? s.ai_api_key_masked : '';
+}
+
 onMounted(async () => {
   try {
-    const s = await api.settings() as unknown as SiteSettings;
+    const s = await api.settings() as unknown as SiteSettings & AiSettings;
     applyToForm(s);
+    applyAiSettings(s);
     loading.value = false;
   } catch (e) {
     emit('notify', (e as Error).message, true);
@@ -90,6 +145,61 @@ async function changePassword() {
     pwdSaving.value = false;
   }
 }
+
+async function fetchModels() {
+  fetchingModels.value = true;
+  try {
+    const res = await api.aiModels();
+    modelList.value = res.models;
+    if (res.models.length > 0) {
+      aiForm.model = res.models[0];
+      emit('notify', `已获取 ${res.models.length} 个模型`);
+    }
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    fetchingModels.value = false;
+  }
+}
+
+async function testAndSave() {
+  if (testingAi.value || aiSaving.value) return;
+  testingAi.value = true;
+  try {
+    const res = await api.aiTest({
+      provider: aiForm.provider,
+      base_url: aiForm.baseUrl,
+      model: aiForm.model,
+      reasoning_effort: aiForm.reasoningEffort,
+      api_key: aiForm.apiKey || undefined,
+    });
+    if (res.ok) {
+      aiKeyConfigured.value = !!res.api_key_configured;
+      aiKeyMasked.value = typeof res.api_key_masked === 'string' ? res.api_key_masked : '';
+      aiForm.apiKey = '';
+      applyAiSettings({ ...aiForm, ...res } as unknown as AiSettings);
+      emit('notify', '测试成功，配置已保存');
+    } else {
+      emit('notify', `测试失败：${res.error ?? '未知错误'}`, true);
+    }
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    testingAi.value = false;
+  }
+}
+
+async function deleteAiKey() {
+  if (!confirm('确认清除 AI API Key？清除后 AI 摘要功能将不可用，直到配置新 Key。')) return;
+  try {
+    await api.deleteAiKey();
+    aiKeyConfigured.value = false;
+    aiKeyMasked.value = '';
+    emit('notify', 'API Key 已清除');
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
+}
 </script>
 
 <template>
@@ -127,6 +237,71 @@ async function changePassword() {
         form.SITE_URL !== original.SITE_URL
       " style="color:var(--cinnabar);font-size:0.82rem;">
         有未保存的修改
+      </span>
+    </div>
+  </div>
+
+  <div class="card pad" v-if="!loading" style="margin-top:20px;">
+    <h3 style="margin:0 0 20px;">AI 摘要</h3>
+
+    <div class="field">
+      <label>服务商</label>
+      <select v-model="aiForm.provider" class="select">
+        <option value="deepseek">DeepSeek</option>
+        <option value="openai_compatible">OpenAI Compatible</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>API 地址</label>
+      <input v-model="aiForm.baseUrl" class="input" placeholder="https://api.deepseek.com" />
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input v-model="aiForm.apiKey" type="password" class="input" style="flex:1;" placeholder="留空则不修改" />
+        <span v-if="aiKeyConfigured" style="font-size:0.78rem;color:var(--ink-light);">{{ aiKeyMasked }}</span>
+        <span v-else style="font-size:0.78rem;color:var(--cinnabar);">未配置</span>
+      </div>
+      <div class="hint" style="margin-top:4px;">
+        填写后随「测试并保存」落库，不会明文返回前端。
+        <button class="btn btn-danger mini" @click="deleteAiKey" :disabled="!aiKeyConfigured" style="margin-left:8px;">清除 Key</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>模型</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input v-model="aiForm.model" class="input" style="flex:1;" list="model-list" placeholder="deepseek-v4-flash" />
+        <datalist id="model-list">
+          <option v-for="m in modelList" :key="m" :value="m" />
+        </datalist>
+        <button class="btn btn-ghost" :disabled="fetchingModels" @click="fetchModels">
+          {{ fetchingModels ? '获取中…' : '获取模型列表' }}
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <label>思考强度（reasoning_effort）</label>
+      <input v-model="aiForm.reasoningEffort" class="input" placeholder="留空不传，如 low / medium / high" />
+    </div>
+    <div class="field">
+      <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;">
+        <input v-model="aiForm.multiSummary" type="checkbox" />
+        生成多条摘要供选择
+      </label>
+    </div>
+    <div class="field" v-if="aiForm.multiSummary">
+      <label>候选条数（2～5）</label>
+      <input v-model.number="aiForm.candidateCount" type="number" min="2" max="5" class="input" style="width:100px;" />
+    </div>
+    <div class="hint" style="margin:12px 0;">
+      文章内容会发送到您配置的第三方 AI 服务商。请确认服务商的数据保留、训练使用和合规策略。
+    </div>
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:center;">
+      <button class="btn btn-primary" :disabled="testingAi" @click="testAndSave">
+        {{ testingAi ? '测试中…' : '测试并保存' }}
+      </button>
+      <span style="font-size:0.82rem;color:var(--ink-light);">
+        测试连接成功后自动保存配置和 API Key
       </span>
     </div>
   </div>

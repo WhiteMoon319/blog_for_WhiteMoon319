@@ -16,6 +16,7 @@ declare global {
       R2_PUBLIC_URL: string;
       LOGIN_RATE_LIMIT_MAX: number;
       LOGIN_RATE_LIMIT_WINDOW: number;
+      AI_SETTINGS_ENCRYPTION_KEY?: string;
     }
   }
 

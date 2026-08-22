@@ -45,12 +45,13 @@ export async function createCollection(
     theme_color?: string;
     sort_order?: number;
     post_order?: 'asc' | 'desc';
+    ref_summaries?: number;
   },
 ): Promise<CollectionRow | null> {
   const res = await db
     .prepare(
-      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order)
-       VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries)
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     )
     .bind(
       data.title,
@@ -59,6 +60,7 @@ export async function createCollection(
       data.theme_color ?? '#c23a30',
       data.sort_order ?? 0,
       data.post_order ?? 'desc',
+      data.ref_summaries ?? 0,
     )
     .first<CollectionRow>();
   return res ?? null;
@@ -74,14 +76,15 @@ export async function createCollectionWithTags(
     theme_color?: string;
     sort_order?: number;
     post_order?: 'asc' | 'desc';
+    ref_summaries?: number;
   },
   tagNames: string[],
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       )
       .bind(
         data.title,
@@ -90,6 +93,7 @@ export async function createCollectionWithTags(
         data.theme_color ?? '#c23a30',
         data.sort_order ?? 0,
         data.post_order ?? 'desc',
+        data.ref_summaries ?? 0,
       ),
   ];
   const unique = [...new Set(tagNames.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
@@ -116,7 +120,7 @@ export async function createCollectionWithTags(
 
 export async function updateCollection(db: D1Database, id: number, patch: CollectionPatch): Promise<CollectionRow | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries'].includes(k),
   );
   if (keys.length === 0) return getCollectionById(db, id);
   const sets = keys.map((k) => `${k} = ?`).join(', ');
@@ -136,7 +140,7 @@ export async function updateCollectionWithTags(
   tagNames: string[] | null,
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries'].includes(k),
   );
   const stmts: D1PreparedStatement[] = [];
   if (keys.length > 0) {
@@ -199,9 +203,9 @@ function memberMigrateStmts(
   return [
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, message)
          SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                title, ?, NULL, summary, ?, ?, ?, cover_url, status, '文集删除迁移'
+                title, ?, NULL, summary, summary_source, ?, ?, ?, cover_url, status, '文集删除迁移'
          FROM posts WHERE id = ? AND collection_id = ?`,
       )
       .bind(postId, postId, newSlug, plan.content_md, plan.content_md_patch, plan.base_version, postId, collectionId),

@@ -1,16 +1,24 @@
 import type { APIContext } from 'astro';
 import { checkCsrf, json, requireAuth } from '../../lib/auth.ts';
 import { envOf } from '../../lib/db/index.ts';
-import { getAllSettings, saveSettings } from '../../lib/db/settings.ts';
+import { getAllSettings, saveSettings, isAiSettingKey } from '../../lib/db/settings.ts';
+import { getAiCredential } from '../../lib/db/ai-credentials.ts';
+import { decryptApiKey, maskApiKey } from '../../lib/ai-credentials.ts';
 import type { SettingKey } from '../../lib/db/settings.ts';
 
 export const prerender = false;
 
-const KEY_DEFAULTS: Record<SettingKey, string> = {
+const KEY_DEFAULTS: Record<string, string> = {
   SITE_NAME: '我的书房',
   SITE_SLOGAN: '读书写字，不紧不慢',
   SITE_POEM: '',
   SITE_URL: 'https://example.com',
+  ai_provider: 'deepseek',
+  ai_base_url: 'https://api.deepseek.com',
+  ai_model: 'deepseek-v4-flash',
+  ai_reasoning_effort: '',
+  ai_multi_summary: '0',
+  ai_candidate_count: '3',
 };
 
 const MAX_VALUE_LENGTH = 500;
@@ -29,11 +37,34 @@ export async function GET(ctx: APIContext): Promise<Response> {
   if (!auth.ok) return auth.response;
   const env = await envOf();
   const db = getAllSettings(env.DB);
-  const result: Record<string, string> = {};
+  const result: Record<string, string | boolean> = {};
   const entries = await db;
   for (const k of Object.keys(KEY_DEFAULTS) as SettingKey[]) {
     result[k] = entries[k] ?? env[k as keyof typeof env] ?? KEY_DEFAULTS[k];
   }
+
+  // API Key 状态
+  const encKey = env.AI_SETTINGS_ENCRYPTION_KEY;
+  if (encKey) {
+    const cred = await getAiCredential(env.DB);
+    if (cred) {
+      try {
+        const plaintext = await decryptApiKey(encKey, cred.api_key_ciphertext);
+        result.ai_api_key_configured = true;
+        result.ai_api_key_masked = maskApiKey(plaintext);
+      } catch {
+        result.ai_api_key_configured = false;
+        result.ai_api_key_masked = false;
+      }
+    } else {
+      result.ai_api_key_configured = false;
+      result.ai_api_key_masked = false;
+    }
+  } else {
+    result.ai_api_key_configured = false;
+    result.ai_api_key_masked = false;
+  }
+
   return json(result);
 }
 
@@ -61,6 +92,21 @@ export async function PUT(ctx: APIContext): Promise<Response> {
       }
       if (k === 'SITE_URL' && v && !isValidUrl(v)) {
         return json({ error: 'SITE_URL 仅接受 http/https URL' }, 400);
+      }
+      if (isAiSettingKey(k) && k === 'ai_base_url' && v && !isValidUrl(v)) {
+        return json({ error: 'ai_base_url 仅接受 http/https URL' }, 400);
+      }
+      if (k === 'ai_multi_summary' && v !== '0' && v !== '1') {
+        return json({ error: 'ai_multi_summary 必须为 0 或 1' }, 400);
+      }
+      if (k === 'ai_candidate_count') {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 2 || n > 5) {
+          return json({ error: 'ai_candidate_count 必须是 2-5 的整数' }, 400);
+        }
+      }
+      if (k === 'ai_provider' && v !== 'deepseek' && v !== 'openai_compatible') {
+        return json({ error: 'ai_provider 只支持 deepseek 或 openai_compatible' }, 400);
       }
       pairs[k] = v;
     }

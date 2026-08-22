@@ -163,9 +163,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
       stmts.push(
         env.DB
           .prepare(
-            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
              SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                    title, slug, ?, summary, ?, ?, ?, cover_url, status, meta_keywords, '自动保存'
+                    title, slug, ?, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, '自动保存'
              FROM posts WHERE id = ?`,
           )
           .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id),
@@ -226,9 +226,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     stmts.push(
       env.DB
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, ?, ?, ?, cover_url, ?, meta_keywords, ?
+                  title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, ?, meta_keywords, ?
            FROM posts WHERE id = ? AND status <> ?`,
         )
         .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, status),

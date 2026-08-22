@@ -12,7 +12,7 @@ const editing = ref<Collection | null>(null);
 const creating = ref(false);
 const suggestions = ref<string[]>([]);
 
-const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', tags: [] as string[] });
+const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', ref_summaries: 0, tags: [] as string[] });
 
 const COLORS = ['#c23a30', '#2d6a4f', '#2f4858', '#8a6d3b', '#6baed6'];
 
@@ -33,7 +33,7 @@ onMounted(async () => {
 function openCreate() {
   creating.value = true;
   editing.value = null;
-  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', tags: [] });
+  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', ref_summaries: 0, tags: [] });
 }
 
 async function openEdit(c: Collection) {
@@ -46,6 +46,7 @@ async function openEdit(c: Collection) {
     theme_color: c.theme_color,
     sort_order: c.sort_order,
     post_order: c.post_order,
+    ref_summaries: c.ref_summaries ?? 0,
     tags: [],
   });
   try {
@@ -166,6 +167,12 @@ async function remove(c: Collection) {
             <option value="asc">旧在前（小说连载顺读）</option>
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+          <input v-model.number="form.ref_summaries" type="checkbox" :true-value="1" :false-value="0" />
+          参考前文摘要（AI 生成时参考该文集最近 3 篇已刊文章的摘要风格）
+        </label>
       </div>
       <div class="field">
         <label>标签（其下文章默认继承）</label>

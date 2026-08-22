@@ -42,6 +42,7 @@ const suggestions = ref<string[]>([]);
 const loading = ref(true);
 const saving = ref(false);
 const uploading = ref(false);
+const generatingSummary = ref(false);
 const loadedId = ref<number | null>(null);
 const baseVersion = ref(0);
 
@@ -695,6 +696,36 @@ async function exportMarkdown() {
     exporting.value = false;
   }
 }
+
+async function generateAiSummary() {
+  if (generatingSummary.value) return;
+  const md = currentMarkdown();
+  if (!md.trim()) {
+    emit('notify', '正文为空，无法生成摘要', true);
+    return;
+  }
+  generatingSummary.value = true;
+  try {
+    const res = await api.aiSummary(md, form.collection_id ?? undefined, loadedId.value ?? undefined);
+    if (res.summaries && res.summaries.length > 0) {
+      if (res.summaries.length === 1) {
+        form.summary = res.summaries[0];
+        emit('notify', 'AI 摘要已生成');
+      } else {
+        // 多候选：弹出选择
+        const chosen = res.summaries;
+        form.summary = chosen[0];
+        emit('notify', `已生成 ${chosen.length} 条候选，使用第一条`);
+      }
+    } else {
+      emit('notify', 'AI 未生成有效摘要', true);
+    }
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    generatingSummary.value = false;
+  }
+}
 </script>
 
 <template>
@@ -744,7 +775,12 @@ async function exportMarkdown() {
 
       <div class="field">
         <label>摘要</label>
-        <textarea v-model="form.summary" class="textarea" placeholder="列表卡上的一行小字"></textarea>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <textarea v-model="form.summary" class="textarea" placeholder="列表卡上的一行小字" style="flex:1;" />
+          <button type="button" class="btn btn-ghost" :disabled="generatingSummary" @click="generateAiSummary" style="white-space:nowrap;margin-top:2px;">
+            {{ generatingSummary ? '生成中…' : 'AI 生成' }}
+          </button>
+        </div>
       </div>
 
       <div class="field">

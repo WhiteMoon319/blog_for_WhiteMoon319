@@ -8,6 +8,7 @@ export interface Collection {
   post_order: 'asc' | 'desc';
   created_at: string;
   updated_at: string;
+  ref_summaries: number;
 }
 
 export interface Post {

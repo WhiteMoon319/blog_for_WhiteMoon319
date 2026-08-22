@@ -8,6 +8,7 @@ export interface CollectionRow {
   post_order: 'asc' | 'desc';
   created_at: string;
   updated_at: string;
+  ref_summaries: number;
 }
 
 export interface PostRow {
@@ -26,6 +27,7 @@ export interface PostRow {
   meta_keywords: string;
   created_at: string;
   updated_at: string;
+  summary_source: 'local' | 'manual' | 'ai';
 }
 
 export type PostWithCollection = PostRow & { collection_slug: string | null };
@@ -41,6 +43,7 @@ export interface PostInput {
   meta_keywords?: string;
   is_pinned?: number;
   scheduled_at?: string | null;
+  summary_source?: 'local' | 'manual' | 'ai';
 }
 
 const POST_FIELDS = [
@@ -57,7 +60,7 @@ const POST_FIELDS = [
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 
-const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order'] as const;
+const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries'] as const;
 export type CollectionPatch = Partial<Record<(typeof COLLECTION_FIELDS)[number], string | number>>;
 
 export interface PostVersionRow {
@@ -76,6 +79,7 @@ export interface PostVersionRow {
   created_at: string;
   base_version: number | null;
   content_md_patch: string;
+  summary_source: string;
 }
 
 export interface TagRow {

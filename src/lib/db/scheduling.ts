@@ -42,9 +42,9 @@ export async function publishDuePosts(
     stmts.push(
       db
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, ?, ?, ?, cover_url, 'published', meta_keywords, '定时刊发'
+                  title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, 'published', meta_keywords, '定时刊发'
            FROM posts WHERE id = ? AND ${DUE_GUARD}`,
         )
         .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, id, nowIso),

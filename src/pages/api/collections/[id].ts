@@ -62,6 +62,9 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     }
     patch.post_order = body.post_order;
   }
+  if (typeof body.ref_summaries === 'number') {
+    patch.ref_summaries = body.ref_summaries === 1 ? 1 : 0;
+  }
 
   // 携带 tags 时严格校验（非法/超限 400）；未携带则不动标签
   const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);

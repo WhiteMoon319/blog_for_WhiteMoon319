@@ -125,8 +125,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -139,12 +139,13 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.meta_keywords ?? '',
         data.is_pinned ?? 0,
         data.scheduled_at ?? null,
+        data.summary_source ?? 'manual',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
-         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, '创建'
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
+         SELECT id, 1, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
       ),
   ]);
@@ -162,8 +163,8 @@ export async function createPostWithTags(
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -176,12 +177,13 @@ export async function createPostWithTags(
         data.meta_keywords ?? '',
         data.is_pinned ?? 0,
         data.scheduled_at ?? null,
+        data.summary_source ?? 'manual',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message)
-         SELECT id, 1, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, '创建'
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
+         SELECT id, 1, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
       ),
   ];
@@ -230,6 +232,11 @@ export async function updatePost(
     const cv = current[k as keyof PostRow];
     return String(pv ?? null) !== String(cv ?? null);
   });
+  // 用户提交摘要时标记为 manual
+  if ('summary' in patch && changed.includes('summary') && !changed.includes('summary_source')) {
+    changed.push('summary_source');
+    (patch as Record<string, unknown>).summary_source = 'manual';
+  }
   if (changed.length === 0) {
     // 无实质变化时仍需校验乐观锁基线，避免掩盖另一端的并发写入
     if (baseVersion !== undefined && (await getLatestPostVersion(db, id)) !== baseVersion) return 'conflict';
@@ -254,9 +261,9 @@ export async function updatePost(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -297,6 +304,11 @@ export async function updatePostWithTags(
     const cv = current[k as keyof PostRow];
     return String(pv ?? null) !== String(cv ?? null);
   });
+  // 用户提交摘要时标记为 manual
+  if ('summary' in patch && changed.includes('summary') && !changed.includes('summary_source')) {
+    changed.push('summary_source');
+    (patch as Record<string, unknown>).summary_source = 'manual';
+  }
   const tagsOnly = changed.length === 0;
   if (tagsOnly) {
     // 无实质变更仍需校验乐观锁基线；仅换标签不产生版本记录（版本史记录的是内容）
@@ -320,9 +332,9 @@ export async function updatePostWithTags(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -350,9 +362,9 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
 
 // ---- 回收站（软删除）：trash/restore 每篇 2 语句（版本 + 更新），50 篇 = 100 恰好落在 D1 batch 上限内 ----
 
-const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
 SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-       title, slug, collection_id, summary, ?, ?, ?, cover_url, status, meta_keywords, ?
+       title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
 FROM posts WHERE id = ?`;
 
 function trashVersionStmt(

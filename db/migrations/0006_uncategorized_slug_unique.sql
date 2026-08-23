@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- UNIQUE(collection_id, slug) 对 collection_id IS NULL 的行不生效，
 -- 未分类文章可能重复 slug 导致公开 URL 冲突。
 -- 这里先确定性去重（保留最新一篇的 slug，其余按创建顺序追加 -2/-3…），

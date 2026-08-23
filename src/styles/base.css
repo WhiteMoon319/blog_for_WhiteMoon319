@@ -1,3 +1,8 @@
+/*! 月下独酌 · blog（blog_for_WhiteMoon319）
+ * Copyright (C) 2026 WhiteMoon319
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+ */
 /* ===== 基础样式（移植自 CXJC） ===== */
 
 /* 字体改为 BaseLayout 中异步加载（不阻塞渲染），国内不可达时回退系统字体栈 */
@@ -199,6 +204,33 @@ body {
   color: #b8b8c2;
   letter-spacing: 0.05em;
   margin: 0;
+}
+
+.site-footer .footer-license {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.site-footer .footer-src {
+  color: #c9a227;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px;
+}
+
+.site-footer .footer-src:hover {
+  color: #e6c653;
+  text-decoration: underline;
+}
+
+.site-footer .footer-github {
+  vertical-align: -2px;
 }
 
 /* ===== 印章组件 ===== */

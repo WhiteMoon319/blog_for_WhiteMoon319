@@ -1,3 +1,11 @@
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319
+//
+// 本程序是自由软件：你可以自由修改和再分发它。
+// 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
+//   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { isValidSlug } from '../utils.ts';
 
 // 批量（刊发/撤稿/删除/移动）单请求上限：保证每篇 2 条语句（更新+版本）也落在

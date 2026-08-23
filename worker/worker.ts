@@ -1,3 +1,11 @@
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319
+//
+// 本程序是自由软件：你可以自由修改和再分发它。
+// 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
+//   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 自定义 Worker 入口：包装 @astrojs/cloudflare 生成的 entry.mjs（默认导出 fetch 处理器），
 // 并承接 Cloudflare scheduled 事件（cron 定时发布，见 wrangler triggers）。
 //

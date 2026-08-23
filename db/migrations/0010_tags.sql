@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- 标签系统：tags + collection_tags（文集标签）+ post_tags（文章自有标签）
 -- 文章有效标签 = 文集标签 ∪ 自身标签（查询时计算，不落地复制，避免同步漂移）
 CREATE TABLE IF NOT EXISTS tags (

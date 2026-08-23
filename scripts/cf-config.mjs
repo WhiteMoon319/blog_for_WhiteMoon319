@@ -1,3 +1,11 @@
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319
+//
+// 本程序是自由软件：你可以自由修改和再分发它。
+// 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
+//   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 从 wrangler.jsonc.template 生成本地 wrangler.jsonc（已被 .gitignore 忽略）。
 // 真实资源 ID 只允许来自环境变量或根目录 .env，不入库。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';

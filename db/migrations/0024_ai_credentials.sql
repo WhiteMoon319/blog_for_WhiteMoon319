@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- AI 供应商 API Key 加密凭据
 -- 固定 id = 1 单凭据模式；多供应商时再扩展
 CREATE TABLE ai_credentials (

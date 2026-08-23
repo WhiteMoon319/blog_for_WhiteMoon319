@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- slug 唯一性从「全局」改为「文集内唯一」：UNIQUE(slug) → UNIQUE(collection_id, slug)
 -- SQLite 无法修改约束，需重建表并迁移数据
 CREATE TABLE posts_new (

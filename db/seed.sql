@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- 演示种子数据（仅本地开发用）
 INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES
   ('随笔', 'essays', '日常琐记，流水账亦有真意。', '#c23a30', 1),

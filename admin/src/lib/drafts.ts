@@ -1,3 +1,11 @@
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319
+//
+// 本程序是自由软件：你可以自由修改和再分发它。
+// 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
+//   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 本地草稿自动保存（IndexedDB）：仅浏览器本地保留，不写入服务器。
 // 明确边界：不解决多端并发——服务器冲突仍由 base_version 乐观锁 + 用户选择处理。
 // 键约定：post:{id} 按文章隔离；new:{uuid} 为新建草稿临时键（见 PostEditorView 中 sessionStorage 关联）。

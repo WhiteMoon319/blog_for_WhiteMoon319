@@ -162,6 +162,42 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
     await load();
   }
 }
+
+async function bulkAiSummary(force: boolean) {
+  const ids = [...selected.value];
+  if (ids.length === 0) return;
+  // 非强制时检查是否有非空摘要的文章
+  if (!force) {
+    const hasSummary = ids.some((id) => {
+      const p = posts.value.find((pp) => pp.id === id);
+      return p && p.summary?.trim();
+    });
+    if (hasSummary && !confirm(`选中的文章中有已填写摘要的，AI 将跳过这些。\n\n如需强制覆盖全部摘要，请使用「强制覆盖」按钮。\n\n继续？`)) return;
+  } else {
+    if (!confirm(`将强制覆盖选中 ${ids.length} 篇文章的现有摘要（包括手工填写的内容）。\n\n是否继续？`)) return;
+  }
+  busy.value = true;
+  let ok = 0;
+  let fail = 0;
+  const CHUNK = 5;
+  try {
+    for (let start = 0; start < ids.length; start += CHUNK) {
+      const chunk = ids.slice(start, start + CHUNK);
+      const res = await api.aiBatchSummary(chunk, force);
+      for (const r of res.results) {
+        if (r.status === 'generated') ok++;
+        else if (r.status === 'failed') fail++;
+      }
+    }
+    selected.value = new Set();
+    emit('notify', `AI 摘要完成：成功 ${ok} 篇，跳过 ${ids.length - ok - fail} 篇，失败 ${fail} 篇`);
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    busy.value = false;
+    await load();
+  }
+}
 </script>
 
 <template>
@@ -204,6 +240,9 @@ async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore'
         <button class="btn btn-ghost mini" :disabled="busy || moveCol === ''" @click="bulk('move')">移动</button>
         <span style="flex:1"></span>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('delete')">移入回收站</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulkAiSummary(false)">AI 摘要</button>
+        <button class="btn btn-ghost mini" :disabled="busy" @click="bulkAiSummary(true)">AI 摘要（强制覆盖）</button>
       </template>
       <template v-else>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('restore')">恢复</button>

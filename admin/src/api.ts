@@ -204,10 +204,10 @@ export const api = {
     body: JSON.stringify(config),
   }),
 
-  aiBatchSummary: (ids: number[]) =>
+  aiBatchSummary: (ids: number[], force = false) =>
     request<{ results: Array<{ id: number; status: string; error?: string }> }>('/api/ai/batch-summary', {
       method: 'POST',
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ ids, force }),
     }),
 
   deleteAiKey: () => request<{ ok: boolean }>('/api/settings/ai-key', { method: 'DELETE' }),

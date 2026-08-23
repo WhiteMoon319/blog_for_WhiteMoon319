@@ -27,7 +27,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);
   if (!env.AI_SETTINGS_ENCRYPTION_KEY) return json({ error: 'encryption_key_not_configured' }, 500);
 
-  let body: { ids?: number[] };
+  let body: { ids?: number[]; force?: boolean };
   try {
     body = await ctx.request.json();
   } catch {
@@ -36,6 +36,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!Array.isArray(body.ids) || body.ids.length === 0) return json({ error: 'ids required' }, 400);
   if (body.ids.length > AI_BATCH_MAX) return json({ error: `too many ids, max ${AI_BATCH_MAX}` }, 400);
 
+  const force = body.force === true;
   const ids = [...new Set(body.ids.filter((id): id is number => Number.isInteger(id) && id > 0))];
   if (ids.length === 0) return json({ error: 'invalid ids' }, 400);
 
@@ -64,13 +65,18 @@ export async function POST(ctx: APIContext): Promise<Response> {
       continue;
     }
 
-    if (post.summary_source === 'manual') {
-      results.push({ id, status: 'skipped', error: 'manual_summary' });
-      continue;
-    }
-    if (post.summary_source === 'ai') {
-      results.push({ id, status: 'skipped', error: 'already_generated' });
-      continue;
+    const hasSummary = !!post.summary?.trim();
+    if (!force) {
+      // 非强制模式：只补空摘要，或覆盖 local 导入摘要；manual/ai 的非空摘要一律跳过
+      if (hasSummary && post.summary_source === 'manual') {
+        results.push({ id, status: 'skipped', error: 'manual_summary' });
+        continue;
+      }
+      if (hasSummary && post.summary_source === 'ai') {
+        results.push({ id, status: 'skipped', error: 'already_generated' });
+        continue;
+      }
+      // 空摘要（source 可为 manual/local/ai）与 local 非空摘要都允许生成
     }
 
     if (!post.content_md?.trim()) {
@@ -99,12 +105,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
         continue;
       }
 
-      // 版本化写入：使用 base_version 乐观锁 + summary_source 守卫
+      // 版本化写入：以「读取时的摘要」+ base_version 为守卫，避免覆盖并发的手工修改
       const updated = await env.DB.prepare(
         `UPDATE posts SET summary = ?, summary_source = 'ai', updated_at = datetime('now')
-         WHERE id = ? AND summary_source = 'local' AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?
+         WHERE id = ? AND summary = ? AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?
          RETURNING id`,
-      ).bind(summary, id, id, version).first<{ id: number }>();
+      ).bind(summary, id, post.summary ?? '', id, version).first<{ id: number }>();
 
       if (!updated) {
         results.push({ id, status: 'conflict' });

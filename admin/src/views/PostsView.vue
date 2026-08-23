@@ -120,6 +120,26 @@ async function togglePin(p: Post) {
 const selected = ref<Set<number>>(new Set());
 const busy = ref(false);
 const moveCol = ref<number | ''>('');
+const aiId = ref<number | null>(null);
+
+async function aiOne(p: Post) {
+  if (aiId.value !== null) return;
+  // 有非空摘要时确认覆盖
+  if (p.summary?.trim() && !confirm(`「${p.title}」已有摘要，确要用 AI 重新生成并覆盖？`)) return;
+  aiId.value = p.id;
+  try {
+    const res = await api.aiBatchSummary([p.id], true);
+    const r = res.results[0];
+    if (r?.status === 'generated') emit('notify', 'AI 摘要已更新');
+    else if (r?.status === 'conflict') emit('notify', '摘要刚被修改，请重试', true);
+    else emit('notify', r?.error ? `未生成：${r.error}` : '未生成', true);
+    await load();
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    aiId.value = null;
+  }
+}
 
 function toggleAll() {
   const all = shown.value.map((p) => p.id);
@@ -323,6 +343,9 @@ async function bulkAiSummary(force: boolean) {
                   </button>
                   <button class="btn btn-ghost mini" @click="toggleStatus(p)">
                     {{ p.status === 'published' ? '撤稿' : '刊发' }}
+                  </button>
+                  <button class="btn btn-ghost mini" :disabled="aiId === p.id" @click="aiOne(p)">
+                    {{ aiId === p.id ? '生成中…' : (p.summary?.trim() ? 'AI 重写' : 'AI 摘要') }}
                   </button>
                   <button class="btn btn-danger mini" @click="trash(p)">回收</button>
                 </template>

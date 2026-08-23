@@ -227,3 +227,7 @@ npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # AI 加密主密钥，32 �
 - v1 全量快照，后续版本对最近一次全量快照存 unified diff
 - 补丁超过正文 50% 或 128 字节时重新全量
 - 读取时透明重建，版本史面板 diff 对比不受影响
+
+## 开源协议
+
+[GNU Affero General Public License v3.0（AGPL-3.0）](LICENSE)

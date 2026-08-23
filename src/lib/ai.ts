@@ -1,5 +1,3 @@
-import { createPatch } from 'diff';
-
 const SUMMARY_TIMEOUT_MS = 30_000;
 const TEST_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 100_000;
@@ -29,15 +27,41 @@ function buildEndpoint(baseUrl: string, path: string): string {
 function isInternalUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '0.0.0.0' || u.hostname.startsWith('192.168.') || u.hostname.startsWith('10.') || u.hostname.startsWith('172.16.') || u.hostname === '::1') return true;
-    if (u.hostname.match(/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) return true;
+    let host = u.hostname;
+    // IPv6 地址以 [::1] 形式出现在 hostname，去括号后再判断
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    const lower = host.toLowerCase();
+    if (lower === 'localhost' || lower === '::1' || lower === '::' || lower === '0.0.0.0') return true;
+    if (lower === '' || (lower.includes(':') && !/^[0-9a-f:.]+$/.test(lower))) {
+      // 域名直接放行（解析交给 DNS，无法在 Worker 内逐一解析）
+    }
+    // IPv4 私网/回环
+    if (/^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/.test(lower)) return true;
+    const v4 = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4) {
+      const [a, b] = [Number(v4[1]), Number(v4[2])];
+      if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12
+    }
+    // IPv6：唯一本地 fd00::/8、链路本地 fe80::/10、站点本地 fec0::/10、IPv4 映射 ::ffff:a.b.c.d
+    if (lower.includes(':')) {
+      const ipv6Part = lower.startsWith('::ffff:') ? lower.slice(7) : lower;
+      if (lower.startsWith('::ffff:')) {
+        const v4m = ipv6Part.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (v4m) {
+          const a = Number(v4m[1]);
+          if (a === 127 || a === 10 || a === 192 || (a === 172 && Number(v4m[2]) >= 16 && Number(v4m[2]) <= 31)) return true;
+        }
+        return true; // ::ffff: 非公网可解析为内网风险，一律拦截
+      }
+      if (/^fd[0-9a-f]{2}:/.test(lower) || /^fe[89ab]:/.test(lower) || /^fec0:/.test(lower) || /^fc0[0-9a-f]:/.test(lower)) return true;
+    }
     return false;
   } catch {
     return false;
   }
 }
 
-function sanitizeError(err: unknown): string {
+export function sanitizeError(err: unknown): string {
   if (err instanceof Error) {
     const msg = err.message;
     if (msg.includes('AbortError') || msg.includes('aborted')) return 'request_timeout';
@@ -47,7 +71,7 @@ function sanitizeError(err: unknown): string {
   return String(err).slice(0, 100);
 }
 
-export async function callAi(messages: Array<{ role: string; content: string }>, config: AiConfig, timeoutMs = SUMMARY_TIMEOUT_MS): Promise<string[]> {
+export async function callAi(messages: Array<{ role: string; content: string }>, config: AiConfig, timeoutMs = SUMMARY_TIMEOUT_MS, n?: number): Promise<string[]> {
   const endpoint = buildEndpoint(config.baseUrl, 'chat/completions');
   if (isInternalUrl(endpoint)) throw new Error('blocked_internal_url');
 
@@ -59,6 +83,9 @@ export async function callAi(messages: Array<{ role: string; content: string }>,
 
   if (config.reasoningEffort) {
     body.reasoning_effort = config.reasoningEffort;
+  }
+  if (n !== undefined && n > 1) {
+    body.n = n;
   }
 
   const controller = new AbortController();
@@ -140,15 +167,9 @@ export async function generateSummary(content: string, context: SummaryContext[]
 
   if (config.multiSummary && config.candidateCount > 1) {
     const n = Math.min(config.candidateCount, 5);
-    const body: Record<string, unknown> = {
-      model: config.model,
-      messages,
-      stream: false,
-      n,
-    };
-    // Single call with n. If provider doesn't support n, fallback to 1.
+    // 部分服务商不支持 n，请求失败则回退单条
     try {
-      return await callAi(messages, config);
+      return await callAi(messages, config, SUMMARY_TIMEOUT_MS, n);
     } catch {
       // fallback to single candidate
     }

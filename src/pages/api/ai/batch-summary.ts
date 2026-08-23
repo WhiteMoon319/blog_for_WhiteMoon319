@@ -1,8 +1,8 @@
 import type { APIContext } from 'astro';
-import { envOf, getAllSettings, getAiCredential, getPostById, getLatestPostVersion } from '../../../lib/db';
+import { envOf, getAllSettings, getAiCredential, getLatestPostVersion } from '../../../lib/db';
 import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
-import { generateSummary, collectContext, type AiConfig } from '../../../lib/ai';
+import { generateSummary, collectContext, sanitizeError, type AiConfig } from '../../../lib/ai';
 
 export const prerender = false;
 
@@ -105,29 +105,35 @@ export async function POST(ctx: APIContext): Promise<Response> {
         continue;
       }
 
-      // 版本化写入：以「读取时的摘要」+ base_version 为守卫，避免覆盖并发的手工修改
-      const updated = await env.DB.prepare(
-        `UPDATE posts SET summary = ?, summary_source = 'ai', updated_at = datetime('now')
-         WHERE id = ? AND summary = ? AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?
-         RETURNING id`,
-      ).bind(summary, id, post.summary ?? '', id, version).first<{ id: number }>();
+      // 版本化写入：以「读取时的摘要」+ base_version 为守卫，避免覆盖并发的手工修改；
+      // UPDATE 与版本快照在同一 D1 batch 内原子执行，任一失败整体回滚。
+      const updated = await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE posts SET summary = ?, summary_source = 'ai', updated_at = datetime('now')
+           WHERE id = ? AND summary = ? AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?
+           RETURNING id`,
+        ).bind(summary, id, post.summary ?? '', id, version),
+        // 版本 INSERT 的 SELECT 守卫与 UPDATE 的守卫联动：UPDATE 未命中时 summary_source 未变，
+        // 该 SELECT 落空，不会产生多余版本。
+        env.DB.prepare(
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message, summary_source)
+           SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
+                  title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, 'AI 生成摘要', 'ai'
+           FROM posts
+           WHERE id = ? AND summary_source = 'ai'
+             AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`,
+        ).bind(id, id, id, id, version),
+      ]);
+      const row = updated[0].results?.[0] as { id: number } | undefined;
 
-      if (!updated) {
+      if (!row) {
         results.push({ id, status: 'conflict' });
         continue;
       }
 
-      // 写入版本历史
-      await env.DB.prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, message, summary_source)
-         SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                title, slug, collection_id, summary, content_md, cover_url, status, meta_keywords, 'AI 生成摘要', 'ai'
-         FROM posts WHERE id = ?`,
-      ).bind(id, id, id).run();
-
       results.push({ id, status: 'generated' });
     } catch (e) {
-      results.push({ id, status: 'failed', error: (e as Error).message || 'generation_failed' });
+      results.push({ id, status: 'failed', error: sanitizeError(e) });
     }
   }
 

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { envOf, getAllSettings, saveSettings, getAiCredential, saveAiCredential } from '../../../lib/db';
+import { envOf, getAllSettings, getAiCredential } from '../../../lib/db';
 import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { encryptApiKey, decryptApiKey, maskApiKey } from '../../../lib/ai-credentials';
 import { testConnection, type AiConfig } from '../../../lib/ai';
@@ -57,34 +57,44 @@ export async function POST(ctx: APIContext): Promise<Response> {
     return json({ ok: false, error: testResult.error ?? 'test_failed' });
   }
 
-  // 测试成功，保存配置
+  // 测试成功，保存配置：settings 与 ai_credentials 在同一 D1 batch 原子写入，
+  // 避免先清旧 Key 再写新 Key 造成中途失败后凭据丢失。
   const settingsPairs: Record<string, string> = {
     ai_provider: provider,
     ai_base_url: baseUrl,
     ai_model: model,
     ai_reasoning_effort: reasoningEffort,
   };
-
-  // 如用户传了新 Key 则加密保存
   let newKeyConfigured = false;
   let maskedKey = '';
+  const stmts: D1PreparedStatement[] = Object.entries(settingsPairs).map(([k, v]) =>
+    env.DB.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(k, v),
+  );
+
   if (typeof body.api_key === 'string' && body.api_key.length > 0) {
+    let ciphertext: string;
     try {
-      const ciphertext = await encryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, body.api_key);
-      await saveAiCredential(env.DB, ciphertext);
-      newKeyConfigured = true;
-      maskedKey = maskApiKey(body.api_key);
+      ciphertext = await encryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, body.api_key);
     } catch {
       return json({ error: 'encryption_failed' }, 500);
     }
+    stmts.push(
+      env.DB.prepare(
+        `INSERT INTO ai_credentials (id, api_key_ciphertext, encryption_key_version, updated_at)
+         VALUES (1, ?, 1, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET api_key_ciphertext = excluded.api_key_ciphertext, updated_at = excluded.updated_at`,
+      ).bind(ciphertext),
+    );
+    newKeyConfigured = true;
+    maskedKey = maskApiKey(body.api_key);
   }
 
-  await saveSettings(env.DB, settingsPairs);
+  await env.DB.batch(stmts);
 
   return json({
     ok: true,
     saved: true,
     api_key_configured: newKeyConfigured || !!curCred,
-    api_key_masked: maskedKey || (curCred ? apiKey.slice(0, 3) + '••••••••' + apiKey.slice(-4) : false),
+    api_key_masked: maskedKey || (curCred ? maskApiKey(apiKey) : false),
   });
 }

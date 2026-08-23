@@ -1,5 +1,16 @@
 import type { CollectionRow, PostRow, PostVersionRow, TagRow } from './types.ts';
 
+// 全量导出只允许的非敏感 settings 键（显式白名单，杜绝 SELECT * 泄漏）。
+// 任何新增设置键必须按此显式登记后才可进入导出。
+const EXPORTABLE_SETTINGS = new Set([
+  'SITE_NAME', 'SITE_SLOGAN', 'SITE_POEM', 'SITE_URL',
+  'ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort', 'ai_multi_summary', 'ai_candidate_count',
+]);
+
+function isExportableSetting(key: string): boolean {
+  return EXPORTABLE_SETTINGS.has(key);
+}
+
 export interface PostTagRow {
   post_id: number;
   tag_id: number;
@@ -47,7 +58,10 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
     pages = [];
   }
   try {
-    settings = (await db.prepare('SELECT * FROM settings ORDER BY key').all<Record<string, unknown>>()).results ?? [];
+    // 只导出显式白名单内的非敏感设置，绝不含任何凭据/密文；
+    // 若 settings 中将来出现白名单外的键则不进入快照。
+    const rows = (await db.prepare('SELECT key, value FROM settings ORDER BY key').all<{ key: string; value: string }>()).results ?? [];
+    settings = rows.filter((r) => isExportableSetting(r.key)).map((r) => ({ key: r.key, value: r.value }));
   } catch {
     settings = [];
   }
@@ -96,6 +110,7 @@ export async function exportPostMarkdown(db: D1Database, id: number): Promise<{ 
     `slug: ${yaml(post.slug)}`,
     `collection_id: ${post.collection_id ?? 'null'}`,
     `status: ${post.status}`,
+    `summary: ${yaml(post.summary)}`,
     `created_at: ${yaml(post.created_at)}`,
     `updated_at: ${yaml(post.updated_at)}`,
     post.deleted_at ? `deleted_at: ${yaml(post.deleted_at)}` : null,

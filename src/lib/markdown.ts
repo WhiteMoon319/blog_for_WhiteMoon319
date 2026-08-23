@@ -38,12 +38,13 @@ export function extractMath(src: string): { src: string; math: Array<{ tex: stri
     math.push({ tex: tex.trim(), display: true });
     return `${MATH_MARKER}${idx}${MATH_MARKER}`;
   });
-  // 行内：$ 包裹且首尾非空白、非空内容
-  out = out.replace(/(^|[^$])\$([^\n$]+?)\$([^$]|$)/g, (_m, pre: string, tex: string, post: string) => {
+  // 行内：$ 包裹且首尾非空白、非空内容。
+  // 结尾用零宽 lookahead（不消费边界字符），避免相邻公式 `$a$ $b$` 因吞掉空格而丢匹配
+  out = out.replace(/(^|[^$])\$([^\n$]+?)\$(?=[^$]|$)/g, (_m, pre: string, tex: string) => {
     if (!tex.trim() || tex.startsWith(' ') || tex.endsWith(' ') || /^\$/.test(tex)) return _m;
     const idx = math.length;
     math.push({ tex, display: false });
-    return `${pre}${MATH_MARKER}${idx}${MATH_MARKER}${post}`;
+    return `${pre}${MATH_MARKER}${idx}${MATH_MARKER}`;
   });
   return { src: out, math };
 }

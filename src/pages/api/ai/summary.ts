@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { envOf, getAllSettings, getAiCredential } from '../../../lib/db';
 import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
-import { generateSummary, collectContext, type AiConfig } from '../../../lib/ai';
+import { generateSummary, collectContext, sanitizeError, type AiConfig } from '../../../lib/ai';
 
 export const prerender = false;
 
@@ -71,6 +71,6 @@ export async function POST(ctx: APIContext): Promise<Response> {
     const summaries = await generateSummary(body.content_md, context, config);
     return json({ summaries });
   } catch (e) {
-    return json({ error: (e as Error).message || 'ai_generation_failed' }, 502);
+    return json({ error: sanitizeError(e) }, 502);
   }
 }

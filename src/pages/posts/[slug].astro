@@ -5,6 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
 import ArticleEnhancer from '../../components/ArticleEnhancer.astro';
+import Comments from '../../components/Comments.astro';
 import { safeJsonLd } from '../../lib/seo';
 
 const env = await envOf();
@@ -100,5 +101,6 @@ const jsonLd = {
       {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
     </nav>
   </article>
+  <Comments postId={post.id} />
   <ArticleEnhancer />
 </BaseLayout>

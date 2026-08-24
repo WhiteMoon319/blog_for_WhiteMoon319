@@ -12,18 +12,22 @@ import { api } from '../api';
 export const authState = reactive({
   authed: false,
   checking: true,
+  role: '' as string,
 });
 
 export async function initAuth(): Promise<void> {
   try {
     const me = await api.me();
     authState.authed = me.authenticated;
+    authState.role = (me as unknown as { role?: string }).role ?? '';
   } catch {
     authState.authed = false;
+    authState.role = '';
   }
   authState.checking = false;
 }
 
-export function setAuthed(value: boolean): void {
+export function setAuthed(value: boolean, role = ''): void {
   authState.authed = value;
+  authState.role = role;
 }

@@ -68,10 +68,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
       `感谢注册「月下独酌」博客！\n\n您的验证码是：${code}\n\n5 分钟内有效，请勿泄露给他人。`,
     );
   } catch (e) {
-    // 邮件发送失败时回滚用户创建
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
     return json({ error: '注册失败，请稍后重试' }, 500);
   }
 
-  return json({ ok: true, message: '注册成功，请查看邮箱验证码' }, 201);
+  return json({ ok: true, user_id: user.id, message: '注册成功，请查看邮箱验证码' }, 201);
 }

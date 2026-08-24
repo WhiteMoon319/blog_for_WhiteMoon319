@@ -39,9 +39,10 @@ export interface ExportSnapshot {
   tags: TagRow[];
   collection_tags: CollectionTagRow[];
   post_tags: PostTagRow[];
-  // 可选模块：Phase 4B 之前 pages 表不存在，返回空数组而非报错
   pages: Array<Record<string, unknown>>;
   settings: Array<Record<string, unknown>>;
+  users: Array<Record<string, unknown>>;
+  comments: Array<Record<string, unknown>>;
 }
 
 // 全量数据快照（只读）：登录后经 /api/export 暴露。
@@ -59,20 +60,26 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
 
   let pages: Array<Record<string, unknown>> = [];
   let settings: Array<Record<string, unknown>> = [];
-  // 可选表尚不存在时（按阶段推进部署）返回空数组，接口保持可用
+  let users: Array<Record<string, unknown>> = [];
+  let comments: Array<Record<string, unknown>> = [];
   try {
     pages = (await db.prepare('SELECT * FROM pages ORDER BY id').all<Record<string, unknown>>()).results ?? [];
-  } catch {
-    pages = [];
-  }
+  } catch { pages = []; }
   try {
-    // 只导出显式白名单内的非敏感设置，绝不含任何凭据/密文；
-    // 若 settings 中将来出现白名单外的键则不进入快照。
     const rows = (await db.prepare('SELECT key, value FROM settings ORDER BY key').all<{ key: string; value: string }>()).results ?? [];
     settings = rows.filter((r) => isExportableSetting(r.key)).map((r) => ({ key: r.key, value: r.value }));
-  } catch {
-    settings = [];
-  }
+  } catch { settings = []; }
+  try {
+    // users：仅白名单字段，排除敏感信息
+    users = (await db.prepare(
+      `SELECT id, username, display_name, email, role, status, created_at FROM users ORDER BY id`,
+    ).all<Record<string, unknown>>()).results ?? [];
+  } catch { users = []; }
+  try {
+    comments = (await db.prepare(
+      `SELECT * FROM comments ORDER BY post_id, id`,
+    ).all<Record<string, unknown>>()).results ?? [];
+  } catch { comments = []; }
 
   let migrationVersion = 'unknown';
   try {
@@ -85,7 +92,7 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
   }
 
   return {
-    schema_version: 1,
+    schema_version: 2,
     generated_at: new Date().toISOString(),
     migration_version: migrationVersion,
     collections: collections.results ?? [],
@@ -96,6 +103,8 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
     post_tags: post_tags.results ?? [],
     pages,
     settings,
+    users,
+    comments,
   };
 }
 

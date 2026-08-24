@@ -1021,7 +1021,7 @@ test('e2e：导出——未登录 401，登录后可取全量快照与单篇 Mar
   assert.equal(snap.headers.get('cache-control'), 'no-store', '导出响应不得被缓存');
   assert.ok(String(snap.headers.get('content-disposition')).startsWith('attachment;'), '应提示下载');
   const body = await snap.json();
-  assert.equal(body.schema_version, 1);
+  assert.equal(body.schema_version, 2, 'schema_version 递增');
   assert.ok(body.migration_version.length > 0, '应标注迁移版本');
   assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'export-e2e'), '快照含新文章');
   assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'astro-on-cloudflare'), '快照含种子文章');

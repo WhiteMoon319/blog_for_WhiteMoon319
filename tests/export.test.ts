@@ -49,7 +49,7 @@ test('导出：全量快照含全部表与版本信息，且快照忠实反映�
   await trashPosts(db, [post.id]);
 
   const snap = await exportFullSnapshot(db);
-  assert.equal(snap.schema_version, 1);
+  assert.equal(snap.schema_version, 2, 'schema_version 递增');
   assert.ok(snap.generated_at, '应带生成时间');
   assert.ok(snap.migration_version.length > 0, '应带迁移版本（测试环境可能为 unknown）');
   assert.equal(snap.collections.length, 1);

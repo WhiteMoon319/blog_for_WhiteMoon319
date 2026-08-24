@@ -6,6 +6,7 @@ import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPo
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
 import ArticleEnhancer from '../../../components/ArticleEnhancer.astro';
+import Comments from '../../../components/Comments.astro';
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
@@ -71,5 +72,6 @@ const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
       {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
     </nav>
   </article>
+  <Comments postId={post.id} />
   <ArticleEnhancer />
 </BaseLayout>

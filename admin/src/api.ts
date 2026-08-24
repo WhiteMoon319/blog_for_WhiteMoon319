@@ -43,7 +43,7 @@ export const api = {
   me: () => request<{ authenticated: boolean; sub?: string }>('/api/auth/me'),
 
   login: (password: string) =>
-    request<{ ok: boolean }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }, true),
+    request<{ ok: boolean; role?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }, true),
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
@@ -219,6 +219,16 @@ export const api = {
     }),
 
   deleteAiKey: () => request<{ ok: boolean }>('/api/settings/ai-key', { method: 'DELETE' }),
+
+  // ---- 评论管理 ----
+  adminComments: (status = 'pending', page = 1) =>
+    request<{ comments: Array<{ id: number; post_id: number; body: string; attachments: string; status: string; created_at: string; username: string; display_name: string; post_title: string }>; total: number; page: number }>(
+      `/api/admin/comments?status=${status}&page=${page}`,
+    ),
+  adminCommentUpdate: (id: number, status: 'approved' | 'rejected') =>
+    request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  adminCommentDelete: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'DELETE' }),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

@@ -26,11 +26,16 @@ watch(
 
 onMounted(async () => {
   window.addEventListener('auth:expired', () => {
-    setAuthed(false);
+    setAuthed(false, '');
     if (route.path !== '/login') router.push('/login');
   });
   await initAuth();
-  if (!authState.authed && route.path !== '/login') router.push('/login');
+  // 路由守卫：非管理员角色（reader、未登录）一律重定向到登录页
+  if (route.path !== '/login') {
+    if (!authState.authed || authState.role !== 'admin') {
+      router.push('/login');
+    }
+  }
 });
 
 async function logout() {
@@ -62,6 +67,7 @@ async function logout() {
         <router-link to="/import">导入</router-link>
         <router-link to="/pages">页面</router-link>
         <router-link to="/stats">数据</router-link>
+        <router-link to="/comments">评论</router-link>
         <router-link to="/export">导出</router-link>
         <router-link to="/settings">设置</router-link>
         <router-link to="/editor">写新篇</router-link>

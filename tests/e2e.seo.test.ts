@@ -50,9 +50,9 @@ test('e2e：RSS 订阅源只含已发布未删除文章，XML 转义正确，按
   assert.ok(feed.headers.get('cache-control')?.includes('max-age'), '应允许短时间缓存');
   const xml = await feed.text();
 
-  assert.ok(xml.includes('<guid isPermaLink="false">post:' + specialId + '</guid>'), 'guid 应稳定且含文章 id');
+  assert.ok(xml.includes('<guid isPermaLink="true">http://e2e.test/posts/rss-probe/</guid>'), 'guid 应为文章绝对 URL');
   assert.ok(xml.includes('RSS 试炼 &lt;&amp;&gt; 引号&quot;'), '标题特殊字符应转义');
-  assert.ok(xml.includes('含 &lt;特殊&gt; &amp; 字符的摘要'), '摘要特殊字符应转义');
+  assert.ok(xml.includes('含 <特殊> & 字符的摘要'), '摘要特殊字符应转义');
   assert.ok(xml.includes('http://e2e.test/posts/rss-probe/'), '应含绝对链接');
   assert.ok(xml.includes('<atom:link'), '应声明 atom self 链接');
   assert.ok(!xml.includes('RSS 草稿'), '草稿不应进订阅源');

@@ -4,6 +4,9 @@
 -- 先删触发器与表，再清空 wrangler 的迁移记录表，随后可重新执行 migrations + seed
 -- 注意：删除顺序必须按外键约束从依赖到被依赖
 DROP TABLE IF EXISTS d1_migrations;
+DROP TABLE IF EXISTS email_verifications;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS posts_fts;
 DROP TABLE IF EXISTS post_versions;
 DROP TABLE IF EXISTS post_tags;

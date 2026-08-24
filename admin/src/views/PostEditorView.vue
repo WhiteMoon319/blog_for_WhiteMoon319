@@ -45,6 +45,18 @@ const loading = ref(true);
 const saving = ref(false);
 const uploading = ref(false);
 const generatingSummary = ref(false);
+const promptTemplates = ref<Array<{ id: string; name: string }>>([]);
+const selectedPromptId = ref('overview');
+
+watch(() => form.collection_id, async (colId) => {
+  // 文集切换时更新默认 prompt
+  if (colId != null) {
+    try {
+      const { collection } = await api.collection(colId);
+      selectedPromptId.value = (collection as any).ai_prompt_id ?? 'overview';
+    } catch { /* ignore */ }
+  }
+});
 const loadedId = ref<number | null>(null);
 const baseVersion = ref(0);
 
@@ -280,6 +292,15 @@ async function load() {
     const cols = await api.collections();
     collections.value = cols.collections;
   }
+  // 载入 prompt 模板并确定默认选择
+  try {
+    const s = await api.settings() as unknown as Record<string, string>;
+    const raw = s.ai_prompt_templates;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
+    }
+  } catch { /* ignore */ }
 
   const id = parseId(route.query.id);
   loadedId.value = id;
@@ -708,7 +729,7 @@ async function generateAiSummary() {
   }
   generatingSummary.value = true;
   try {
-    const res = await api.aiSummary(md, form.collection_id ?? undefined, loadedId.value ?? undefined);
+    const res = await api.aiSummary(md, form.collection_id ?? undefined, loadedId.value ?? undefined, selectedPromptId.value);
     if (res.summaries && res.summaries.length > 0) {
       if (res.summaries.length === 1) {
         form.summary = res.summaries[0];
@@ -779,12 +800,16 @@ async function generateAiSummary() {
         <label>摘要</label>
         <div style="display:flex;gap:8px;align-items:flex-start;">
           <textarea v-model="form.summary" class="textarea" placeholder="列表卡上的一行小字" style="flex:1;" />
-          <button type="button" class="btn btn-ghost" :disabled="generatingSummary" @click="generateAiSummary" style="white-space:nowrap;margin-top:2px;">
-            {{ generatingSummary ? '生成中…' : 'AI 生成' }}
-          </button>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <select v-model="selectedPromptId" class="select" style="width:auto;font-size:0.78rem;padding:4px 8px;">
+              <option v-for="t in promptTemplates" :key="t.id" :value="t.id">{{ t.name }}（{{ t.id }}）</option>
+            </select>
+            <button type="button" class="btn btn-ghost" :disabled="generatingSummary" @click="generateAiSummary" style="white-space:nowrap;margin-top:2px;">
+              {{ generatingSummary ? '生成中…' : 'AI 生成' }}
+</button>
         </div>
       </div>
-
+    </div>
       <div class="field">
         <label>SEO 关键词（meta keywords，逗号分隔，最多 200 字）</label>
         <input v-model="form.meta_keywords" class="input" maxlength="200" placeholder="文章、随笔、书房" />

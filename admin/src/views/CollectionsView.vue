@@ -14,14 +14,24 @@ const editing = ref<Collection | null>(null);
 const creating = ref(false);
 const suggestions = ref<string[]>([]);
 
-const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', ref_summaries: 0, tags: [] as string[] });
+const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', ref_summaries: 0, tags: [] as string[], ai_prompt_id: 'overview' });
 
 const COLORS = ['#c23a30', '#2d6a4f', '#2f4858', '#8a6d3b', '#6baed6'];
+const promptTemplates = ref<Array<{ id: string; name: string }>>([]);
 
 async function load() {
-  const r = await api.collections();
+  const [r, s] = await Promise.all([
+    api.collections(),
+    api.settings().catch(() => ({ ai_prompt_templates: '' })),
+  ]);
   collections.value = r.collections;
   loaded.value = true;
+  // 加载 prompt 模板列表
+  const raw = (s as Record<string, string>).ai_prompt_templates;
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
+  } catch { /* ignore */ }
 }
 onMounted(async () => {
   try {
@@ -35,7 +45,7 @@ onMounted(async () => {
 function openCreate() {
   creating.value = true;
   editing.value = null;
-  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', ref_summaries: 0, tags: [] });
+  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', ref_summaries: 0, tags: [], ai_prompt_id: 'overview' });
 }
 
 async function openEdit(c: Collection) {
@@ -49,6 +59,7 @@ async function openEdit(c: Collection) {
     sort_order: c.sort_order,
     post_order: c.post_order,
     ref_summaries: c.ref_summaries ?? 0,
+    ai_prompt_id: c.ai_prompt_id ?? 'overview',
     tags: [],
   });
   try {
@@ -175,6 +186,13 @@ async function remove(c: Collection) {
           <input v-model.number="form.ref_summaries" type="checkbox" :true-value="1" :false-value="0" />
           参考前文摘要（AI 生成时参考该文集最近 3 篇已刊文章的摘要风格）
         </label>
+      </div>
+      <div class="field">
+        <label>AI 摘要模板</label>
+        <select v-model="form.ai_prompt_id" class="select">
+          <option v-for="t in promptTemplates" :key="t.id" :value="t.id">{{ t.name }}（{{ t.id }}）</option>
+          <option :value="'overview'" v-if="!promptTemplates.find((t) => t.id === 'overview')">博客摘要（overview）</option>
+        </select>
       </div>
       <div class="field">
         <label>标签（其下文章默认继承）</label>

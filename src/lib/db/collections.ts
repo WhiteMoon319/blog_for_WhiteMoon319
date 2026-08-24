@@ -54,12 +54,13 @@ export async function createCollection(
     sort_order?: number;
     post_order?: 'asc' | 'desc';
     ref_summaries?: number;
+    ai_prompt_id?: string;
   },
 ): Promise<CollectionRow | null> {
   const res = await db
     .prepare(
-      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     )
     .bind(
       data.title,
@@ -69,6 +70,7 @@ export async function createCollection(
       data.sort_order ?? 0,
       data.post_order ?? 'desc',
       data.ref_summaries ?? 0,
+      data.ai_prompt_id ?? 'overview',
     )
     .first<CollectionRow>();
   return res ?? null;
@@ -85,14 +87,15 @@ export async function createCollectionWithTags(
     sort_order?: number;
     post_order?: 'asc' | 'desc';
     ref_summaries?: number;
+    ai_prompt_id?: string;
   },
   tagNames: string[],
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       )
       .bind(
         data.title,
@@ -102,6 +105,7 @@ export async function createCollectionWithTags(
         data.sort_order ?? 0,
         data.post_order ?? 'desc',
         data.ref_summaries ?? 0,
+        data.ai_prompt_id ?? 'overview',
       ),
   ];
   const unique = [...new Set(tagNames.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
@@ -128,7 +132,7 @@ export async function createCollectionWithTags(
 
 export async function updateCollection(db: D1Database, id: number, patch: CollectionPatch): Promise<CollectionRow | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id'].includes(k),
   );
   if (keys.length === 0) return getCollectionById(db, id);
   const sets = keys.map((k) => `${k} = ?`).join(', ');
@@ -148,7 +152,7 @@ export async function updateCollectionWithTags(
   tagNames: string[] | null,
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id'].includes(k),
   );
   const stmts: D1PreparedStatement[] = [];
   if (keys.length > 0) {

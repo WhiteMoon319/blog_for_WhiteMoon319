@@ -64,6 +64,41 @@ const fetchingModels = ref(false);
 const testingAi = ref(false);
 const aiSaving = ref(false);
 
+interface PromptTemplate { id: string; name: string; prompt: string; }
+const promptTemplates = ref<PromptTemplate[]>([]);
+const promptSaving = ref(false);
+
+function parseTemplates(raw: string | undefined): PromptTemplate[] {
+  try {
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed)) return parsed.filter((t) => t && typeof t.id === 'string' && typeof t.name === 'string' && typeof t.prompt === 'string');
+  } catch { /* ignore */ }
+  return [];
+}
+
+async function savePromptTemplates() {
+  promptSaving.value = true;
+  try {
+    const trimmed = promptTemplates.value
+      .filter((t) => t.id.trim() && t.name.trim() && t.prompt.trim())
+      .map((t) => ({ id: t.id.trim(), name: t.name.trim(), prompt: t.prompt.trim() }));
+    const result = await api.saveSettings({ ai_prompt_templates: JSON.stringify(trimmed) });
+    emit('notify', 'Prompt 模板已保存');
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    promptSaving.value = false;
+  }
+}
+
+function addPromptTemplate() {
+  promptTemplates.value.push({ id: `prompt-${Date.now()}`, name: '新模板', prompt: '' });
+}
+
+function removePromptTemplate(i: number) {
+  promptTemplates.value.splice(i, 1);
+}
+
 const saving = ref(false);
 const loading = ref(true);
 
@@ -103,6 +138,7 @@ onMounted(async () => {
     const s = await api.settings() as unknown as SiteSettings & AiSettings;
     applyToForm(s);
     applyAiSettings(s);
+    promptTemplates.value = parseTemplates((s as unknown as Record<string, string>).ai_prompt_templates);
     loading.value = false;
   } catch (e) {
     emit('notify', (e as Error).message, true);
@@ -305,6 +341,36 @@ async function deleteAiKey() {
       <span style="font-size:0.82rem;color:var(--ink-light);">
         测试连接成功后自动保存配置和 API Key
       </span>
+    </div>
+  </div>
+
+  <div class="card pad" v-if="!loading" style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 style="margin:0;">Prompt 模板</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost mini" @click="addPromptTemplate">＋ 新增模板</button>
+        <button class="btn btn-primary mini" :disabled="promptSaving" @click="savePromptTemplates">
+          {{ promptSaving ? '保存中…' : '保存模板' }}
+        </button>
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>模板说明</label>
+      <div class="hint">
+        每套模板定义一组 AI 提示词。文集可指定使用哪套；编辑器生成时默认跟随文集，也可临时切换。
+        <code>overview</code> 为默认博客摘要，<code>teaser</code> 为章节导读（适合小说/连载，不剧透）。
+      </div>
+    </div>
+    <div v-for="(t, i) in promptTemplates" :key="i" class="prompt-card" style="border:1px solid var(--hairline);border-radius:8px;padding:14px;margin-top:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input v-model="t.id" class="input" style="width:130px;font-family:var(--font-mono);" placeholder="标识(如 overview)" />
+        <input v-model="t.name" class="input" style="width:160px;" placeholder="名称" />
+        <button class="btn btn-danger mini" :disabled="promptSaving" @click="removePromptTemplate(i)">删</button>
+      </div>
+      <textarea v-model="t.prompt" class="textarea" style="margin-top:8px;" rows="6" placeholder="提示词内容…" />
+    </div>
+    <div class="hint" style="margin-top:8px;">
+      注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
     </div>
   </div>
 

@@ -64,6 +64,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
       ref_summaries: typeof body.ref_summaries === 'number' ? body.ref_summaries : 0,
+      ai_prompt_id: typeof body.ai_prompt_id === 'string' ? body.ai_prompt_id : 'overview',
     }, parsedTags.tags);
     if (!created) return json({ error: 'collection create failed' }, 500);
     return json({ collection: created.collection, tags: created.tags }, 201);

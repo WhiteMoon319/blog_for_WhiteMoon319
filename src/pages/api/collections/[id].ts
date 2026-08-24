@@ -73,6 +73,9 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.ref_summaries === 'number') {
     patch.ref_summaries = body.ref_summaries === 1 ? 1 : 0;
   }
+  if (typeof body.ai_prompt_id === 'string' && body.ai_prompt_id.length > 0) {
+    patch.ai_prompt_id = body.ai_prompt_id;
+  }
 
   // 携带 tags 时严格校验（非法/超限 400）；未携带则不动标签
   const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);

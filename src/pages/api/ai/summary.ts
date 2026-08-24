@@ -10,7 +10,7 @@ import type { APIContext } from 'astro';
 import { envOf, getAllSettings, getAiCredential } from '../../../lib/db';
 import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
-import { generateSummary, collectContext, sanitizeError, type AiConfig } from '../../../lib/ai';
+import { generateSummary, collectContext, parsePromptTemplates, sanitizeError, type AiConfig } from '../../../lib/ai';
 
 export const prerender = false;
 
@@ -33,7 +33,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);
   if (!env.AI_SETTINGS_ENCRYPTION_KEY) return json({ error: 'encryption_key_not_configured' }, 500);
 
-  let body: { content_md?: string; collection_id?: number; post_id?: number };
+  let body: { content_md?: string; collection_id?: number; post_id?: number; prompt_id?: string };
   try {
     body = await ctx.request.json();
   } catch {
@@ -56,8 +56,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const config = loadConfig(settings, apiKey);
+  const templates = parsePromptTemplates(settings.ai_prompt_templates);
 
   let collectionId: number | null = body.collection_id ?? null;
+  let promptId = body.prompt_id;
   if (body.post_id) {
     const post = await env.DB.prepare('SELECT collection_id, deleted_at FROM posts WHERE id = ?').bind(body.post_id).first<{ collection_id: number | null; deleted_at: string | null }>();
     if (!post || post.deleted_at) return json({ error: 'post not found' }, 404);
@@ -67,7 +69,14 @@ export async function POST(ctx: APIContext): Promise<Response> {
     collectionId = post.collection_id;
   }
 
+  // 未显式指定 prompt 时使用文集配置（默认 overview）
+  if (!promptId && collectionId !== null) {
+    const col = await env.DB.prepare('SELECT ai_prompt_id FROM collections WHERE id = ?').bind(collectionId).first<{ ai_prompt_id: string }>();
+    if (col?.ai_prompt_id) promptId = col.ai_prompt_id;
+  }
+
   let context = null;
+  // 参考上文摘要只用于博客摘要模板；且与 prompt 模板联动（overview 才注入）
   if (collectionId !== null) {
     const col = await env.DB.prepare('SELECT ref_summaries FROM collections WHERE id = ?').bind(collectionId).first<{ ref_summaries: number }>();
     if (col && col.ref_summaries === 1) {
@@ -76,8 +85,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   try {
-    const summaries = await generateSummary(body.content_md, context, config);
-    return json({ summaries });
+    const summaries = await generateSummary(body.content_md, context, config, { templates, promptId });
+    return json({ summaries, prompt_id: promptId ?? 'overview' });
   } catch (e) {
     return json({ error: sanitizeError(e) }, 502);
   }

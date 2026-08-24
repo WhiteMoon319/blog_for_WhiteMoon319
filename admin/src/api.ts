@@ -195,10 +195,10 @@ export const api = {
 
   aiModels: () => request<{ models: string[] }>('/api/ai/models'),
 
-  aiSummary: (md: string, collectionId?: number, postId?: number) =>
-    request<{ summaries: string[] }>('/api/ai/summary', {
+  aiSummary: (md: string, collectionId?: number, postId?: number, promptId?: string) =>
+    request<{ summaries: string[]; prompt_id: string }>('/api/ai/summary', {
       method: 'POST',
-      body: JSON.stringify({ content_md: md, collection_id: collectionId, post_id: postId }),
+      body: JSON.stringify({ content_md: md, collection_id: collectionId, post_id: postId, prompt_id: promptId }),
     }),
 
   aiTest: (config: {

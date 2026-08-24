@@ -11,11 +11,11 @@ import type { D1Database } from '@cloudflare/workers-types';
 const WHITELIST = [
   'SITE_NAME', 'SITE_SLOGAN', 'SITE_POEM', 'SITE_URL',
   'ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort',
-  'ai_multi_summary', 'ai_candidate_count',
+  'ai_multi_summary', 'ai_candidate_count', 'ai_prompt_templates',
 ] as const;
 export type SettingKey = (typeof WHITELIST)[number];
 
-const AI_KEYS = new Set(['ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort', 'ai_multi_summary', 'ai_candidate_count']);
+const AI_KEYS = new Set(['ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort', 'ai_multi_summary', 'ai_candidate_count', 'ai_prompt_templates']);
 
 function isKey(k: string): k is SettingKey {
   return (WHITELIST as readonly string[]).includes(k);

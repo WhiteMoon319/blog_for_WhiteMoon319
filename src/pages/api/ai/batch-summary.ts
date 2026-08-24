@@ -10,7 +10,7 @@ import type { APIContext } from 'astro';
 import { envOf, getAllSettings, getAiCredential, getLatestPostVersion } from '../../../lib/db';
 import { json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
-import { generateSummary, collectContext, sanitizeError, type AiConfig } from '../../../lib/ai';
+import { generateSummary, collectContext, parsePromptTemplates, sanitizeError, type AiConfig } from '../../../lib/ai';
 
 export const prerender = false;
 
@@ -60,6 +60,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const config = loadConfig(settings, apiKey);
+  const templates = parsePromptTemplates(settings.ai_prompt_templates);
 
   const results: Array<{ id: number; status: string; error?: string }> = [];
 
@@ -92,10 +93,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
       continue;
     }
 
-    // 获取参考上下文
+    // 获取该文集的 prompt 模板与参考上下文
     let context = null;
+    let promptId: string | undefined;
     if (post.collection_id !== null) {
-      const col = await env.DB.prepare('SELECT ref_summaries FROM collections WHERE id = ?').bind(post.collection_id).first<{ ref_summaries: number }>();
+      const col = await env.DB.prepare('SELECT ref_summaries, ai_prompt_id FROM collections WHERE id = ?').bind(post.collection_id).first<{ ref_summaries: number; ai_prompt_id: string }>();
+      if (col?.ai_prompt_id) promptId = col.ai_prompt_id;
       if (col && col.ref_summaries === 1) {
         context = await collectContext(env.DB, post.collection_id, id);
       }
@@ -105,7 +108,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
     const version = await getLatestPostVersion(env.DB, id);
 
     try {
-      const summaries = await generateSummary(post.content_md, context, config);
+      const summaries = await generateSummary(post.content_md, context, config, { templates, promptId });
       const summary = summaries[0];
 
       if (!summary) {

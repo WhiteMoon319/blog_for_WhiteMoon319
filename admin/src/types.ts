@@ -17,6 +17,7 @@ export interface Collection {
   created_at: string;
   updated_at: string;
   ref_summaries: number;
+  ai_prompt_id: string;
 }
 
 export interface Post {

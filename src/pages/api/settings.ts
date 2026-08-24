@@ -27,6 +27,7 @@ const KEY_DEFAULTS: Record<string, string> = {
   ai_reasoning_effort: '',
   ai_multi_summary: '0',
   ai_candidate_count: '3',
+  ai_prompt_templates: '',
 };
 
 const MAX_VALUE_LENGTH = 500;
@@ -95,26 +96,34 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   for (const k of Object.keys(KEY_DEFAULTS) as SettingKey[]) {
     if (k in body && typeof (body as Record<string, unknown>)[k] === 'string') {
       const v = ((body as Record<string, unknown>)[k] as string).trim();
-      if (v.length > MAX_VALUE_LENGTH) {
+      if (k === 'ai_prompt_templates') {
+        // prompt 模板 JSON 较长，单独放宽；并做宽松的结构校验
+        if (v.length > 20_000) return json({ error: `${k} too long` }, 400);
+        try {
+          const parsed = JSON.parse(v);
+          if (!Array.isArray(parsed) || parsed.some((t) => !t || typeof t.id !== 'string' || typeof t.name !== 'string' || typeof t.prompt !== 'string' || t.id.length === 0 || t.prompt.length === 0)) {
+            return json({ error: 'ai_prompt_templates 格式非法：需为 [{ id, name, prompt }]' }, 400);
+          }
+        } catch {
+          return json({ error: 'ai_prompt_templates 需为合法 JSON' }, 400);
+        }
+      } else if (v.length > MAX_VALUE_LENGTH) {
         return json({ error: `${k} too long: 最多 ${MAX_VALUE_LENGTH} 字` }, 400);
-      }
-      if (k === 'SITE_URL' && v && !isValidUrl(v)) {
+      } else if (k === 'SITE_URL' && v && !isValidUrl(v)) {
         return json({ error: 'SITE_URL 仅接受 http/https URL' }, 400);
-      }
-      if (isAiSettingKey(k) && k === 'ai_base_url' && v && !isValidUrl(v)) {
+      } else if (isAiSettingKey(k) && k === 'ai_base_url' && v && !isValidUrl(v)) {
         return json({ error: 'ai_base_url 仅接受 http/https URL' }, 400);
-      }
-      if (k === 'ai_multi_summary' && v !== '0' && v !== '1') {
+      } else if (k === 'ai_multi_summary' && v !== '0' && v !== '1') {
         return json({ error: 'ai_multi_summary 必须为 0 或 1' }, 400);
-      }
-      if (k === 'ai_candidate_count') {
+      } else if (k === 'ai_candidate_count') {
         const n = Number(v);
         if (!Number.isInteger(n) || n < 2 || n > 5) {
           return json({ error: 'ai_candidate_count 必须是 2-5 的整数' }, 400);
         }
-      }
-      if (k === 'ai_provider' && v !== 'deepseek' && v !== 'openai_compatible') {
+      } else if (k === 'ai_provider' && v !== 'deepseek' && v !== 'openai_compatible') {
         return json({ error: 'ai_provider 只支持 deepseek 或 openai_compatible' }, 400);
+      } else if (k === 'ai_reasoning_effort' && v.length > 32) {
+        return json({ error: 'ai_reasoning_effort 最长 32 字符' }, 400);
       }
       pairs[k] = v;
     }

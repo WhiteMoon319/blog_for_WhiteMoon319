@@ -8,6 +8,7 @@
 
 import type { APIContext } from 'astro';
 import { getSession, json } from '../../../lib/auth';
+import { envOf, getUserById } from '../../../lib/db';
 
 export const prerender = false;
 
@@ -16,5 +17,19 @@ export async function GET(ctx: APIContext): Promise<Response> {
   if (!session) {
     return json({ authenticated: false }, 401);
   }
-  return json({ authenticated: true, sub: session.sub, exp: session.exp });
+  const m = session.sub?.match(/^user:(\d+)$/);
+  if (!m) return json({ authenticated: false }, 401);
+  const env = await envOf();
+  const user = await getUserById(env.DB, Number(m[1]));
+  if (!user) return json({ authenticated: false }, 401);
+
+  return json({
+    authenticated: true,
+    sub: session.sub,
+    role: user.role,
+    username: user.username,
+    display_name: user.display_name,
+    email_verified: user.email_verified === 1,
+    exp: session.exp,
+  });
 }

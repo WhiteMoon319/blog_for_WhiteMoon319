@@ -8,7 +8,7 @@
 
 import type { APIContext } from 'astro';
 import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
-import { getSession, json, requireAuth, isAdmin, checkCsrf } from '../../../lib/auth';
+import { resolveUser, json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
@@ -22,8 +22,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const post = await getPostById(env.DB, id);
   if (!post) return json({ error: 'not found' }, 404);
 
-  const session = await getSession(ctx);
-  if (post.status === 'draft' && !isAdmin(session)) {
+  const user = await resolveUser(ctx);
+  if (post.status === 'draft' && (!user || user.user.role !== 'admin')) {
     return json({ error: 'not found' }, 404);
   }
   const tags = await listPostOwnTags(env.DB, id);

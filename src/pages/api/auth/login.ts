@@ -7,14 +7,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { checkPassword, checkCsrf, json, setSessionCookie } from '../../../lib/auth';
-import { envOf } from '../../../lib/db';
+import { checkCsrf, json, setSessionCookie } from '../../../lib/auth';
+import { envOf, getUserByUsername, getUserByEmail } from '../../../lib/db';
+import { verifyPasswordHash } from '../../../lib/db/credentials';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
 export const prerender = false;
 
 export async function POST(ctx: APIContext): Promise<Response> {
-  let body: { password?: unknown };
+  let body: { username?: unknown; password?: unknown };
   try {
     body = await ctx.request.json();
   } catch {
@@ -23,6 +24,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (typeof body.password !== 'string') {
     return json({ error: 'password required' }, 400);
   }
+
+  // 统一登录：默认管理员登录（旧客户端不传 username 时回退 admin）
+  const raw = typeof body.username === 'string' && body.username.trim() ? body.username.trim() : 'admin';
+  const ident = raw.toLowerCase();
 
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) {
@@ -40,9 +45,27 @@ export async function POST(ctx: APIContext): Promise<Response> {
     });
   }
 
-  if (!(await checkPassword(env, body.password))) {
+const user = (await getUserByUsername(env.DB, ident)) ?? (await getUserByEmail(env.DB, ident));
+  let ok = false;
+  if (user && user.password_hash) {
+    ok = await verifyPasswordHash(body.password, user.password_hash);
+  } else if (user && !user.password_hash && user.role === 'admin') {
+    // 管理员空密码哈希（种子占位）：回退到 env BLOG_ADMIN_PASSWORD 明文比对
+    const expected = env.BLOG_ADMIN_PASSWORD;
+    if (typeof expected === 'string' && expected.length >= 4) {
+      if (expected.length === body.password.length) {
+        let diff = 0;
+        for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ body.password.charCodeAt(i);
+        ok = diff === 0;
+      }
+    }
+  }
+  if (!user || !ok) {
     return json({ error: 'invalid credentials' }, 401);
   }
-  await setSessionCookie(ctx, 'admin');
-  return json({ ok: true });
+  if (user.status !== 'active') {
+    return json({ error: 'account disabled' }, 403);
+  }
+  await setSessionCookie(ctx, `user:${user.id}`, user.session_version);
+  return json({ ok: true, role: user.role, username: user.username });
 }

@@ -8,15 +8,15 @@
 
 import type { APIContext } from 'astro';
 import { envOf, listPosts, createPostWithTags, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
-import { getSession, json, requireAuth, isAdmin, checkCsrf } from '../../../lib/auth';
+import { resolveUser, json, requireAuth, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
 export const prerender = false;
 
 export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
-  const session = await getSession(ctx);
-  const authed = isAdmin(session);
+  const user = await resolveUser(ctx);
+  const authed = user !== null;
   const url = new URL(ctx.request.url);
 
   const status = url.searchParams.get('status');

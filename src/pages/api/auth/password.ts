@@ -7,28 +7,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { checkCsrf, checkPassword, clearSessionCookie, json, requireAuth } from '../../../lib/auth.ts';
-import { envOf } from '../../../lib/db/index.ts';
-import { getCredentials, hashPassword, incrementSessionVersion, setCredentials } from '../../../lib/db/credentials.ts';
+import { checkCsrf, clearSessionCookie, json, requireAuth } from '../../../lib/auth.ts';
+import { envOf, getUserByUsername, updatePassword, incrementUserSessionVersion } from '../../../lib/db/index.ts';
+import { hashPassword } from '../../../lib/db/credentials.ts';
 import { consumeLoginAttempt, clientIp } from '../../../lib/ratelimit.ts';
 
 export const prerender = false;
-
-const MIN_PASSWORD_LENGTH = 8;
-
-function passwordStrength(password: string): { ok: true } | { ok: false; error: string } {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return { ok: false, error: `密码至少 ${MIN_PASSWORD_LENGTH} 位` };
-  }
-  // 至少包含两类字符：字母 + (数字或特殊)
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasDigit = /\d/.test(password);
-  const hasSpecial = /[^a-zA-Z\d]/.test(password);
-  if (!hasLetter || (!hasDigit && !hasSpecial)) {
-    return { ok: false, error: '密码至少包含字母和数字/特殊字符' };
-  }
-  return { ok: true };
-}
 
 export async function POST(ctx: APIContext): Promise<Response> {
   const auth = await requireAuth(ctx);
@@ -39,45 +23,44 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const attempt = await consumeLoginAttempt(env.DB, `pwd:${clientIp(ctx.request)}`, {
-    max: 5,
-    windowSec: 300,
+    max: 5, windowSec: 300,
   });
   if (!attempt.ok) {
     return new Response(JSON.stringify({ error: 'too many attempts, try again later' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(attempt.retryAfter) },
+      status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(attempt.retryAfter) },
     });
   }
 
   let body: { old_password?: unknown; new_password?: unknown };
-  try {
-    body = await ctx.request.json();
-  } catch {
-    return json({ error: 'bad request' }, 400);
-  }
+  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
   if (typeof body.old_password !== 'string' || typeof body.new_password !== 'string') {
     return json({ error: 'old_password and new_password required' }, 400);
   }
-  if (body.old_password === body.new_password) {
-    return json({ error: '新旧密码不能相同' }, 400);
+  if (body.old_password === body.new_password) return json({ error: '新旧密码不能相同' }, 400);
+
+  if (body.new_password.length < 8) return json({ error: '密码至少 8 位' }, 400);
+  if (!/[a-zA-Z]/.test(body.new_password) || (!/\d/.test(body.new_password) && !/[^a-zA-Z0-9]/.test(body.new_password))) {
+    return json({ error: '密码至少包含字母和数字/特殊字符' }, 400);
   }
 
-  const strength = passwordStrength(body.new_password);
-  if (!strength.ok) {
-    return json({ error: strength.error }, 400);
+  // 验证旧密码：通过用户表或 env 回退
+  let passwordOk = false;
+  if (auth.user.password_hash) {
+    const { verifyPasswordHash } = await import('../../../lib/db/credentials.ts');
+    passwordOk = await verifyPasswordHash(body.old_password, auth.user.password_hash);
+  } else if (auth.user.role === 'admin') {
+    const expected = env.BLOG_ADMIN_PASSWORD;
+    if (typeof expected === 'string' && expected.length >= 4 && expected.length === body.old_password.length) {
+      let diff = 0;
+      for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ body.old_password.charCodeAt(i);
+      passwordOk = diff === 0;
+    }
   }
-
-  if (!(await checkPassword(env, body.old_password))) {
-    return json({ error: '原密码错误' }, 401);
-  }
+  if (!passwordOk) return json({ error: '原密码错误' }, 401);
 
   const hash = await hashPassword(body.new_password);
-  const existing = await getCredentials(env.DB);
-  const newVersion = (existing?.session_version ?? 1) + 1;
-  await setCredentials(env.DB, hash, newVersion);
+  await updatePassword(env.DB, auth.user.id, hash);
 
-  // 修改密码后清除当前会话，强制重新登录
   clearSessionCookie(ctx);
-
   return json({ ok: true, message: '密码已更新，请重新登录' });
 }

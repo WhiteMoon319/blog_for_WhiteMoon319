@@ -32,3 +32,4 @@ export * from './pages.ts';
 export * from './stats.ts';
 export * from './ai-credentials.ts';
 export * from './users.ts';
+export * from './comments.ts';

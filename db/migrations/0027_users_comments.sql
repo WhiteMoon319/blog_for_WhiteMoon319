@@ -1,3 +1,5 @@
+-- 月下独酌 · blog（blog_for_WhiteMoon319）
+-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 -- 统一用户表：读者 + 管理员 + 预留多作者
 -- 会话 sub 统一为 user:{id}，不再有独立 admin sub
 CREATE TABLE IF NOT EXISTS users (

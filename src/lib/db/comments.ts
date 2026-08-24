@@ -19,9 +19,12 @@ export interface CommentRow {
   created_at: string;
 }
 
-export interface CommentTree extends CommentRow {
+export interface CommentFlat extends CommentRow {
   username: string;
   display_name: string;
+}
+
+export interface CommentTree extends CommentFlat {
   floor: number;
   children: CommentTree[];
 }
@@ -36,46 +39,24 @@ export async function listApprovedComments(db: D1Database, postId: number): Prom
        ORDER BY c.created_at ASC, c.id ASC`,
     )
     .bind(postId)
-    .all<CommentRow & { username: string; display_name: string }>();
+    .all<CommentFlat>();
 
-  const all = (rows.results ?? []).map((r) => ({
-    ...r,
-    children: [] as CommentTree[],
-  }));
+  const all = (rows.results ?? []).map((r) => ({ ...r, floor: 0, children: [] as CommentTree[] }));
+  const byId = new Map<number, CommentTree>();
+  for (const c of all) byId.set(c.id, c);
 
-  // 构建树：顶层 + 一层回复
   const tops: CommentTree[] = [];
-  const map = new Map<number, CommentTree>();
-  for (const r of all) {
-    const node = { ...r, floor: 0, children: [] };
-    map.set(r.id, node);
-    if (r.parent_id === null) tops.push(node);
+  for (const c of all) {
+    if (c.parent_id === null) tops.push(c);
+    else byId.get(c.parent_id)?.children.push(c);
   }
-  // 分配楼层
-  tops.forEach((t, i) => {
-    t.floor = i + 1;
-    const old = t as any;
-    delete old.username;
-    delete old.display_name;
-    delete old.status;
-  });
-  // 挂载子回复
-  for (const r of all) {
-    if (r.parent_id !== null) {
-      const parent = map.get(r.parent_id);
-      if (parent) {
-        const child = map.get(r.id)!;
-        child.floor = parent.floor;
-        parent.children.push(child);
-      }
-    }
+
+  // 楼层号：顶层 1、2、3…，回复 X_1、X_2…（按时间序）。不重排（透视留空洞由后端存续控制）
+  tops.forEach((t, i) => { t.floor = i + 1; });
+  for (const t of tops) {
+    t.children.forEach((c, i) => { c.floor = i + 1; });
   }
-  return tops.map((t) => {
-    t.children.sort((a, b) => a.created_at.localeCompare(b.created_at));
-    // 子楼层编号
-    t.children.forEach((c, i) => { c.floor = t.floor; });
-    return t;
-  });
+  return tops;
 }
 
 export async function createComment(
@@ -84,28 +65,17 @@ export async function createComment(
 ): Promise<CommentRow | null> {
   const attachments = JSON.stringify(data.attachments ?? []);
   return db
-    .prepare(
-      `INSERT INTO comments (post_id, parent_id, user_id, body, attachments)
-       VALUES (?, ?, ?, ?, ?) RETURNING *`,
-    )
+    .prepare(`INSERT INTO comments (post_id, parent_id, user_id, body, attachments) VALUES (?, ?, ?, ?, ?) RETURNING *`)
     .bind(data.post_id, data.parent_id ?? null, data.user_id, data.body, attachments)
     .first<CommentRow>();
 }
 
-export async function updateCommentStatus(
-  db: D1Database,
-  id: number,
-  status: 'approved' | 'rejected',
-): Promise<boolean> {
-  const row = await db
-    .prepare(`UPDATE comments SET status = ? WHERE id = ? AND status = 'pending' RETURNING id`)
-    .bind(status, id)
-    .first<{ id: number }>();
+export async function updateCommentStatus(db: D1Database, id: number, status: 'approved' | 'rejected'): Promise<boolean> {
+  const row = await db.prepare(`UPDATE comments SET status = ? WHERE id = ? AND status = 'pending' RETURNING id`).bind(status, id).first<{ id: number }>();
   return !!row;
 }
 
 export async function deleteComment(db: D1Database, id: number): Promise<boolean> {
-  // 级联删除子回复
   await db.prepare('DELETE FROM comments WHERE parent_id = ?').bind(id).run();
   const row = await db.prepare('DELETE FROM comments WHERE id = ? RETURNING id').bind(id).first<{ id: number }>();
   return !!row;
@@ -118,19 +88,12 @@ export async function listCommentsForAdmin(
   pageSize = 20,
 ): Promise<{ comments: Array<CommentRow & { username: string; display_name: string; post_title: string }>; total: number }> {
   const offset = (page - 1) * pageSize;
-  const totalRow = await db
-    .prepare(`SELECT COUNT(*) AS n FROM comments WHERE status = ?`)
-    .bind(status)
-    .first<{ n: number }>();
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM comments WHERE status = ?`).bind(status).first<{ n: number }>();
   const rows = await db
     .prepare(
       `SELECT c.*, u.username, u.display_name, p.title AS post_title
-       FROM comments c
-       JOIN users u ON u.id = c.user_id
-       JOIN posts p ON p.id = c.post_id
-       WHERE c.status = ?
-       ORDER BY c.created_at DESC
-       LIMIT ? OFFSET ?`,
+       FROM comments c JOIN users u ON u.id = c.user_id JOIN posts p ON p.id = c.post_id
+       WHERE c.status = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
     )
     .bind(status, pageSize, offset)
     .all<CommentRow & { username: string; display_name: string; post_title: string }>();

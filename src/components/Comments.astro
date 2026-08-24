@@ -1,10 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-interface Props {
-  postId: number;
-}
-
+interface Props { postId: number }
 const { postId } = Astro.props;
 const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (env.R2_PUBLIC_URL || '').replace(/\/+$/, ''));
 ---
@@ -17,10 +14,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
     <textarea class="comment-input" rows="3" maxlength="2000" placeholder="写下你的想法…"></textarea>
     <div class="comment-attachments"></div>
     <div class="comment-form-row">
-      <label class="comment-img-btn">
-        ＋ 图片（≤3 张）
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
-      </label>
+      <label class="comment-img-btn">＋ 图片（≤3 张）<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden /></label>
       <span class="comment-hint">审核通过后显示</span>
       <button type="submit" class="btn btn-primary mini">发表</button>
     </div>
@@ -30,8 +24,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 </section>
 
 <script>
-  const root = document.querySelector<HTMLElement>('.comments');
-  if (!root) throw new Error('no comments root');
+  const root = document.querySelector<HTMLElement>('.comments')!;
   const postId = Number(root.dataset.postId);
   const r2Base = root.dataset.r2 ?? '';
   const statusEl = root.querySelector<HTMLElement>('.comments-status')!;
@@ -47,8 +40,10 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-  async function fixCookies() {
-    // 让公开页也能发送带 Cookie 的请求
+  function parseAttachments(raw: unknown): string[] {
+    if (Array.isArray(raw)) return raw.filter((k): k is string => typeof k === 'string');
+    if (typeof raw === 'string') try { const p = JSON.parse(raw); return Array.isArray(p) ? p.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
+    return [];
   }
 
   async function loadMe() {
@@ -65,52 +60,40 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 
   function renderTree(comments: any[]) {
     listEl.innerHTML = '';
-    if (!comments.length) {
-      emptyEl.style.display = 'block';
-      return;
-    }
+    if (!comments.length) { emptyEl.style.display = 'block'; return; }
     emptyEl.style.display = 'none';
     for (const c of comments) {
-      const li = renderComment(c);
+      const li = document.createElement('li');
+      li.className = 'comment';
+      li.innerHTML = commentHtml(c);
       listEl.appendChild(li);
       if (c.children?.length) {
         const ul = document.createElement('ul');
         ul.className = 'comment-replies';
-        for (const ch of c.children) ul.appendChild(renderComment(ch));
+        for (const ch of c.children) { const l = document.createElement('li'); l.className = 'comment'; l.innerHTML = commentHtml(ch); ul.appendChild(l); }
         li.appendChild(ul);
       }
     }
   }
 
-  function renderComment(c: any): HTMLElement {
-    const li = document.createElement('li');
-    li.className = 'comment';
-    li.dataset.id = c.id;
-    const attach = Array.isArray(c.attachments) && c.attachments.length
-      ? c.attachments.map((k: string) => `<img src="${r2Base}/${esc(k)}" loading="lazy" class="comment-img" />`).join('')
-      : '';
-    const replyBtn = c.parent_id === null ? `<button class="btn btn-ghost mini comment-reply" data-parent="${c.id}" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
-    li.innerHTML = `
+  function commentHtml(c: any): string {
+    const attach = parseAttachments(c.attachments).map((k: string) => `<img src="${r2Base}/${esc(k)}" loading="lazy" class="comment-img" />`).join('');
+    const replyBtn = c.parent_id === null ? `<button class="btn btn-ghost mini comment-reply" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
+    const floor = c.parent_id === null ? `#${c.floor}` : `#${c.floor}`;
+    return `
       <div class="comment-head">
-        <span class="comment-floor">${c.floor}</span>
-        <span class="comment-author">${esc(c.display_name || c.username)}</span>
+        <span class="comment-floor">${floor}</span>
+        <span class="comment-author">${esc(c.display_name || c.username || '匿名')}</span>
         <span class="comment-time">${esc((c.created_at || '').slice(0, 16).replace('T', ' '))}</span>
       </div>
       <div class="comment-body">${esc(c.body)}</div>
       ${attach ? `<div class="comment-attach">${attach}</div>` : ''}
       <div class="comment-actions">${replyBtn}</div>`;
-    return li;
   }
 
   function renderAuth() {
-    if (!me) {
-      authEl.innerHTML = `<p class="comments-login">登录后可评论 — <a href="/login/?redirect=${encodeURIComponent(location.pathname)}">登录</a> / <a href="/register/">注册</a></p>`;
-      return;
-    }
-    if (!me.email_verified) {
-      authEl.innerHTML = `<p class="comments-login">请先验证邮箱后再评论 — <a href="/verify-email/">去验证</a></p>`;
-      return;
-    }
+    if (!me) { authEl.innerHTML = `<p class="comments-login"><a href="/login/?redirect=${encodeURIComponent(location.pathname)}">登录</a> 或 <a href="/register/">注册</a> 后可留言</p>`; return; }
+    if (!me.email_verified) { authEl.innerHTML = `<p class="comments-login">请先<a href="/verify-email/">验证邮箱</a>后再留言</p>`; return; }
     formEl.style.display = 'block';
   }
 
@@ -120,19 +103,15 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   }
 
   fileInput.addEventListener('change', async () => {
-    const files = Array.from(fileInput.files ?? []);
-    for (const f of files) {
+    for (const f of Array.from(fileInput.files ?? [])) {
       if (images.length >= 3) break;
       if (f.size > 2 * 1024 * 1024) { renderStatus('图片不能超过 2MB', true); continue; }
-      const fd = new FormData();
-      fd.append('file', f);
+      const fd = new FormData(); fd.append('file', f);
       const res = await fetch('/api/comments/upload', { method: 'POST', credentials: 'same-origin', body: fd });
       const data = await res.json();
       if (!res.ok) { renderStatus(data.error || '上传失败', true); continue; }
       images.push(data.key);
-      const img = document.createElement('img');
-      img.src = data.url;
-      img.className = 'comment-attach-thumb';
+      const img = document.createElement('img'); img.src = data.url; img.className = 'comment-attach-thumb';
       attachEl.appendChild(img);
     }
   });
@@ -142,33 +121,28 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
     const body = inputEl.value.trim();
     if (!body) { renderStatus('请输入内容', true); return; }
     const res = await fetch('/api/comments', {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ post_id: postId, body, attachments: images }),
     });
     const data = await res.json();
-    if (res.status === 403 && data.error === 'email_required') {
-      location.href = '/verify-email/';
-      return;
-    }
-    if (!res.ok) {
-      renderStatus(data.error || '发表失败（可能需要登录或验证邮箱）', true);
-      return;
-    }
-    inputEl.value = '';
-    images.length = 0;
-    attachEl.innerHTML = '';
-    renderStatus('待审核，通过后可见');
-    await loadComments();
+    if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
+    if (!res.ok) { renderStatus(data.error || '发表失败', true); return; }
+    inputEl.value = ''; images.length = 0; attachEl.innerHTML = '';
+    renderStatus('评论已提交，审核通过后可见');
+    // 在列表末尾插入一条占位提示
+    emptyEl.style.display = 'none';
+    const pendingEl = document.createElement('div');
+    pendingEl.className = 'comment-pending';
+    pendingEl.textContent = '您的评论已提交，等待审核中…';
+    listEl.appendChild(pendingEl);
   });
 
-  listEl.addEventListener('click', async (e) => {
+  listEl.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.comment-reply');
     if (!btn) return;
-    // 回填到表单，回复当前评论（作为 body 前缀，简化处理）
-    inputEl.value = `@${btn.dataset.name} `;
-    inputEl.focus();
+    inputEl.value = `@${btn.dataset.name} `; inputEl.focus();
+    window.scrollTo({ top: formEl.offsetTop, behavior: 'smooth' });
   });
 
   loadMe().then((u) => { me = u; renderAuth(); });
@@ -176,44 +150,26 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 </script>
 
 <style>
-  .comments {
-    margin: 3em 0 0;
-    padding-top: 2em;
-    border-top: 1px solid var(--hairline);
-  }
-  .comments-title {
-    font-family: var(--font-brush);
-    font-size: 1.2rem;
-    font-weight: 400;
-    letter-spacing: 0.1em;
-    margin: 0 0 1em;
-    color: var(--ink-deep);
-  }
+  .comments { margin: 3em 0 0; padding-top: 2em; border-top: 1px solid var(--hairline); }
+  .comments-title { font-family: var(--font-brush); font-size: 1.2rem; font-weight: 400; letter-spacing: 0.1em; margin: 0 0 1em; color: var(--ink-deep); }
   .comments-status { font-size: 0.82rem; margin-bottom: 0.6em; min-height: 1.2em; }
   .comments-status.err { color: var(--cinnabar); }
   .comments-status.ok { color: var(--ink-soft); }
-  .comments-login { font-size: 0.9rem; color: var(--ink-mid); }
+  .comments-login { font-size: 0.9rem; color: var(--ink-mid); margin-bottom: 1em; }
   .comments-login a { color: var(--cinnabar); }
   .comment-form { margin-bottom: 1.6em; }
-  .comment-input {
-    width: 100%;
-    min-height: 4em;
-    padding: 0.6em 0.8em;
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
-    background: var(--paper-card);
-    font: inherit;
-    resize: vertical;
-  }
-  .comment-form-row { display: flex; align-items: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
-  .comment-img-btn { font-size: 0.82rem; color: var(--ink-soft); cursor: pointer; }
-  .comment-hint { font-size: 0.75rem; color: var(--ink-light); margin-left: auto; }
+  .comment-input { width: 100%; min-height: 4em; padding: 0.6em 0.8em; border: 1px solid var(--hairline); border-radius: 6px; background: var(--paper-card); font: inherit; resize: vertical; box-sizing: border-box; }
+  .comment-form-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+  .comment-img-btn { font-size: 0.8rem; color: var(--ink-soft); cursor: pointer; padding: 4px 0; }
+  .comment-img-btn:hover { color: var(--ink-deep); }
+  .comment-hint { font-size: 0.75rem; color: var(--ink-light); }
   .comment-attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .comment-attach-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--hairline); }
   .comments-list { list-style: none; margin: 0; padding: 0; }
-  .comment { padding: 0.8em 0; border-bottom: 1px dashed var(--hairline); }
+  .comment { padding: 0.8em 0; }
+  .comment + .comment { border-top: 1px solid var(--hairline); }
   .comment-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-  .comment-floor { color: var(--ink-light); font-size: 0.75rem; }
+  .comment-floor { color: var(--ink-light); font-size: 0.75rem; min-width: 2em; }
   .comment-author { font-size: 0.85rem; color: var(--ink-deep); font-weight: 600; }
   .comment-time { font-size: 0.72rem; color: var(--ink-light); }
   .comment-body { font-size: 0.9rem; line-height: 1.7; color: var(--ink-deep); white-space: pre-wrap; word-break: break-word; }
@@ -221,5 +177,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   .comment-img { max-width: 100%; max-height: 400px; border-radius: 6px; margin-top: 4px; }
   .comment-actions { margin-top: 6px; }
   .comment-replies { list-style: none; margin: 0.6em 0 0 1.4em; padding: 0; border-left: 2px solid var(--hairline); padding-left: 1em; }
+  .comment-replies > .comment { border: none; }
   .comments-empty { color: var(--ink-light); font-size: 0.85rem; padding: 1em 0; }
+  .comment-pending { color: var(--cinnabar); font-size: 0.85rem; padding: 0.6em 0; border-bottom: 1px dashed var(--hairline); }
 </style>

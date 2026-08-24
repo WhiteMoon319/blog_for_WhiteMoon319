@@ -7,18 +7,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listPublishedPosts } from '../lib/db';
+import { envOf, listPublishedPosts, getCollectionsByIds } from '../lib/db';
 import { escapeXml } from '../lib/seo';
+import { postHref } from '../lib/utils';
+import { renderMarkdown } from '../lib/markdown';
 
 // RSS 订阅源：最近 50 篇已发布文章（不含草稿/回收站），按发布时间倒序。
 export const prerender = false;
 
 const MAX_ITEMS = 50;
 
+function fmtDate(d: string): string {
+  // D1 返回的日期格式为 "2026-08-20 08:04:51"，需转为 ISO 8601 再格式化
+  const iso = d.includes('T') ? d : d.replace(' ', 'T') + 'Z';
+  const date = new Date(iso);
+  return isNaN(date.getTime()) ? '' : date.toUTCString();
+}
+
 export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
 
-  // SITE_URL 为空或非法时明确失败，绝不用错误基础拼出不可用的绝对链接。
   const base = env.SITE_URL.replace(/\/+$/, '');
   if (!/^https?:\/\//i.test(base)) {
     return new Response(JSON.stringify({ error: 'SITE_URL 未配置或非法，无法生成订阅源' }), {
@@ -29,23 +37,35 @@ export async function GET(ctx: APIContext): Promise<Response> {
 
   const posts = await listPublishedPosts(env.DB, { limit: MAX_ITEMS });
 
+  // 收集文集 slug 映射
+  const colIds = [...new Set(posts.map((p) => p.collection_id).filter((id): id is number => id !== null))];
+  const colMap = new Map<number, string>();
+  if (colIds.length > 0) {
+    const cols = await getCollectionsByIds(env.DB, colIds);
+    for (const [id, c] of cols) colMap.set(id, c.slug);
+  }
+
   const items = posts.map((p) => {
-    const link = `${base}/posts/${p.slug}/`;
+    const colSlug = p.collection_id !== null ? colMap.get(p.collection_id) ?? null : null;
+    const link = `${base}${postHref(p.slug, colSlug)}`;
+    const pubDate = fmtDate(p.created_at);
+    const { html } = renderMarkdown(p.content_md);
     return [
       '<item>',
       `<title>${escapeXml(p.title)}</title>`,
       `<link>${escapeXml(link)}</link>`,
-      `<guid isPermaLink="false">post:${p.id}</guid>`,
-      p.summary ? `<description>${escapeXml(p.summary)}</description>` : '',
-      `<pubDate>${new Date(p.created_at).toUTCString()}</pubDate>`,
+      `<guid isPermaLink="true">${escapeXml(link)}</guid>`,
+      p.summary ? `<description><![CDATA[${p.summary}]]></description>` : '',
+      html ? `<content:encoded><![CDATA[${html}]]></content:encoded>` : '',
+      pubDate ? `<pubDate>${pubDate}</pubDate>` : '',
       '</item>',
     ].join('');
   });
 
-  const lastBuild = posts.length > 0 ? `<lastBuildDate>${new Date(posts[0].created_at).toUTCString()}</lastBuildDate>` : '';
+  const lastBuild = posts.length > 0 ? `<lastBuildDate>${fmtDate(posts[0].created_at)}</lastBuildDate>` : '';
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">`,
+    `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">`,
     '<channel>',
     `<title>${escapeXml(env.SITE_NAME)}</title>`,
     `<description>${escapeXml(env.SITE_SLOGAN ?? '')}</description>`,
@@ -57,7 +77,6 @@ export async function GET(ctx: APIContext): Promise<Response> {
     '</rss>',
     ''].join('\n');
 
-  // 订阅源可短时间缓存；内容变更才更新
   return new Response(xml, {
     headers: {
       'content-type': 'application/rss+xml; charset=utf-8',

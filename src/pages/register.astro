@@ -53,12 +53,12 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
 </BaseLayout>
 
 <script>
-  const registerForm = document.getElementById('register-form')!;
+  const registerForm = document.getElementById('register-form')! as HTMLFormElement;
   const regErr = document.getElementById('register-error')!;
   const verifyStage = document.getElementById('verify-stage')!;
   const verifyEmail = document.getElementById('verify-email')!;
-  const verifyBtn = document.getElementById('verify-btn')!;
-  const resendBtn = document.getElementById('resend-btn')!;
+  const verifyBtn = document.getElementById('verify-btn')! as HTMLButtonElement;
+  const resendBtn = document.getElementById('resend-btn')! as HTMLButtonElement;
   const verifyErr = document.getElementById('verify-error')!;
   const redirect = new URLSearchParams(location.search).get('redirect') ?? '/';
   let userId: number | null = null;
@@ -80,13 +80,13 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
           display_name: fd.get('display_name'),
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; user_id?: number };
       if (!res.ok) {
         regErr.textContent = res.status === 429 ? '尝试过于频繁，请稍后再试。' : (data.error ?? '注册失败');
         regErr.style.display = 'block';
         return;
       }
-      userId = data.user_id;
+      userId = typeof data.user_id === 'number' ? data.user_id : null;
       email = String(fd.get('email'));
       verifyEmail.textContent = email;
       verifyStage.style.display = 'block';
@@ -109,7 +109,7 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, code }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string };
       if (!res.ok) {
         verifyErr.textContent = data.error ?? '验证失败';
         verifyErr.style.display = 'block';
@@ -148,7 +148,7 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string };
       if (!res.ok) { verifyErr.textContent = data.error ?? '重发失败，请 60 秒后重试'; verifyErr.style.display = 'block'; }
       else verifyErr.textContent = ''; // 静默（勿暴露邮箱状态）
     } catch {

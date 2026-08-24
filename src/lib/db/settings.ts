@@ -12,6 +12,7 @@ const WHITELIST = [
   'SITE_NAME', 'SITE_SLOGAN', 'SITE_POEM', 'SITE_URL',
   'ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort',
   'ai_multi_summary', 'ai_candidate_count', 'ai_prompt_templates',
+  'comment_review_keywords',
 ] as const;
 export type SettingKey = (typeof WHITELIST)[number];
 

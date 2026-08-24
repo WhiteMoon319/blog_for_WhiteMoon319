@@ -25,10 +25,10 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
 </BaseLayout>
 
 <script>
-  const form = document.getElementById('code-form')!;
+  const form = document.getElementById('code-form')! as HTMLFormElement;
   const errEl = document.getElementById('verify-error')!;
   const codeInput = document.getElementById('code') as HTMLInputElement;
-  const resendBtn = document.getElementById('resend-btn')!;
+  const resendBtn = document.getElementById('resend-btn')! as HTMLButtonElement;
   const redirect = new URLSearchParams(location.search).get('redirect') ?? '/';
 
   // 获取当前用户信息
@@ -37,7 +37,7 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
 
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(async (r) => {
     if (r.status !== 200) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
-    const data = await r.json();
+    const data = await r.json() as { email_verified?: boolean; sub?: string };
     if (data.email_verified) { location.href = redirect; return; }
     userId = data.sub ? parseInt(data.sub.replace('user:', '')) : null;
   });
@@ -54,7 +54,7 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
       body: JSON.stringify({ user_id: userId, code }),
     });
     if (!res.ok) {
-      const data = await res.json();
+      const data = await res.json() as { error?: string };
       errEl.textContent = data.error ?? '验证失败';
       errEl.style.display = 'block';
       return;

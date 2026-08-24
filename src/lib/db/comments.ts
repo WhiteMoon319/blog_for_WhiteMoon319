@@ -86,16 +86,20 @@ export async function listCommentsForAdmin(
   status: string,
   page: number,
   pageSize = 20,
+  postId?: number,
 ): Promise<{ comments: Array<CommentRow & { username: string; display_name: string; post_title: string }>; total: number }> {
   const offset = (page - 1) * pageSize;
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM comments WHERE status = ?`).bind(status).first<{ n: number }>();
+  const where = ['c.status = ?'];
+  const args: (string | number)[] = [status];
+  if (postId) { where.push('c.post_id = ?'); args.push(postId); }
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM comments c WHERE ${where.join(' AND ')}`).bind(...args).first<{ n: number }>();
   const rows = await db
     .prepare(
       `SELECT c.*, u.username, u.display_name, p.title AS post_title
        FROM comments c JOIN users u ON u.id = c.user_id JOIN posts p ON p.id = c.post_id
-       WHERE c.status = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
+       WHERE ${where.join(' AND ')} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
     )
-    .bind(status, pageSize, offset)
+    .bind(...args, pageSize, offset)
     .all<CommentRow & { username: string; display_name: string; post_title: string }>();
   return { comments: rows.results ?? [], total: totalRow?.n ?? 0 };
 }

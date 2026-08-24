@@ -68,6 +68,7 @@ async function logout() {
         <router-link to="/pages">页面</router-link>
         <router-link to="/stats">数据</router-link>
         <router-link to="/comments">评论</router-link>
+        <router-link to="/users">用户</router-link>
         <router-link to="/export">导出</router-link>
         <router-link to="/settings">设置</router-link>
         <router-link to="/editor">写新篇</router-link>

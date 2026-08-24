@@ -116,6 +116,24 @@ function applyToForm(s: SiteSettings) {
   original.SITE_URL = s.SITE_URL;
 }
 
+const commentAutoApprove = ref('');
+
+function applyCommentSettings(s: Record<string, unknown>) {
+  commentAutoApprove.value = (s.comment_review_keywords as string) ?? '';
+}
+
+async function saveCommentSettings() {
+  saving.value = true;
+  try {
+    const result = await api.saveSettings({ comment_review_keywords: commentAutoApprove.value.trim() });
+    emit('notify', result.saved ? `已保存：${result.saved.join('、')}` : '无需变更');
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    saving.value = false;
+  }
+}
+
 function applyAiSettings(s: AiSettings) {
   aiForm.provider = s.ai_provider || 'deepseek';
   aiForm.baseUrl = s.ai_base_url || 'https://api.deepseek.com';
@@ -139,6 +157,7 @@ onMounted(async () => {
     applyToForm(s);
     applyAiSettings(s);
     promptTemplates.value = parseTemplates((s as unknown as Record<string, string>).ai_prompt_templates);
+    applyCommentSettings(s as unknown as Record<string, unknown>);
     loading.value = false;
   } catch (e) {
     emit('notify', (e as Error).message, true);
@@ -371,6 +390,20 @@ async function deleteAiKey() {
     </div>
     <div class="hint" style="margin-top:8px;">
       注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
+    </div>
+  </div>
+
+  <div class="card pad" v-if="!loading" style="margin-top:20px;">
+    <h3 style="margin:0 0 20px;">评论设置</h3>
+    <div class="field">
+      <label>需人工审核的关键词</label>
+      <input v-model="commentAutoApprove" class="input" placeholder="如：广告，联系方式（逗号分隔；留空则全部直接展示）" />
+      <div class="hint">命中任一关键词的评论将保持待审核状态；未命中关键词的评论默认直接展示。</div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:center;">
+      <button class="btn btn-primary" :disabled="saving" @click="saveCommentSettings">
+        {{ saving ? '保存中…' : '保存评论设置' }}
+      </button>
     </div>
   </div>
 

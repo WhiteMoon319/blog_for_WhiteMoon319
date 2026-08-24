@@ -10,6 +10,7 @@ import type { APIContext } from 'astro';
 import { envOf } from '../../../lib/db';
 import { requireAnyUser, json, checkCsrf } from '../../../lib/auth';
 import { createComment } from '../../../lib/db/comments';
+import { getAllSettings } from '../../../lib/db/settings';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
 export const prerender = false;
@@ -31,7 +32,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const postId = Number(body.post_id);
   if (!Number.isInteger(postId) || postId <= 0) return json({ error: 'post_id required' }, 400);
   if (typeof body.body !== 'string' || !body.body.trim()) return json({ error: 'body required' }, 400);
-  if (body.body.length > 2000) return json({ error: 'body too long' }, 400);
+  const commentBody = body.body.trim();
+  if (commentBody.length > 2000) return json({ error: 'body too long' }, 400);
 
   const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(postId).first<{ id: number; status: string; deleted_at: string | null }>();
   if (!post || post.status !== 'published' || post.deleted_at) return json({ error: 'post not found' }, 404);
@@ -58,6 +60,16 @@ export async function POST(ctx: APIContext): Promise<Response> {
     body: body.body.trim(),
     attachments,
   });
+
+  // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
+  const settings = await getAllSettings(env.DB);
+  const keywords = settings.comment_review_keywords ?? '';
+  const needsReview = keywords
+    ? keywords.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean).some((w) => commentBody.toLowerCase().includes(w))
+    : false;
+  if (!needsReview) {
+    await env.DB.prepare(`UPDATE comments SET status = 'approved' WHERE id = ?`).bind(comment!.id).run();
+  }
 
   return json({ comment }, 201);
 }

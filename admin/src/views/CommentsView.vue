@@ -25,11 +25,12 @@ const page = ref(1);
 const pageSize = 20;
 const loaded = ref(false);
 const busy = ref(false);
+const filterPostId = ref<number | undefined>(undefined);
 
 async function load() {
   busy.value = true;
   try {
-    const res = await api.adminComments(tab.value, page.value);
+    const res = await api.adminComments(tab.value, page.value, filterPostId.value);
     comments.value = res.comments;
     total.value = res.total;
   } catch (e) {
@@ -42,6 +43,11 @@ async function load() {
 
 function switchTab(t: 'pending' | 'approved' | 'rejected') {
   tab.value = t;
+  page.value = 1;
+  load();
+}
+
+function searchByPost() {
   page.value = 1;
   load();
 }
@@ -81,7 +87,7 @@ onMounted(load);
   </div>
 
   <div class="card">
-    <div class="card-head" style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="card-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <button
         v-for="t in (['pending', 'approved', 'rejected'] as const)"
         :key="t"
@@ -92,6 +98,10 @@ onMounted(load);
         {{ t === 'pending' ? '待审核' : t === 'approved' ? '已批准' : '已拒绝' }}
       </button>
       <span style="margin-left:auto;font-size:0.82rem;color:var(--ink-light);">共 {{ total }} 条</span>
+      <span style="display:flex;gap:4px;align-items:center;">
+        <input v-model.number="filterPostId" type="number" class="input" style="width:80px;padding:4px 8px;font-size:0.78rem;" placeholder="文章 ID" />
+        <button class="btn btn-ghost mini" @click="searchByPost">筛选</button>
+      </span>
     </div>
 
     <div class="table-wrap">

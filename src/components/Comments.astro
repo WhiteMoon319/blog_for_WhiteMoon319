@@ -15,7 +15,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
     <div class="comment-attachments"></div>
     <div class="comment-form-row">
       <label class="comment-img-btn">＋ 图片（≤3 张）<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden /></label>
-      <span class="comment-hint">审核通过后显示</span>
+      <span class="comment-hint">不含敏感词将直接展示</span>
       <button type="submit" class="btn btn-primary mini">发表</button>
     </div>
   </form>
@@ -49,12 +49,12 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   async function loadMe() {
     const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
     if (res.status === 401) return null;
-    return res.json();
+    return res.json() as Promise<{ authenticated: boolean; email_verified?: boolean }>;
   }
 
   async function loadComments() {
     const res = await fetch(`/api/posts/${postId}/comments`);
-    const data = await res.json();
+    const data = await res.json() as { comments?: any[] };
     renderTree(data.comments ?? []);
   }
 
@@ -108,10 +108,10 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
       if (f.size > 2 * 1024 * 1024) { renderStatus('图片不能超过 2MB', true); continue; }
       const fd = new FormData(); fd.append('file', f);
       const res = await fetch('/api/comments/upload', { method: 'POST', credentials: 'same-origin', body: fd });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; key?: string; url?: string };
       if (!res.ok) { renderStatus(data.error || '上传失败', true); continue; }
-      images.push(data.key);
-      const img = document.createElement('img'); img.src = data.url; img.className = 'comment-attach-thumb';
+      images.push(data.key!);
+      const img = document.createElement('img'); img.src = data.url!; img.className = 'comment-attach-thumb';
       attachEl.appendChild(img);
     }
   });
@@ -125,7 +125,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ post_id: postId, body, attachments: images }),
     });
-    const data = await res.json();
+    const data = await res.json() as { error?: string };
     if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
     if (!res.ok) { renderStatus(data.error || '发表失败', true); return; }
     inputEl.value = ''; images.length = 0; attachEl.innerHTML = '';
@@ -150,34 +150,35 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 </script>
 
 <style>
-  .comments { margin: 3em 0 0; padding-top: 2em; border-top: 1px solid var(--hairline); }
-  .comments-title { font-family: var(--font-brush); font-size: 1.2rem; font-weight: 400; letter-spacing: 0.1em; margin: 0 0 1em; color: var(--ink-deep); }
-  .comments-status { font-size: 0.82rem; margin-bottom: 0.6em; min-height: 1.2em; }
+  .comments { max-width: 760px; margin: 3em auto 0; padding: 2em 24px 0; border-top: 1px solid var(--hairline); }
+  .comments-title { font-family: var(--font-brush); font-size: 1.3rem; font-weight: 400; letter-spacing: 0.1em; margin: 0 0 1.2em; color: var(--ink-deep); }
+  .comments-status { font-size: 0.82rem; margin-bottom: 0.8em; min-height: 1.2em; }
   .comments-status.err { color: var(--cinnabar); }
   .comments-status.ok { color: var(--ink-soft); }
-  .comments-login { font-size: 0.9rem; color: var(--ink-mid); margin-bottom: 1em; }
+  .comments-login { font-size: 0.9rem; color: var(--ink-mid); margin-bottom: 1.2em; }
   .comments-login a { color: var(--cinnabar); }
-  .comment-form { margin-bottom: 1.6em; }
-  .comment-input { width: 100%; min-height: 4em; padding: 0.6em 0.8em; border: 1px solid var(--hairline); border-radius: 6px; background: var(--paper-card); font: inherit; resize: vertical; box-sizing: border-box; }
+  .comment-form { margin-bottom: 2em; }
+  .comment-input { width: 100%; min-height: 4.6em; padding: 0.8em 1em; border: 1px solid var(--hairline); border-radius: 8px; background: var(--paper-card); font: inherit; resize: vertical; box-sizing: border-box; transition: border-color 0.15s; }
+  .comment-input:focus { border-color: var(--cinnabar); outline: none; }
   .comment-form-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
   .comment-img-btn { font-size: 0.8rem; color: var(--ink-soft); cursor: pointer; padding: 4px 0; }
   .comment-img-btn:hover { color: var(--ink-deep); }
   .comment-hint { font-size: 0.75rem; color: var(--ink-light); }
   .comment-attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-  .comment-attach-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--hairline); }
+  .comment-attach-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--hairline); }
   .comments-list { list-style: none; margin: 0; padding: 0; }
-  .comment { padding: 0.8em 0; }
+  .comment { padding: 1em 0 1em 0; }
   .comment + .comment { border-top: 1px solid var(--hairline); }
-  .comment-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .comment-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
   .comment-floor { color: var(--ink-light); font-size: 0.75rem; min-width: 2em; }
-  .comment-author { font-size: 0.85rem; color: var(--ink-deep); font-weight: 600; }
+  .comment-author { font-size: 0.9rem; color: var(--ink-deep); font-weight: 600; }
   .comment-time { font-size: 0.72rem; color: var(--ink-light); }
-  .comment-body { font-size: 0.9rem; line-height: 1.7; color: var(--ink-deep); white-space: pre-wrap; word-break: break-word; }
-  .comment-attach { margin-top: 6px; }
+  .comment-body { font-size: 0.95rem; line-height: 1.8; color: var(--ink-deep); white-space: pre-wrap; word-break: break-word; }
+  .comment-attach { margin-top: 8px; }
   .comment-img { max-width: 100%; max-height: 400px; border-radius: 6px; margin-top: 4px; }
-  .comment-actions { margin-top: 6px; }
-  .comment-replies { list-style: none; margin: 0.6em 0 0 1.4em; padding: 0; border-left: 2px solid var(--hairline); padding-left: 1em; }
+  .comment-actions { margin-top: 8px; display: flex; gap: 8px; }
+  .comment-replies { list-style: none; margin: 0.6em 0 0 1.6em; padding: 0; border-left: 2px solid var(--hairline); padding-left: 1em; }
   .comment-replies > .comment { border: none; }
-  .comments-empty { color: var(--ink-light); font-size: 0.85rem; padding: 1em 0; }
-  .comment-pending { color: var(--cinnabar); font-size: 0.85rem; padding: 0.6em 0; border-bottom: 1px dashed var(--hairline); }
+  .comments-empty { color: var(--ink-light); font-size: 0.85rem; padding: 1.2em 0; }
+  .comment-pending { color: var(--cinnabar); font-size: 0.85rem; padding: 0.8em 0; border-bottom: 1px dashed var(--hairline); }
 </style>

@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf } from '../../../../lib/db';
+import { envOf, listPosts } from '../../../../lib/db';
 import { json, requireAdmin } from '../../../../lib/auth';
 import { listCommentsForAdmin } from '../../../../lib/db/comments';
 
@@ -22,7 +22,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const status = url.searchParams.get('status') ?? 'pending';
   if (!['pending', 'approved', 'rejected'].includes(status)) return json({ error: 'invalid status' }, 400);
   const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+  const postId = Number(url.searchParams.get('post_id')) || undefined;
 
-  const { comments, total } = await listCommentsForAdmin(env.DB, status, page);
+  const { comments, total } = await listCommentsForAdmin(env.DB, status, page, 20, postId);
   return json({ comments, total, page });
 }

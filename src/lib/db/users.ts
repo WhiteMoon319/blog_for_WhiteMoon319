@@ -91,7 +91,7 @@ export async function setUserEmailVerified(db: D1Database, userId: number): Prom
 
 export async function banUser(db: D1Database, userId: number): Promise<boolean> {
   const row = await db
-    .prepare(`UPDATE users SET status = 'banned', session_version = session_version + 1 WHERE id = ? AND status = 'active' RETURNING id`)
+    .prepare(`UPDATE users SET status = CASE WHEN status = 'active' THEN 'banned' ELSE 'active' END, session_version = session_version + 1 WHERE id = ? AND role != 'admin' RETURNING id`)
     .bind(userId)
     .first<{ id: number }>();
   return !!row;

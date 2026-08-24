@@ -22,6 +22,7 @@ const router = createRouter({
     { path: '/pages', name: 'pages', component: () => import('./views/PagesView.vue') },
     { path: '/stats', name: 'stats', component: () => import('./views/StatsView.vue') },
     { path: '/comments', name: 'comments', component: () => import('./views/CommentsView.vue') },
+    { path: '/users', name: 'users', component: () => import('./views/UsersView.vue') },
     { path: '/editor', name: 'editor', component: () => import('./views/PostEditorView.vue') },
   ],
 });

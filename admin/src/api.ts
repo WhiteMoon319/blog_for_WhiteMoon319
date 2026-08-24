@@ -220,11 +220,16 @@ export const api = {
 
   deleteAiKey: () => request<{ ok: boolean }>('/api/settings/ai-key', { method: 'DELETE' }),
 
+  // ---- 用户管理 ----
+  users: () => request<{ users: Array<{ id: number; username: string; display_name: string; email: string; role: string; status: string; created_at: string }> }>('/api/users'),
+  userBan: (id: number) => request<{ ok: boolean }>(`/api/users/${id}/ban`, { method: 'POST' }),
+
   // ---- 评论管理 ----
-  adminComments: (status = 'pending', page = 1) =>
-    request<{ comments: Array<{ id: number; post_id: number; body: string; attachments: string; status: string; created_at: string; username: string; display_name: string; post_title: string }>; total: number; page: number }>(
-      `/api/admin/comments?status=${status}&page=${page}`,
-    ),
+  adminComments: (status = 'pending', page = 1, postId?: number) => {
+    let url = `/api/admin/comments?status=${status}&page=${page}`;
+    if (postId) url += `&post_id=${postId}`;
+    return request<{ comments: Array<{ id: number; post_id: number; body: string; attachments: string; status: string; created_at: string; username: string; display_name: string; post_title: string }>; total: number; page: number }>(url);
+  },
   adminCommentUpdate: (id: number, status: 'approved' | 'rejected') =>
     request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
   adminCommentDelete: (id: number) =>

@@ -28,6 +28,7 @@ const KEY_DEFAULTS: Record<string, string> = {
   ai_multi_summary: '0',
   ai_candidate_count: '3',
   ai_prompt_templates: '',
+  comment_review_keywords: '',
 };
 
 const MAX_VALUE_LENGTH = 500;

@@ -210,7 +210,7 @@ npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # AI 加密主密钥，32 �
 ## 数据库
 
 - **迁移**：`db/migrations/0001_init` ~ `0025_post_summary_source`
-- **核心表**：`collections`（文集，含 `ref_summaries`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本，含 `summary_source`/`base_version`/`content_md_patch`）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置）
+- **核心表**：`collections`（文集，含 `ref_summaries`/`ai_prompt_id`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本，含 `summary_source`/`base_version`/`content_md_patch`）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置，含 `ai_prompt_templates`）
 - **文章 slug**：文集内唯一；未分类由部分唯一索引保证全局唯一。删除文集时 slug 冲突自动加后缀
 
 ## AI 摘要
@@ -221,6 +221,21 @@ npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # AI 加密主密钥，32 �
 - 文章列表：批量生成（可强制覆盖现有摘要）
 - 导入页：导入后批量生成
 - 文集参考前文摘要：开启后 AI 生成时带同文集最近 3 篇已刊文章的摘要作为参考
+
+### Prompt 模板
+
+支持多套 AI 提示词模板，后台设置页可新增/编辑/删除：
+
+- **博客摘要**（`overview`，默认）：100-200 字概括全文，适合杂文/随笔/技术文
+- **章节导读**（`teaser`）：生成单章导读，回味标题、点出推进点、营造阅读氛围但不剧透，适合小说/连载
+
+使用规则：
+
+- 每套模板定义 `id`（标识）、`name`（名称）与 `prompt`（提示词）
+- **文集**可指定使用哪套模板（文集编辑页「AI 摘要模板」下拉）
+- 批量生成（文章列表/导入）按各文集自己的 `ai_prompt_id` 逐篇处理
+- **编辑器**单篇生成默认跟随文集选择，可临时下拉切换
+- 参考上文摘要：博客摘要模板注入会带「风格参考」语境；章节导读/自定义模板注入会带「前文衔接」语境（需文集开启「参考前文摘要」）
 
 ## 版本管理
 

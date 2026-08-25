@@ -7,6 +7,8 @@ import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
 import ArticleEnhancer from '../../../components/ArticleEnhancer.astro';
 import Comments from '../../../components/Comments.astro';
+import PostLike from '../../../components/PostLike.astro';
+import { resolveUser } from '../../../lib/auth';
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
@@ -23,6 +25,10 @@ const effectiveTags = await listPostEffectiveTags(env.DB, post.id);
 const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);
 const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
+// 文章点赞：计数 + 当前用户是否已赞
+const user = await resolveUser(Astro);
+const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
+const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
 ---
 
 <BaseLayout title={post.title} description={post.summary} image={post.cover_url ? post.cover_url : undefined}>
@@ -72,6 +78,7 @@ const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
       {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
     </nav>
   </article>
+  <PostLike postId={post.id} likes={likeCount?.n ?? 0} liked={liked} />
   <Comments postId={post.id} />
   <ArticleEnhancer />
 </BaseLayout>

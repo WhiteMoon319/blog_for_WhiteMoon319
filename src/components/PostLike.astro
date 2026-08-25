@@ -1,0 +1,63 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+interface Props {
+  postId: number;
+  likes: number;
+  liked: boolean;
+}
+const { postId, likes, liked } = Astro.props;
+---
+
+<div class="post-like" data-post-id={postId}>
+  <button type="button" class="btn btn-ghost post-like-btn" data-liked={liked ? '1' : '0'}>
+    <span class="post-like-heart">{liked ? '❤' : '♡'}</span>
+    <span class="post-like-count">{likes}</span>
+  </button>
+  <span class="post-like-hint">喜欢的文章可点个赞</span>
+</div>
+
+<script>
+  const el = document.querySelector<HTMLElement>('.post-like');
+  if (el) {
+    const btn = el.querySelector<HTMLButtonElement>('.post-like-btn')!;
+    const countEl = el.querySelector<HTMLElement>('.post-like-count')!;
+    const heartEl = el.querySelector<HTMLElement>('.post-like-heart')!;
+    const postId = Number(el.dataset.postId);
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST', credentials: 'same-origin' });
+        const data = await res.json() as { liked?: boolean; likes_count?: number; error?: string };
+        if (res.status === 401) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
+        if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
+        if (!res.ok) return;
+        btn.dataset.liked = data.liked ? '1' : '0';
+        heartEl.textContent = data.liked ? '❤' : '♡';
+        countEl.textContent = String(data.likes_count ?? 0);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .post-like {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 2em auto 0;
+  }
+  .post-like-btn {
+    font-size: 1rem;
+    padding: 6px 18px;
+    border-radius: 999px;
+    border-color: var(--cinnabar);
+    color: var(--cinnabar);
+  }
+  .post-like-btn:hover { background: color-mix(in srgb, var(--cinnabar) 8%, transparent); }
+  .post-like-hint { font-size: 0.78rem; color: var(--ink-light); }
+</style>

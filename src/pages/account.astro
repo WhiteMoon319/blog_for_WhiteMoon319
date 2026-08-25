@@ -14,7 +14,7 @@ const env = await envOf();
       <div id="me-box" style="display:none;">
         <!-- 头像 + 昵称 -->
         <div class="acc-header">
-          <img id="avatar-img" class="acc-avatar" src="" alt="头像" />
+          <img id="avatar-img" class="acc-avatar" src="" alt="头像" style="display:none;" />
           <div>
             <p class="acc-username" id="acc-username"></p>
             <p class="acc-role" id="acc-role"></p>
@@ -92,8 +92,8 @@ const env = await envOf();
   const u = await me();
   if (u) {
     (document.getElementById('me-box') as HTMLElement).style.display = 'block';
-    (document.getElementById('acc-username') as HTMLElement).textContent = u.role === 'admin' ? '@' + u.username + '（管理员）' : '@' + u.username;
-    (document.getElementById('acc-role') as HTMLElement).textContent = u.role;
+    (document.getElementById('acc-username') as HTMLElement).textContent = '@' + u.username;
+    (document.getElementById('acc-role') as HTMLElement).textContent = u.role === 'admin' ? '管理员' : u.role === 'author' ? '作者' : '读者';
     (document.getElementById('display_name') as HTMLInputElement).value = u.display_name;
     (document.getElementById('email') as HTMLInputElement).value = u.email;
     (document.getElementById('notify_email') as HTMLInputElement).checked = !!u.notify_email;

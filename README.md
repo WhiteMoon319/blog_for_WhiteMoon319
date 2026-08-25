@@ -197,7 +197,8 @@ pnpm test               # 单测 + e2e（需先 pnpm run build）
 
 ### 前置要求
 
-- **Node.js ≥ 22** + **pnpm**（`npm install -g pnpm`）
+- **Node.js ≥ 22**（自动检测，缺失时脚本会引导安装）
+- **pnpm**（自动检测，缺失时脚本会用 npm 安装）
 - **Cloudflare 账号**（免费即可）
 - 一个已经指向 Cloudflare 的域名（可选，也可用默认的 `.workers.dev` 域名）
 
@@ -205,11 +206,21 @@ pnpm test               # 单测 + e2e（需先 pnpm run build）
 
 ```bash
 # 1. 克隆仓库，进入目录
+git clone https://github.com/WhiteMoon319/blog_for_WhiteMoon319.git
 cd blog_for_WhiteMoon319
-
-# 2. 运行一键部署向导
-pnpm run setup
 ```
+
+**然后二选一：**
+
+**Windows**：双击 `setup.bat`（自动检查/安装 Node.js 与 pnpm，随后启动部署向导）
+
+**macOS / Linux**：
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+> 若你已经装好 Node.js 和 pnpm，也可以直接用 `pnpm run setup` 启动同一个向导。
 
 向导会逐步引导你完成以下操作（全程中文）：
 

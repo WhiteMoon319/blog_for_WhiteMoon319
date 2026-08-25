@@ -27,13 +27,14 @@ watch(
 onMounted(async () => {
   window.addEventListener('auth:expired', () => {
     setAuthed(false, '');
-    if (route.path !== '/login') router.push('/login');
+    if (route.path !== '/login') window.location.href = '/login/?redirect=/admin/';
   });
   await initAuth();
-  // 路由守卫：非管理员角色（reader、未登录）一律重定向到登录页
   if (route.path !== '/login') {
-    if (!authState.authed || authState.role !== 'admin') {
-      router.push('/login');
+    if (!authState.authed) {
+      window.location.href = '/login/?redirect=/admin/';
+    } else if (authState.role !== 'admin') {
+      window.location.href = '/404';
     }
   }
 });

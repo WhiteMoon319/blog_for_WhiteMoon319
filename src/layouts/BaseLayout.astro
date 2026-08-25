@@ -4,6 +4,7 @@
 import '../styles/tokens.css';
 import '../styles/base.css';
 import { envOf } from '../lib/db';
+import { resolveUser } from '../lib/auth';
 
 interface Props {
   title?: string;
@@ -17,6 +18,12 @@ const { title, description = '一座写在 Cloudflare 上的小书斋。', image
 const env = await envOf();
 const siteName = env.SITE_NAME;
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
+
+// 用户状态（用于导航栏展示）
+const user = await resolveUser(Astro).catch(() => null);
+const isLoggedIn = !!user;
+const isAdminUser = user?.user.role === 'admin';
+const userName = user?.user.display_name || user?.user.username;
 const pageQuery = Astro.url.searchParams.get('page') ? Astro.url.search : '';
 const canonical = `${siteUrl}${Astro.url.pathname}${pageQuery}`;
 const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
@@ -118,6 +125,17 @@ const navLinks = [
       />
       <h3>{siteName}</h3>
       <p>© {new Date().getFullYear()} · 月下少辞令，醉后自逍遥。</p>
+      <p class="footer-user">
+        {isLoggedIn ? (
+          <>
+            <a href="/account/" class="footer-src">@{userName}</a>
+            {isAdminUser && <a href="/admin/" class="footer-src">后台</a>}
+            <a href="/logout/" class="footer-src">退出</a>
+          </>
+        ) : (
+          <a href="/login/" class="footer-src">登录</a>
+        )}
+      </p>
       <p class="footer-license">
         本站由
         <a href="https://github.com/WhiteMoon319/blog_for_WhiteMoon319" target="_blank" rel="noopener" class="footer-src" aria-label="本站源代码（GitHub）">

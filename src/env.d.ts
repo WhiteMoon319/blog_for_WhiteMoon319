@@ -30,6 +30,7 @@ declare global {
       SMTP_USER?: string;
       SMTP_PASS?: string;
       SMTP_FROM?: string;
+      EDGE_CACHE?: string;
     }
   }
 

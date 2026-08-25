@@ -7,6 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { defineMiddleware } from 'astro:middleware';
+import { envOf } from './lib/db';
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
@@ -15,16 +16,64 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
 };
 
-// 不参与 CDN 边缘缓存的路径（含个性化/表单/写操作）
-const NO_CACHE_PREFIXES = ['/login', '/register', '/verify-email', '/account', '/logout', '/preview/', '/admin/', '/search/'];
+// 不参与边缘缓存的路径（含个性化/表单/搜索等动态内容）
 const NO_CACHE_EXACT = ['/login/', '/register/', '/verify-email/', '/account/', '/logout/'];
+const NO_CACHE_PREFIXES = ['/login', '/register', '/verify-email', '/account', '/logout', '/preview/', '/admin/', '/search/', '/api/'];
 
 function shouldCachePublic(path: string): boolean {
   if (NO_CACHE_EXACT.includes(path)) return false;
   return !NO_CACHE_PREFIXES.some((p) => path.startsWith(p));
 }
 
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(name)) headers.append(name, value);
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
+  const method = context.request.method;
+  const path = context.url.pathname;
+  const hasSession = !!context.cookies.get('blog_session')?.value;
+
+  // ---- 匿名 GET 公开 HTML 页面：Workers Cache API 边缘缓存（60s 新鲜 + SWR）----
+  // 仅生产启用；e2e/dev 通过 EDGE_CACHE=false 关闭，避免测试间脏缓存
+  if ((method === 'GET' || method === 'HEAD') && !hasSession && import.meta.env.PROD && shouldCachePublic(path)) {
+    try {
+      const env = await envOf();
+      if (env.EDGE_CACHE !== 'false') {
+        const cache = (caches as unknown as { default: { match(k: Request): Promise<Response | undefined>; put(k: Request, r: Response): Promise<void> } }).default;
+        const cached = await cache.match(context.request);
+        if (cached) {
+          const headers = new Headers(cached.headers);
+          for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+            if (!headers.has(name)) headers.append(name, value);
+          }
+          return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
+        }
+
+        const response = await next();
+        if (response.status === 200 && (response.headers.get('content-type') || '').includes('text/html')) {
+          const headers = new Headers(response.headers);
+          for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+            if (!headers.has(name)) headers.append(name, value);
+          }
+          headers.set('Cache-Control', 'public, max-age=60');
+          headers.set('CDN-Cache-Control', 'public, s-maxage=60');
+          const res = new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+          await cache.put(context.request, res.clone());
+          return res;
+        }
+        return withSecurityHeaders(response);
+      }
+    } catch {
+      // 缓存层异常时降级为直渲染
+    }
+  }
+
+  // ---- 常规路径：安全头 + 缓存语义 ----
   const response = await next();
   const headers = new Headers(response.headers);
 
@@ -32,30 +81,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (!headers.has(name)) headers.append(name, value);
   }
 
-  const method = context.request.method;
-  const path = context.url.pathname;
   const contentType = headers.get('content-type') || '';
-  const hasSession = !!context.cookies.get('blog_session')?.value;
   const hasCacheHeader = headers.has('Cache-Control');
 
-  // 公开 HTML 页面：CDN 边缘缓存 60s 新鲜 + 后台 5 分钟再验证，浏览器也缓存 60s
-  // （文章/首页/归档/标签页等只读公开内容；登录用户带身份信息一律不缓存）
   if ((method === 'GET' || method === 'HEAD') && contentType.includes('text/html') && !hasCacheHeader) {
     if (hasSession) {
       headers.set('Cache-Control', 'private, no-store');
-    } else if (shouldCachePublic(path)) {
-      const cache = 'public, max-age=60, s-maxage=60, stale-while-revalidate=300';
-      headers.set('Cache-Control', cache);
-      // Cloudflare 边缘缓存优先读该头；同源双写保证中间缓存/CDN 均可缓存墙
-      headers.set('CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-    } else {
+    } else if (!shouldCachePublic(path)) {
       headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    } else {
+      headers.set('Cache-Control', 'public, max-age=60');
     }
   }
 
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 });

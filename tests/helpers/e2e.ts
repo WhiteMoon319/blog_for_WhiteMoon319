@@ -134,6 +134,7 @@ export async function makeE2e(): Promise<E2eClient> {
             R2_PUBLIC_URL: { type: 'json', value: '' },
             LOGIN_RATE_LIMIT_MAX: { type: 'json', value: 10 },
             LOGIN_RATE_LIMIT_WINDOW: { type: 'json', value: 300 },
+            EDGE_CACHE: { type: 'json', value: false },
           },
         },
       },

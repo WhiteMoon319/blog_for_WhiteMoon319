@@ -16,8 +16,8 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
       <!-- 第一步：注册表单 -->
       <form id="register-form">
         <div class="auth-field">
-          <label for="username">用户名</label>
-          <input id="username" name="username" class="input" placeholder="字母、数字、下划线或中文" autocomplete="username" required />
+          <label for="username">用户名（仅英文字母和数字）</label>
+          <input id="username" name="username" class="input" placeholder="仅英文字母和数字" autocomplete="username" required />
         </div>
         <div class="auth-field">
           <label for="email">邮箱</label>

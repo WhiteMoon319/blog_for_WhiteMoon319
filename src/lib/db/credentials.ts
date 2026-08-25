@@ -56,7 +56,8 @@ function parseHash(formatted: string): {
   const iterMatch = /^iter=(\d+)$/.exec(iterPart);
   if (!iterMatch) return null;
   const iterations = parseInt(iterMatch[1]!, 10);
-  if (!Number.isFinite(iterations) || iterations < 1) return null;
+  // 迭代数上限防御：DB 被篡改时可构造超大迭代数造成 CPU DoS
+  if (!Number.isFinite(iterations) || iterations < 1 || iterations > 1_000_000) return null;
   const saltMatch = /^salt=(.+)$/.exec(saltPart);
   const hashMatch = /^hash=(.+)$/.exec(hashPart);
   if (!saltMatch || !hashMatch) return null;

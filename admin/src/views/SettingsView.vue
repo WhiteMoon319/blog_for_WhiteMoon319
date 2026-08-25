@@ -130,16 +130,6 @@ const emailConfigured = ref(false);
 const emailTesting = ref(false);
 const emailMasked = reactive({ host: '', username: '', from: '' });
 
-function applyEmailSettings(s: Record<string, unknown>) {
-  emailConfigured.value = !!(s as { email_configured?: boolean }).email_configured;
-  const raw = (s as Record<string, unknown>).email as Record<string, unknown> | undefined;
-  if (raw) {
-    emailMasked.host = (raw.smtp_host as string) ?? '';
-    emailMasked.username = (raw.smtp_username as string) ?? '';
-    emailMasked.from = (raw.from_email as string) ?? '';
-  }
-}
-
 async function loadEmailStatus() {
   try {
     const res = await api.emailSettings();

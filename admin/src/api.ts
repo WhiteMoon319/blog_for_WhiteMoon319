@@ -42,8 +42,8 @@ async function request<T>(path: string, options: RequestInit = {}, silent401 = f
 export const api = {
   me: () => request<{ authenticated: boolean; sub?: string }>('/api/auth/me'),
 
-  login: (password: string) =>
-    request<{ ok: boolean; role?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }, true),
+  login: (password: string, username = 'admin') =>
+    request<{ ok: boolean; role?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }, true),
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 

@@ -17,6 +17,14 @@ function notify(msg: string, err = false) {
   setTimeout(() => (toast.msg = ''), 2600);
 }
 
+// 路由守卫：initAuth 未完成或非管理员时，除登录页外一律拦截
+// （authed 但非 admin → 404；未登录 → 统一登录页）
+router.beforeEach((to) => {
+  if (to.path === '/login') return true;
+  if (authState.checking) return false; // 等 initAuth 完成后再放行
+  return true;
+});
+
 watch(
   () => route.path,
   (path) => {

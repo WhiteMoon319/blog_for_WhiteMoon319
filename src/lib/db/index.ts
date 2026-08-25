@@ -31,5 +31,6 @@ export type { CredentialRow } from './credentials.ts';
 export * from './pages.ts';
 export * from './stats.ts';
 export * from './ai-credentials.ts';
+export * from './email-credentials.ts';
 export * from './users.ts';
 export * from './comments.ts';

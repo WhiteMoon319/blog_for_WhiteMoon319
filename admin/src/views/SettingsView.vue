@@ -118,6 +118,82 @@ function applyToForm(s: SiteSettings) {
 
 const commentAutoApprove = ref('');
 
+// ---- 邮件（SMTP）配置 ----
+const emailForm = reactive({
+  smtp_host: '',
+  smtp_port: 465,
+  smtp_username: '',
+  smtp_password: '',
+  from_email: '',
+});
+const emailConfigured = ref(false);
+const emailTesting = ref(false);
+const emailMasked = reactive({ host: '', username: '', from: '' });
+
+function applyEmailSettings(s: Record<string, unknown>) {
+  emailConfigured.value = !!(s as { email_configured?: boolean }).email_configured;
+  const raw = (s as Record<string, unknown>).email as Record<string, unknown> | undefined;
+  if (raw) {
+    emailMasked.host = (raw.smtp_host as string) ?? '';
+    emailMasked.username = (raw.smtp_username as string) ?? '';
+    emailMasked.from = (raw.from_email as string) ?? '';
+  }
+}
+
+async function loadEmailStatus() {
+  try {
+    const res = await api.emailSettings();
+    emailConfigured.value = res.configured;
+    if (res.configured) {
+      emailMasked.host = res.smtp_host ?? '';
+      emailMasked.username = res.smtp_username ?? '';
+      emailMasked.from = res.from_email ?? '';
+    }
+  } catch { /* ignore */ }
+}
+
+async function testAndSaveEmail() {
+  if (emailTesting.value) return;
+  emailTesting.value = true;
+  try {
+    const res = await api.emailTestAndSave({
+      smtp_host: emailForm.smtp_host.trim(),
+      smtp_port: emailForm.smtp_port,
+      smtp_username: emailForm.smtp_username.trim(),
+      smtp_password: emailForm.smtp_password.trim(),
+      from_email: emailForm.from_email.trim(),
+    });
+    if (res.ok) {
+      emailConfigured.value = true;
+      emailMasked.host = emailForm.smtp_host.trim();
+      emailMasked.username = emailForm.smtp_username.trim();
+      emailMasked.from = emailForm.from_email.trim();
+      emailForm.smtp_password = '';
+      emit('notify', 'SMTP 测试成功，配置已保存');
+    } else {
+      emit('notify', `SMTP 测试失败：${res.error ?? '未知错误'}`, true);
+    }
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  } finally {
+    emailTesting.value = false;
+  }
+}
+
+async function clearEmail() {
+  if (!confirm('确认清除 SMTP 邮件配置？清除后注册验证码与通知邮件将无法发送。')) return;
+  try {
+    await api.emailClear();
+    emailConfigured.value = false;
+    emailMasked.host = '';
+    emailMasked.username = '';
+    emailMasked.from = '';
+    emit('notify', 'SMTP 配置已清除');
+  } catch (e) {
+    emit('notify', (e as Error).message, true);
+  }
+}
+
 function applyCommentSettings(s: Record<string, unknown>) {
   commentAutoApprove.value = (s.comment_review_keywords as string) ?? '';
 }
@@ -158,6 +234,7 @@ onMounted(async () => {
     applyAiSettings(s);
     promptTemplates.value = parseTemplates((s as unknown as Record<string, string>).ai_prompt_templates);
     applyCommentSettings(s as unknown as Record<string, unknown>);
+    await loadEmailStatus();
     loading.value = false;
   } catch (e) {
     emit('notify', (e as Error).message, true);
@@ -390,6 +467,43 @@ async function deleteAiKey() {
     </div>
     <div class="hint" style="margin-top:8px;">
       注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
+    </div>
+  </div>
+
+  <div class="card pad" v-if="!loading" style="margin-top:20px;">
+    <h3 style="margin:0 0 20px;">邮件（SMTP）</h3>
+    <div class="field">
+      <label>SMTP 服务器</label>
+      <input v-model="emailForm.smtp_host" class="input" placeholder="smtp.qq.com" />
+    </div>
+    <div class="field">
+      <label>端口</label>
+      <input v-model.number="emailForm.smtp_port" type="number" class="input" style="width:100px;" />
+    </div>
+    <div class="field">
+      <label>用户名</label>
+      <input v-model="emailForm.smtp_username" class="input" placeholder="邮箱地址或授权码用户名" />
+    </div>
+    <div class="field">
+      <label>授权码 / 密码</label>
+      <input v-model="emailForm.smtp_password" type="password" class="input" placeholder="留空则不修改" />
+      <div class="hint" style="margin-top:4px;">
+        <span v-if="emailConfigured" style="color:var(--ink-light);">已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span>
+        <span v-else style="color:var(--cinnabar);">未配置</span>
+        <button class="btn btn-danger mini" :disabled="!emailConfigured" @click="clearEmail" style="margin-left:8px;">清除配置</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>发件邮箱</label>
+      <input v-model="emailForm.from_email" class="input" placeholder="noreply@example.com" />
+    </div>
+    <div class="hint" style="margin:8px 0;">
+      用于发送注册验证码、回复通知等邮件。测试成功后自动保存配置（授权码加密存储）。
+    </div>
+    <div style="margin-top:12px;display:flex;gap:12px;align-items:center;">
+      <button class="btn btn-primary" :disabled="emailTesting" @click="testAndSaveEmail">
+        {{ emailTesting ? '测试中…' : '测试并保存' }}
+      </button>
     </div>
   </div>
 

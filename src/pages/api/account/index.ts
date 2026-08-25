@@ -13,7 +13,7 @@ import { hashVerificationCode, generateVerificationCode, sendEmail } from '../..
 
 export const prerender = false;
 
-// GET /api/account/me — 当前用户信息
+// GET /api/account — 当前用户信息
 export async function GET(ctx: APIContext): Promise<Response> {
   const auth = await requireAnyUser(ctx);
   if (!auth.ok) return auth.response;
@@ -30,7 +30,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   });
 }
 
-// PUT /api/account/profile — 修改昵称/头像/通知设置
+// PUT /api/account — 修改昵称/头像/通知设置/邮箱
 export async function PUT(ctx: APIContext): Promise<Response> {
   const auth = await requireAnyUser(ctx);
   if (!auth.ok) return auth.response;
@@ -67,7 +67,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return json({ error: 'email 格式无效' }, 400);
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(newEmail).first<{ id: number }>();
     if (existing) return json({ error: '该邮箱已被使用' }, 409);
-    await updateEmail(env.DB, auth.user.id, newEmail);
+    try {
+      await updateEmail(env.DB, auth.user.id, newEmail);
+    } catch {
+      // 并发窗口撞 UNIQUE 约束
+      return json({ error: '该邮箱已被使用' }, 409);
+    }
     // 发送验证码
     try {
       const code = await generateVerificationCode();

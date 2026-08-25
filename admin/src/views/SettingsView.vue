@@ -476,7 +476,7 @@ async function deleteAiKey() {
     </div>
     <div class="field">
       <label>授权码 / 密码</label>
-      <input v-model="emailForm.smtp_password" type="password" class="input" placeholder="留空则不修改" />
+      <input v-model="emailForm.smtp_password" type="password" class="input" placeholder="QQ 邮箱授权码（非 QQ 密码）" />
       <div class="hint" style="margin-top:4px;">
         <span v-if="emailConfigured" style="color:var(--ink-light);">已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span>
         <span v-else style="color:var(--cinnabar);">未配置</span>

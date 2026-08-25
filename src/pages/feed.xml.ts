@@ -41,8 +41,16 @@ export async function GET(ctx: APIContext): Promise<Response> {
 
   const posts = await listPublishedPosts(env.DB, { limit: MAX_ITEMS });
 
-  // 代际 key：任一文章增删改（id/created_at/updated_at 变化）即失效
-  const cacheKey = posts.map((p) => `${p.id}:${p.created_at}:${p.updated_at}`).join('|');
+  // 收集文集 slug 映射（slug 变更也需使缓存失效，故纳入代际 key）
+  const colIds = [...new Set(posts.map((p) => p.collection_id).filter((id): id is number => id !== null))];
+  const colMap = new Map<number, string>();
+  if (colIds.length > 0) {
+    const cols = await getCollectionsByIds(env.DB, colIds);
+    for (const [id, c] of cols) colMap.set(id, c.slug);
+  }
+
+  // 代际 key：任一文章增删改或文集 slug 变化即失效
+  const cacheKey = posts.map((p) => `${p.id}:${p.created_at}:${p.updated_at}:${p.collection_id !== null ? colMap.get(p.collection_id) ?? '' : ''}`).join('|');
   if (feedCache && feedCache.key === cacheKey) {
     return new Response(feedCache.xml, {
       headers: {
@@ -50,14 +58,6 @@ export async function GET(ctx: APIContext): Promise<Response> {
         'cache-control': 'public, max-age=300',
       },
     });
-  }
-
-  // 收集文集 slug 映射
-  const colIds = [...new Set(posts.map((p) => p.collection_id).filter((id): id is number => id !== null))];
-  const colMap = new Map<number, string>();
-  if (colIds.length > 0) {
-    const cols = await getCollectionsByIds(env.DB, colIds);
-    for (const [id, c] of cols) colMap.set(id, c.slug);
   }
 
   const items = posts.map((p) => {

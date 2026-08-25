@@ -44,5 +44,5 @@ const bodyHtml = dbPage?.published === 1
       )
     }
   </article>
-  <ArticleEnhancer />
+  <ArticleEnhancer html={bodyHtml ?? ''} />
 </BaseLayout>

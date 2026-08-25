@@ -62,6 +62,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
     body: body.body.trim(),
     attachments,
   });
+  if (!comment) return json({ error: '发表失败' }, 500);
 
     // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
   const settings = await getAllSettings(env.DB);
@@ -72,7 +73,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   let finalStatus: 'pending' | 'approved' = 'pending';
   if (!needsReview) {
     finalStatus = 'approved';
-    await env.DB.prepare(`UPDATE comments SET status = 'approved' WHERE id = ?`).bind(comment!.id).run();
+    await env.DB.prepare(`UPDATE comments SET status = 'approved' WHERE id = ?`).bind(comment.id).run();
   }
 
   // 回复通知：被回复者开启了邮件提醒（await 确保响应返回前完成发送）

@@ -43,8 +43,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // 仅 GET：HEAD 跳过（Cache API put 不接受 HEAD），避免双重渲染
   if (method === 'GET' && !hasSession && import.meta.env.PROD && shouldCachePublic(path)) {
     try {
-      const env = await envOf();
-      if (env.EDGE_CACHE !== 'false') {
+            const env = await envOf();
+      // EDGE_CACHE=false（字符串或布尔）均可关闭缓存
+      const edgeCache = env.EDGE_CACHE as unknown;
+      const cacheDisabled = edgeCache === false || edgeCache === 'false';
+      if (!cacheDisabled) {
         const cache = (caches as unknown as { default: { match(k: Request): Promise<Response | undefined>; put(k: Request, r: Response): Promise<void> } }).default;
         const cached = await cache.match(context.request);
         if (cached) {

@@ -94,7 +94,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   function commentHtml(c: any): string {
     const attach = parseAttachments(c.attachments).map((k: string) => `<img src="${r2Base}/${esc(k)}" loading="lazy" class="comment-img" />`).join('');
     const replyBtn = c.parent_id === null ? `<button type="button" class="btn btn-ghost mini comment-reply" data-parent="${c.id}" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
-    const floor = c.parent_id === null ? `#${c.floor}` : `#${c.floor}`;
+    const floor = `#${c.floor}`;
     const likeBtn = `<button type="button" class="btn btn-ghost mini comment-like" data-id="${c.id}" data-liked="${c.liked_by_me ? '1' : '0'}">${c.liked_by_me ? '❤' : '♡'} <span class="comment-like-count">${c.likes_count ?? 0}</span></button>`;
     const avatar = c.avatar_url ? `<img src="${esc(c.avatar_url)}" class="comment-avatar" />` : `<span class="comment-avatar comment-avatar-placeholder">${(c.display_name || c.username || '?')[0].toUpperCase()}</span>`;
     return `

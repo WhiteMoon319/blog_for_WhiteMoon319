@@ -193,27 +193,102 @@ pnpm run typecheck      # astro check + vue-tsc + tsc（含 tests/）
 pnpm test               # 单测 + e2e（需先 pnpm run build）
 ```
 
-## 部署
+## 部署（从零开始）
+
+### 前置要求
+
+- **Node.js ≥ 22** + **pnpm**（`npm install -g pnpm`）
+- **Cloudflare 账号**（免费即可）
+- 一个已经指向 Cloudflare 的域名（可选，也可用默认的 `.workers.dev` 域名）
+
+### 一键部署
 
 ```bash
-pnpm run cf:deploy      # 构建 → wrangler deploy
+# 1. 克隆仓库，进入目录
+cd blog_for_WhiteMoon319
+
+# 2. 运行一键部署向导
+pnpm run setup
 ```
 
-**首次部署数据准备：**
+向导会逐步引导你完成以下操作（全程中文）：
+
+1. ✅ 检查 Node.js / pnpm
+2. ✅ 安装依赖
+3. ✅ 登录 Cloudflare（浏览器打开授权页面）
+4. ✅ 自动创建 D1 数据库（blog-db）
+5. ✅ 自动创建 R2 存储桶（blog-images）
+6. ✅ 生成 `.env` 配置文件
+7. ✅ 设置生产密钥（管理员密码、会话密钥、AI 加密密钥、SMTP 凭据等）
+8. ✅ 应用数据库迁移
+9. ✅ 构建并部署到 Cloudflare Workers
+
+整个过程约 5-10 分钟。部署完成后，用浏览器访问你的域名即可看到博客。
+
+### 首次部署后
+
+部署完成后，登录后台 `/admin/`（管理员账号为 `admin`，密码为刚才设置的 `BLOG_ADMIN_PASSWORD`）：
+
+1. **设置 → 邮件（SMTP）**：填入 `smtp.qq.com`、端口 `465`、QQ 邮箱、授权码，点「测试并保存」——注册验证码和回复通知邮件才能发送
+2. **设置 → AI 摘要**：如需 AI 摘要功能，配置服务商 / API Key / 模型
+3. **设置 → 评论设置**：配置需人工审核的关键词（若不配置则全部直接展示）
+
+### 手动部署
+
+如需一步步手动操作：
 
 ```bash
-npx wrangler d1 migrations apply blog-db --remote
-npx wrangler d1 execute blog-db --remote --file=db/seed.sql   # 可选种子
-```
+# 1. 修改站点名称为你的博客名（可选）
+# 编辑 wrangler.jsonc.template 中的 vars 部分
 
-**生产密钥：**
+# 2. 安装依赖
+pnpm install
 
-```bash
+# 3. 登录 Cloudflare
+pnpm exec wrangler login
+
+# 4. 创建 D1 数据库（获取 database_id）
+pnpm exec wrangler d1 create blog-db
+
+# 5. 创建 R2 存储桶
+pnpm exec wrangler r2 bucket create blog-images
+
+# 6. 复制 .env.example 为 .env，填入真实 D1 数据库 ID
+cp .env.example .env
+
+# 7. 设置生产密钥（逐个输入）
 npx wrangler secret put BLOG_ADMIN_PASSWORD
 npx wrangler secret put BLOG_SESSION_SECRET
-npx wrangler secret put R2_PUBLIC_URL
-npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # AI 加密主密钥，32 字节 hex
+npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # 32 字节 hex，用 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 生成
+npx wrangler secret put SMTP_USER
+npx wrangler secret put SMTP_PASS
+npx wrangler secret put SMTP_FROM
+
+# 8. 应用远程迁移 + 种子
+npx wrangler d1 migrations apply blog-db --remote
+npx wrangler d1 execute blog-db --remote --file=db/seed.sql   # 可选：演示种子数据
+
+# 9. 构建并部署
+pnpm run build
+npx wrangler deploy
 ```
+
+### 日常更新
+
+```bash
+pnpm run deploy    # 构建 → 迁移 → 部署（一键）
+```
+
+## 性能优化
+
+| 优化 | 效果 |
+|------|------|
+| 边缘缓存 | Workers Cache API 匿名公开页面 60s 边缘命中，登录用户 no-store |
+| 按需渲染 | KaTeX 样式、hljs 样式、mermaid/markmap 运行时仅在正文含对应内容时加载 |
+| 编辑器懒加载 | PostEditorView 2.4MB → 1.2MB，mermaid/markmap 动态 chunk |
+| RSS 内存缓存 | 代际 key 缓存，避免每次请求重渲染 50 篇 markdown |
+| D1 查询优化 | 点赞计数改为 LEFT JOIN GROUP BY 批量计算，sitemap 列裁剪 |
+| 公开页面 | 首页仅 1 个 CSS（45KB），0 个 JS，首次加载无 JS 阻塞 |
 
 ## 数据库
 

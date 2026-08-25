@@ -21,7 +21,9 @@
     "cf:config": "node scripts/cf-config.mjs",
     "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/reset.sql && wrangler d1 migrations apply blog-db --local && wrangler d1 execute blog-db --local --file=db/seed.sql",
     "cf:dev": "pnpm run build && wrangler dev",
-    "cf:deploy": "pnpm run build && wrangler deploy"
+    "cf:deploy": "pnpm run build && wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
+    "setup": "node scripts/setup-deploy.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.2.1",

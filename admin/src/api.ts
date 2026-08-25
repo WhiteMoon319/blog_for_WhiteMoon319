@@ -222,7 +222,7 @@ export const api = {
 
   // ---- 邮件配置 ----
   emailSettings: () => request<{ configured: boolean; smtp_host?: string; smtp_port?: number; smtp_username?: string; from_email?: string }>('/api/settings/email'),
-  emailTestAndSave: (data: { smtp_host: string; smtp_port: number; smtp_username: string; smtp_password: string; from_email: string }) =>
+  emailTestAndSave: (data: { smtp_host: string; smtp_port: number; smtp_username: string; smtp_password: string; from_email: string; test_email?: string }) =>
     request<{ ok?: boolean; error?: string }>('/api/settings/email', { method: 'POST', body: JSON.stringify(data) }),
   emailClear: () => request<{ ok: boolean }>('/api/settings/email', { method: 'DELETE' }),
 

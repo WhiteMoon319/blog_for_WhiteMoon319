@@ -25,6 +25,11 @@ declare global {
       LOGIN_RATE_LIMIT_MAX: number;
       LOGIN_RATE_LIMIT_WINDOW: number;
       AI_SETTINGS_ENCRYPTION_KEY?: string;
+      SMTP_HOST?: string;
+      SMTP_PORT?: string;
+      SMTP_USER?: string;
+      SMTP_PASS?: string;
+      SMTP_FROM?: string;
     }
   }
 

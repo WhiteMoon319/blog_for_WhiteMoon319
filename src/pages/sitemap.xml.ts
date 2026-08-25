@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listCollections, type PostWithCollection } from '../lib/db';
+import { envOf, listCollections } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -21,11 +21,11 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const collections = await listCollections(env.DB);
   const posts = await env.DB
     .prepare(
-      `SELECT p.*, c.slug AS collection_slug FROM posts p
+      `SELECT p.id, p.slug, p.collection_id, p.updated_at, p.status, p.deleted_at, c.slug AS collection_slug FROM posts p
        LEFT JOIN collections c ON c.id = p.collection_id
        WHERE p.status = 'published' AND p.deleted_at IS NULL`,
     )
-    .all<PostWithCollection>();
+    .all<{ id: number; slug: string; collection_id: number | null; updated_at: string; status: string; deleted_at: string | null; collection_slug: string | null }>();
 
   const cacheKey = collections.map((c) => `${c.id}:${c.updated_at}`).join('|') + '||' + (posts.results ?? []).map((p) => `${p.id}:${p.updated_at}`).join('|');
   if (sitemapCache && sitemapCache.key === cacheKey) {

@@ -88,19 +88,5 @@ export async function POST(ctx: APIContext): Promise<Response> {
     }
   }
 
-  // 新评论通知文章作者（预留多作者时通知 author_id 对应用户）
-  (async () => {
-    try {
-      const postAuthor = await env.DB.prepare("SELECT email, email_verified, notify_email, display_name FROM users WHERE role = 'admin' LIMIT 1").first<{ email: string; email_verified: number; notify_email: number; display_name: string }>();
-      if (postAuthor && postAuthor.email_verified && postAuthor.notify_email && postAuthor.email !== auth.user.email) {
-        const { sendEmail } = await import('../../../lib/email');
-        const postTitle = await env.DB.prepare('SELECT title FROM posts WHERE id = ?').bind(postId).first<{ title: string }>();
-        if (postTitle) await sendEmail(postAuthor.email, `「${postTitle.title}」有新评论 - 月下独酌`,
-          `${postAuthor.display_name} 您好，\n\n${auth.user.display_name || auth.user.username} 在您的文章「${postTitle.title}」发表了新评论：\n\n"${commentBody.slice(0, 200)}"\n\nhttps://blog.whitemoon319.xyz/posts/${postId}`,
-        );
-      }
-    } catch { /* 静默 */ }
-  })();
-
   return json({ comment }, 201);
 }

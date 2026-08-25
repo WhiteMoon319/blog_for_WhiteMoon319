@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status, created_at);
 -- 种子管理员：从 admin_credentials 复制密码哈希（若存在）
 -- 若无 admin_credentials，创建占位用户保留 env 回退登录路径
 INSERT INTO users (username, display_name, email, email_verified, password_hash, role, session_version, created_at)
-SELECT 'admin', '管理员', '3287047638@qq.com', 1,
+SELECT 'admin', '管理员', 'admin@example.com', 1,
        COALESCE((SELECT password_hash FROM admin_credentials WHERE id = 1), ''),
        'admin', 1, datetime('now')
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');

@@ -1,8 +1,10 @@
----
+﻿---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import BaseLayout from '../layouts/BaseLayout.astro';
 const redirect = Astro.url.searchParams.get('redirect') ?? '/';
+// 防开放重定向：仅允许站内路径
+const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
 ---
 
 <BaseLayout title="验证邮箱" noindex>
@@ -30,6 +32,8 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
   const codeInput = document.getElementById('code') as HTMLInputElement;
   const resendBtn = document.getElementById('resend-btn')! as HTMLButtonElement;
   const redirect = new URLSearchParams(location.search).get('redirect') ?? '/';
+  // 防开放重定向：仅允许站内路径
+  const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
 
   // 获取当前用户信息
   let userId: number | null = null;
@@ -37,9 +41,10 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
 
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(async (r) => {
     if (r.status !== 200) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
-    const data = await r.json() as { email_verified?: boolean; sub?: string };
-    if (data.email_verified) { location.href = redirect; return; }
+    const data = await r.json() as { email_verified?: boolean; sub?: string; email?: string };
+    if (data.email_verified) { location.href = safeRedirect; return; }
     userId = data.sub ? parseInt(data.sub.replace('user:', '')) : null;
+    email = data.email ?? '';
   });
 
   form.addEventListener('submit', async (e) => {
@@ -59,10 +64,11 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
       errEl.style.display = 'block';
       return;
     }
-    location.href = redirect;
+    location.href = safeRedirect;
   });
 
   resendBtn.addEventListener('click', async () => {
+    if (!email) return;
     resendBtn.disabled = true;
     const res = await fetch('/api/auth/resend-verification', {
       method: 'POST', credentials: 'same-origin',

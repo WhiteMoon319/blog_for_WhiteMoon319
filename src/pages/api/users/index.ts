@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listUsers } from '../../../lib/db';
+import { envOf } from '../../../lib/db';
 import { json, requireAdmin } from '../../../lib/auth';
 
 export const prerender = false;
@@ -16,6 +16,9 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const auth = await requireAdmin(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
-  const users = await listUsers(env.DB);
-  return json({ users });
+  // 白名单字段：绝不返回 password_hash / session_version
+  const rows = await env.DB.prepare(
+    `SELECT id, username, display_name, email, role, status, created_at FROM users ORDER BY created_at DESC`,
+  ).all();
+  return json({ users: rows.results ?? [] });
 }

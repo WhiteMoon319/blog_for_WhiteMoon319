@@ -17,6 +17,11 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const id = Number(ctx.params.id);
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
   const env = await envOf();
+
+  // 文章必须存在且已发布未删除（回收站/草稿的评论不可读）
+  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(id).first<{ id: number; status: string; deleted_at: string | null }>();
+  if (!post || post.status !== 'published' || post.deleted_at) return json({ error: 'post not found' }, 404);
+
   const user = await resolveUser(ctx);
   const currentUserId = user?.user.id;
   const comments = await listApprovedComments(env.DB, id, currentUserId);

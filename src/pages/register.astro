@@ -61,6 +61,8 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
   const resendBtn = document.getElementById('resend-btn')! as HTMLButtonElement;
   const verifyErr = document.getElementById('verify-error')!;
   const redirect = new URLSearchParams(location.search).get('redirect') ?? '/';
+  // 防开放重定向：仅允许站内路径
+  const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
   let userId: number | null = null;
   let email = '';
 
@@ -123,7 +125,7 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/';
         body: JSON.stringify({ username: (document.getElementById('username') as HTMLInputElement).value, password: (document.getElementById('password') as HTMLInputElement).value }),
       });
       if (loginRes.ok) {
-        location.href = redirect;
+        location.href = safeRedirect;
       } else {
         location.href = '/login/?redirect=' + encodeURIComponent(redirect);
       }

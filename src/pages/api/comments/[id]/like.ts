@@ -36,8 +36,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
     // 取消点赞
     await env.DB.prepare(`DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?`).bind(id, auth.user.id).run();
   } else {
-    // 点赞
-    await env.DB.prepare(`INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
+    // 点赞（OR IGNORE 防并发重复插入）
+    await env.DB.prepare(`INSERT OR IGNORE INTO comment_likes (comment_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
   }
 
   // 返回新点赞数

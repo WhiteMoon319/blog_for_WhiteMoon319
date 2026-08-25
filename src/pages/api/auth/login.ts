@@ -9,7 +9,7 @@
 import type { APIContext } from 'astro';
 import { checkCsrf, json, setSessionCookie } from '../../../lib/auth';
 import { envOf, getUserByUsername, getUserByEmail } from '../../../lib/db';
-import { verifyPasswordHash } from '../../../lib/db/credentials';
+import { hashPassword, verifyPasswordHash } from '../../../lib/db/credentials';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
 export const prerender = false;
@@ -59,6 +59,9 @@ const user = (await getUserByUsername(env.DB, ident)) ?? (await getUserByEmail(e
         ok = diff === 0;
       }
     }
+  } else {
+    // 用户不存在：执行等价 PBKDF2 消除计时侧信道（防用户名枚举）
+    await hashPassword(body.password);
   }
   if (!user || !ok) {
     return json({ error: 'invalid credentials' }, 401);

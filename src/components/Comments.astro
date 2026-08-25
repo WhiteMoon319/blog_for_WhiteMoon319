@@ -36,6 +36,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   const attachEl = root.querySelector<HTMLElement>('.comment-attachments')!;
   const fileInput = root.querySelector<HTMLInputElement>('input[type=file]')!;
   const images: string[] = [];
+  let replyParentId: number | null = null;
   let me: { authenticated: boolean; email_verified?: boolean } | null = null;
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -92,7 +93,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 
   function commentHtml(c: any): string {
     const attach = parseAttachments(c.attachments).map((k: string) => `<img src="${r2Base}/${esc(k)}" loading="lazy" class="comment-img" />`).join('');
-    const replyBtn = c.parent_id === null ? `<button type="button" class="btn btn-ghost mini comment-reply" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
+    const replyBtn = c.parent_id === null ? `<button type="button" class="btn btn-ghost mini comment-reply" data-parent="${c.id}" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
     const floor = c.parent_id === null ? `#${c.floor}` : `#${c.floor}`;
     const likeBtn = `<button type="button" class="btn btn-ghost mini comment-like" data-id="${c.id}" data-liked="${c.liked_by_me ? '1' : '0'}">${c.liked_by_me ? '❤' : '♡'} <span class="comment-like-count">${c.likes_count ?? 0}</span></button>`;
     const avatar = c.avatar_url ? `<img src="${esc(c.avatar_url)}" class="comment-avatar" />` : `<span class="comment-avatar comment-avatar-placeholder">${(c.display_name || c.username || '?')[0].toUpperCase()}</span>`;
@@ -142,12 +143,12 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
     const res = await fetch('/api/comments', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ post_id: postId, body, attachments: images }),
+      body: JSON.stringify({ post_id: postId, parent_id: replyParentId, body, attachments: images }),
     });
     const data = await res.json() as { error?: string };
     if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
     if (!res.ok) { renderStatus(data.error || '发表失败', true); return; }
-    inputEl.value = ''; images.length = 0; attachEl.innerHTML = '';
+    inputEl.value = ''; images.length = 0; attachEl.innerHTML = ''; replyParentId = null;
     renderStatus('评论已提交，审核通过后可见');
     // 在列表末尾插入一条占位提示
     emptyEl.style.display = 'none';
@@ -160,6 +161,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   listEl.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.comment-reply');
     if (btn) {
+      replyParentId = Number(btn.dataset.parent) || null;
       inputEl.value = `@${btn.dataset.name} `; inputEl.focus();
       window.scrollTo({ top: formEl.offsetTop, behavior: 'smooth' });
       return;

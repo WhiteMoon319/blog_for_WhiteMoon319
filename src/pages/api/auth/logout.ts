@@ -7,28 +7,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { checkCsrf, clearSessionCookie, json } from '../../../lib/auth';
+import { checkCsrf, clearSessionCookie, getSession, json } from '../../../lib/auth';
 import { envOf, incrementUserSessionVersion } from '../../../lib/db';
 
 export const prerender = false;
 
-// 注销：清 Cookie 并对该用户 session_version + 1，使已签发 token 立即失效
+// 注销：清 Cookie 并对该用户 session_version + 1，使已签发 token（含其他设备/泄露 token）立即失效
 export async function POST(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) {
     return json({ error: 'forbidden: invalid origin' }, 403);
   }
-  const m = ctx.cookies.get('blog_session')?.value?.split('.')[0];
-  let userId: number | null = null;
-  if (m) {
-    try {
-      const parsed = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(m.replace(/-/g, '+').replace(/_/g, '/') + '=='), (c) => c.charCodeAt(0))));
-      const mm = parsed.sub?.match(/^user:(\d+)$/);
-      if (mm) userId = Number(mm[1]);
-    } catch { /* ignore */ }
-  }
-  if (userId !== null) {
-    await incrementUserSessionVersion(env.DB, userId);
+  const session = await getSession(ctx);
+  if (session) {
+    const mm = session.sub?.match(/^user:(\d+)$/);
+    if (mm) {
+      try {
+        await incrementUserSessionVersion(env.DB, Number(mm[1]));
+      } catch { /* 升版本失败不阻塞登出 */ }
+    }
   }
   clearSessionCookie(ctx);
   return json({ ok: true });

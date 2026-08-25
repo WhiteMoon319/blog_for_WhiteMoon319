@@ -40,7 +40,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // ---- 匿名 GET 公开 HTML 页面：Workers Cache API 边缘缓存（60s 新鲜 + SWR）----
   // 仅生产启用；e2e/dev 通过 EDGE_CACHE=false 关闭，避免测试间脏缓存
-  if ((method === 'GET' || method === 'HEAD') && !hasSession && import.meta.env.PROD && shouldCachePublic(path)) {
+  // 仅 GET：HEAD 跳过（Cache API put 不接受 HEAD），避免双重渲染
+  if (method === 'GET' && !hasSession && import.meta.env.PROD && shouldCachePublic(path)) {
     try {
       const env = await envOf();
       if (env.EDGE_CACHE !== 'false') {

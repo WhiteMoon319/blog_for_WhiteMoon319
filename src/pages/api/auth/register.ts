@@ -38,6 +38,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const username = body.username.trim().toLowerCase();
   const email = body.email.trim().toLowerCase();
   const displayName = typeof body.display_name === 'string' && body.display_name.trim() ? body.display_name.trim() : username;
+  if (displayName.length > 30) return json({ error: '昵称最长 30 字' }, 400);
 
   if (username.length < 2 || username.length > 64) return json({ error: '用户名 2-64 字符' }, 400);
   if (!/^[a-zA-Z0-9]+$/.test(username)) return json({ error: '用户名仅允许英文字母与数字' }, 400);

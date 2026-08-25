@@ -73,18 +73,16 @@ export async function POST(ctx: APIContext): Promise<Response> {
     await env.DB.prepare(`UPDATE comments SET status = 'approved' WHERE id = ?`).bind(comment!.id).run();
   }
 
-  // 回复通知：被回复者开启了邮件提醒
+  // 回复通知：被回复者开启了邮件提醒（await 确保响应返回前完成发送）
   if (parentAuthorId && parentAuthorId !== auth.user.id) {
     const parentUser = await env.DB.prepare('SELECT email, email_verified, notify_email, display_name FROM users WHERE id = ?').bind(parentAuthorId).first<{ email: string; email_verified: number; notify_email: number; display_name: string }>();
     if (parentUser && parentUser.email_verified && parentUser.notify_email) {
-      (async () => {
-        try {
-          const { sendEmail } = await import('../../../lib/email');
-          await sendEmail(parentUser.email, '有人回复了您的评论 - 月下独酌',
-            `${parentUser.display_name} 您好，\n\n${auth.user.display_name || auth.user.username} 回复了您在「月下独酌」的评论：\n\n"${commentBody.slice(0, 200)}"\n\nhttps://blog.whitemoon319.xyz/posts/${postId} 可查看。`,
-          );
-        } catch { /* 邮件发送失败静默 */ }
-      })();
+      try {
+        const { sendEmail } = await import('../../../lib/email');
+        await sendEmail(parentUser.email, '有人回复了您的评论 - 月下独酌',
+          `${parentUser.display_name} 您好，\n\n${auth.user.display_name || auth.user.username} 回复了您在「月下独酌」的评论：\n\n"${commentBody.slice(0, 200)}"\n\n请前往博客查看。`,
+        );
+      } catch { /* 邮件发送失败静默 */ }
     }
   }
 

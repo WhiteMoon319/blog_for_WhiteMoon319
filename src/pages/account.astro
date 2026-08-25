@@ -82,7 +82,7 @@ const env = await envOf();
     notify_email: boolean;
   }
   async function me(): Promise<AccountInfo | null> {
-    const r = await fetch('/api/account/me', { credentials: 'same-origin' });
+    const r = await fetch('/api/account', { credentials: 'same-origin' });
     if (r.status === 401) { location.href = '/login/?redirect=/account/'; return null; }
     return r.json() as Promise<AccountInfo>;
   }
@@ -130,7 +130,7 @@ const env = await envOf();
         email: (document.getElementById('email') as HTMLInputElement).value,
       };
       if (avatarUrl !== (u.avatar_url ?? '')) payload.avatar_url = avatarUrl;
-      const res = await fetch('/api/account/profile', {
+      const res = await fetch('/api/account', {
         method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

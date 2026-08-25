@@ -55,8 +55,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
       `<title>${escapeXml(p.title)}</title>`,
       `<link>${escapeXml(link)}</link>`,
       `<guid isPermaLink="true">${escapeXml(link)}</guid>`,
-      p.summary ? `<description><![CDATA[${p.summary}]]></description>` : '',
-      html ? `<content:encoded><![CDATA[${html}]]></content:encoded>` : '',
+      p.summary ? `<description><![CDATA[${p.summary.replace(/\]\]>/g, ']]&gt;')}]]></description>` : '',
+      html ? `<content:encoded><![CDATA[${html.replace(/\]\]>/g, ']]&gt;')}]]></content:encoded>` : '',
       pubDate ? `<pubDate>${pubDate}</pubDate>` : '',
       '</item>',
     ].join('');

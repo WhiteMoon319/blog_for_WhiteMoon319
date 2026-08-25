@@ -45,16 +45,20 @@ export async function listApprovedComments(db: D1Database, postId: number, curre
     .bind(postId)
     .all<CommentFlat & { likes_count: number }>();
 
-  // 获取当前用户点赞状态
+  // 获取当前用户点赞状态（分片查询，避免超出 D1 绑定参数上限）
   const likedIds = new Set<number>();
   if (currentUserId && rows.results?.length) {
     const ids = (rows.results ?? []).map((r) => r.id);
-    const chips = ids.map(() => '?').join(',');
-    const liked = await db
-      .prepare(`SELECT comment_id FROM comment_likes WHERE comment_id IN (${chips}) AND user_id = ?`)
-      .bind(...ids, currentUserId)
-      .all<{ comment_id: number }>();
-    for (const l of liked.results ?? []) likedIds.add(l.comment_id);
+    const CHUNK = 90;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const batch = ids.slice(i, i + CHUNK);
+      const chips = batch.map(() => '?').join(',');
+      const liked = await db
+        .prepare(`SELECT comment_id FROM comment_likes WHERE comment_id IN (${chips}) AND user_id = ?`)
+        .bind(...batch, currentUserId)
+        .all<{ comment_id: number }>();
+      for (const l of liked.results ?? []) likedIds.add(l.comment_id);
+    }
   }
 
   const all = (rows.results ?? []).map((r) => ({
@@ -97,8 +101,12 @@ export async function updateCommentStatus(db: D1Database, id: number, status: 'a
 }
 
 export async function deleteComment(db: D1Database, id: number): Promise<boolean> {
-  await db.prepare('DELETE FROM comments WHERE parent_id = ?').bind(id).run();
-  const row = await db.prepare('DELETE FROM comments WHERE id = ? RETURNING id').bind(id).first<{ id: number }>();
+  // 级联删除子回复 + 删本体，同批原子执行
+  const results = await db.batch([
+    db.prepare('DELETE FROM comments WHERE parent_id = ?').bind(id),
+    db.prepare('DELETE FROM comments WHERE id = ? RETURNING id').bind(id),
+  ]);
+  const row = results[1].results?.[0] as { id: number } | undefined;
   return !!row;
 }
 

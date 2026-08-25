@@ -58,7 +58,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
       host: cred.smtp_host || 'smtp.qq.com',
       port: cred.smtp_port || 465,
       secure: (cred.smtp_port || 465) === 465,
-      auth: { user: cred.smtp_username || '3287047638@qq.com', pass: password },
+      auth: { user: cred.smtp_username, pass: password },
     });
     from = cred.from_email;
   }
@@ -80,7 +80,9 @@ export async function testSmtpCreds(host: string, port: number, user: string, pa
 }
 
 export async function generateVerificationCode(): Promise<string> {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(100000 + (arr[0] % 900000));
 }
 
 export async function hashVerificationCode(code: string): Promise<string> {

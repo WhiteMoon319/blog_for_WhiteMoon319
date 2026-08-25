@@ -32,7 +32,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (existing) {
     await env.DB.prepare(`DELETE FROM post_likes WHERE post_id = ? AND user_id = ?`).bind(id, auth.user.id).run();
   } else {
-    await env.DB.prepare(`INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
+    await env.DB.prepare(`INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
   }
 
   const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?`).bind(id).first<{ n: number }>();

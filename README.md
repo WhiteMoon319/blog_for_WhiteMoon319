@@ -1,6 +1,6 @@
 # 月下独酌 · blog
 
-架在 Cloudflare 上的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写就，可分文集（合集），支持发布/草稿切换、版本历史、图片直传、AI 摘要生成。
+架在 Cloudflare 上的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写就，可分文集（合集），支持发布/草稿切换、版本历史、图片直传、AI 摘要生成、用户注册与评论互动。
 
 ## 功能
 
@@ -11,34 +11,42 @@
 - 标签：标签云、独立标签页 `/tags/{tag}/`、`/tags/?t=` 多标签交集检索、标签内关键词搜索
 - 归档页（按时间轴）、关于页、站内搜索（`/search/`，`#标签` 前缀自动转跳标签页）
 - 阅读量统计、上一篇/下一篇相邻导航、`/sitemap.xml` 动态生成
-- KaTeX 数学公式、Mermaid 流程图、MarkMap 脑图服务端渲染 + 客户端运行时
+- KaTeX 数学公式、Mermaid 流程图、MarkMap 脑图服务端渲染 + 客户端运行时（按需加载：正文含对应内容才拉取资源）
 - 代码高亮（highlight.js）、GFM 表格
+- 用户系统：注册（邮箱验证码验证）/ 登录（用户名或邮箱）/ 个人中心（昵称、头像、密码、邮箱绑定、邮件提醒开关）
+- 评论系统：嵌套回复（2 层）、楼层号（`1_1` 格式）、文字 + 图片（R2 附件）、点赞、敏感词人工审核
+- 文章/评论点赞
+- 边缘缓存：Workers Cache API 匿名公开页面 60s 边缘缓存 + 后台刷新
 - 古风水墨视觉风格：纸纹背景、印章、毛笔标题、朱砂强调色、深色模式
 
 **后台（`/admin`）**
 
-- 密码登录（HMAC 签名会话 Cookie + 登录限流）
-- 文集管理：新建/编辑/删除（名称、slug、简介、主题色、参考前文摘要开关）
+- 统一账号登录（与管理端共用 `/login`，role 判定权限；非管理员访问后台跳 404）
+- 文集管理：新建/编辑/删除（名称、slug、简介、主题色、参考前文摘要开关、AI 摘要模板选择）
 - 文章管理：Tiptap 富文本编辑器（可视化 + 源码双模式，CodeMirror Markdown 编辑 + 实时预览），表格/代码高亮/链接/图片，发布/草稿/定时/置顶
 - AI 摘要生成：单篇生成（多候选可选）、批量生成（导入页/文章列表）、文集参考摘要、可配置 API Key（AES-256-GCM 加密存储）
 - 版本历史：增量存储（unified diff），回滚，对比与词级高亮
 - Word 文档（.docx）导入为 Markdown，导入后 AI 批量生成摘要
 - 图片管理：拖拽直传 R2，媒体库浏览/删除，封面与正文插图
 - 数据看板：阅读趋势、日聚合热文 TOP、统计字数
+- 评论审核：待审/已准/已拒分栏、按文章 ID 筛选、批准/驳回/删除
+- 用户管理：列表、封禁/解封（封禁即踢下线）
 
 ## 技术栈
 
 - **Astro 7**（`output: server`）+ **@astrojs/cloudflare** 适配器，SSR 运行在 **Cloudflare Workers**
-- **Cloudflare D1**：文集、文章、版本历史与登录限流数据
-- **Cloudflare R2**：上传图片
+- **Cloudflare D1**：文集、文章、版本历史、用户、评论与登录限流数据
+- **Cloudflare R2**：上传图片与评论/头像附件
 - **Vue 3 + Vite**：`admin/` 管理端 SPA，构建后合并进 Worker 静态资源（`dist/client/admin`）
 - **marked + sanitize-html**：Markdown 渲染与 XSS 清洗
 - **KaTeX**：数学公式服务端渲染
-- **Mermaid / MarkMap (d3)**：图表客户端运行时渲染
+- **Mermaid / MarkMap (d3)**：图表客户端运行时渲染（动态 import 按需加载）
 - **highlight.js**：代码语法高亮
 - **TipTap (ProseMirror)**：WYSIWYG 编辑器（表格、代码块低亮）
 - **CodeMirror 6**：源码模式 Markdown 编辑器
 - **OpenAI-compatible API**：AI 摘要生成（DeepSeek / OpenAI / 自定义端点）
+- **nodemailer**：SMTP 邮件发送（注册验证码、回复通知）
+- **Workers Cache API**：公开页面边缘缓存
 - **miniflare + node:test**：本地 e2e 测试
 
 ## 目录结构

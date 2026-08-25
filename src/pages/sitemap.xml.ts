@@ -12,6 +12,9 @@ import { postHref } from '../lib/utils';
 
 export const prerender = false;
 
+// 模块级缓存：代际 key 为文集+文章时间戳指纹，内容无变化时复用
+let sitemapCache: { key: string; xml: string } | null = null;
+
 export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   const base = env.SITE_URL.replace(/\/$/, '');
@@ -24,9 +27,15 @@ export async function GET(ctx: APIContext): Promise<Response> {
     )
     .all<PostWithCollection>();
 
+  const cacheKey = collections.map((c) => `${c.id}:${c.updated_at}`).join('|') + '||' + (posts.results ?? []).map((p) => `${p.id}:${p.updated_at}`).join('|');
+  if (sitemapCache && sitemapCache.key === cacheKey) {
+    return new Response(sitemapCache.xml, {
+      headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+    });
+  }
+
   const urls = ['/', '/archive/', '/about/', '/search/'].map((path) => ({
-    path,
-    lastmod: undefined as string | undefined,
+    path, lastmod: undefined as string | undefined,
   }));
 
   for (const c of collections) {
@@ -36,22 +45,15 @@ export async function GET(ctx: APIContext): Promise<Response> {
     urls.push({ path: postHref(p.slug, p.collection_slug), lastmod: p.updated_at });
   }
 
-  const body = urls
-    .map((u) => {
-      const loc = `${base}${u.path}`;
-      return `  <url>\n    <loc>${loc}</loc>${u.lastmod ? `\n    <lastmod>${u.lastmod.slice(0, 10)}</lastmod>` : ''}\n  </url>`;
-    })
-    .join('\n');
+  const body = urls.map((u) => {
+    const loc = `${base}${u.path}`;
+    return `  <url>\n    <loc>${loc}</loc>${u.lastmod ? `\n    <lastmod>${u.lastmod.slice(0, 10)}</lastmod>` : ''}\n  </url>`;
+  }).join('\n');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${body}
-</urlset>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`;
+  sitemapCache = { key: cacheKey, xml };
 
   return new Response(xml, {
-    headers: {
-      'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
-    },
+    headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
   });
 }

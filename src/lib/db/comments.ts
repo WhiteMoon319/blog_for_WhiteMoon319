@@ -36,13 +36,19 @@ export async function listApprovedComments(db: D1Database, postId: number, curre
   const rows = await db
     .prepare(
       `SELECT c.*, u.username, u.display_name, u.avatar_url,
-              (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes_count
+              COALESCE(lc.likes_count, 0) AS likes_count
        FROM comments c
        JOIN users u ON u.id = c.user_id
+       LEFT JOIN (
+         SELECT comment_id, COUNT(*) AS likes_count
+         FROM comment_likes
+         WHERE comment_id IN (SELECT id FROM comments WHERE post_id = ? AND status = 'approved')
+         GROUP BY comment_id
+       ) lc ON lc.comment_id = c.id
        WHERE c.post_id = ? AND c.status = 'approved'
        ORDER BY c.created_at ASC, c.id ASC`,
     )
-    .bind(postId)
+    .bind(postId, postId)
     .all<CommentFlat & { likes_count: number }>();
 
   // 获取当前用户点赞状态（分片查询，避免超出 D1 绑定参数上限）

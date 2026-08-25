@@ -29,11 +29,6 @@ import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
 import { parseId } from '../lib/format';
 import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
-import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github-dark.css';
-import mermaid from 'mermaid';
-import { Transformer } from 'markmap-lib';
-import { Markmap } from 'markmap-view';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -209,8 +204,22 @@ async function renderDiagrams() {
   const host = previewHost.value;
   if (!host) return;
 
+  // 动态注入 KaTeX 和 hljs 样式（仅首次需要）
+  if (!document.querySelector('link[href="/_assets/katex.min.css"]')) {
+    const katexLink = document.createElement('link');
+    katexLink.rel = 'stylesheet'; katexLink.href = '/_assets/katex.min.css';
+    document.head.appendChild(katexLink);
+  }
+  if (!document.querySelector('link[href="/_assets/github-dark.css"]')) {
+    const hljsLink = document.createElement('link');
+    hljsLink.rel = 'stylesheet'; hljsLink.href = '/_assets/github-dark.css';
+    document.head.appendChild(hljsLink);
+  }
+
   const mermaidEls = Array.from(host.querySelectorAll<HTMLElement>('.diagram.mermaid'));
   if (mermaidEls.length > 0) {
+    // 动态 import mermaid（约 2MB，按需加载）
+    const { default: mermaid } = await import('mermaid');
     mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
     await Promise.all(
       mermaidEls.map(async (el, i) => {
@@ -227,6 +236,11 @@ async function renderDiagrams() {
 
   const markmapEls = Array.from(host.querySelectorAll<HTMLElement>('.diagram.markmap'));
   if (markmapEls.length > 0) {
+    // 动态 import markmap（约 500KB，按需加载）
+    const [{ Transformer }, { Markmap }] = await Promise.all([
+      import('markmap-lib'),
+      import('markmap-view'),
+    ]);
     const transformer = new Transformer();
     markmapEls.forEach((el) => {
       try {

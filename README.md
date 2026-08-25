@@ -59,7 +59,7 @@ admin/                   Vue 3 管理端 SPA（/admin/ 基路径，TipTap 编辑
 db/
   migrations/            D1 迁移（0001_init ~ 0025_post_summary_source）
   seed.sql               本地演示种子数据
-  reset.sql              本地整库重置（cf:db:local 可重入）
+  reset-local.sql         本地整库重置（cf:db:local 可重入）
 scripts/
   cf-config.mjs          由模板 + .env 生成本地 wrangler.jsonc
   merge-admin.mjs        把 admin/dist 合并进 dist/client/admin

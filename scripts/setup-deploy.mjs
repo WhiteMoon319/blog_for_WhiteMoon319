@@ -7,28 +7,54 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // 一键部署向导：从零开始，对零基础小白友好。
-// 逐步引导完成：依赖检查 → 登录 → 创建 D1/R2 → 配置 .env → 设置密钥 → 迁移 → 构建 → 部署。
-// 使用：Windows 双击 setup.bat / Mac·Linux 运行 ./setup.sh（或 node scripts/setup-deploy.mjs）
+// 支持断点续传：失败后重试会自动跳过已完成步骤。
+// 使用：Windows 双击 setup.bat / Mac·Linux 运行 ./setup.sh（或 node scripts/setup-deploy.mjs --retry 从头开始）
 
 import { execSync } from 'node:child_process';
-import { existsSync, writeFileSync, appendFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, appendFileSync, readFileSync, unlinkSync } from 'node:fs';
 import readline from 'node:readline/promises';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const PROGRESS_FILE = '.setup-progress';
 
-const VER = '🔑';
-const INFO = 'ℹ';
-const OK = '✅';
-const ERR = '❌';
-const STEP = '🐾';
+const VER = '🔑'; const INFO = 'ℹ'; const OK = '✅'; const ERR = '❌'; const STEP = '🐾';
 
 function run(cmd, opts = {}) {
   console.log(`\n  ${cmd}`);
   execSync(cmd, { stdio: 'inherit', cwd: process.cwd(), ...opts });
 }
-
 function runOut(cmd) {
   return execSync(cmd, { encoding: 'utf8', cwd: process.cwd() }).toString();
+}
+
+// ---- 断点续传 ----
+function loadProgress() {
+  if (!existsSync(PROGRESS_FILE)) return new Set();
+  return new Set(readFileSync(PROGRESS_FILE, 'utf8').split('\n').filter(Boolean));
+}
+function saveProgress(step) {
+  const done = loadProgress();
+  done.add(step);
+  writeFileSync(PROGRESS_FILE, [...done].join('\n') + '\n');
+}
+function isStepDone(step) { return loadProgress().has(step); }
+function clearProgress() {
+  if (existsSync(PROGRESS_FILE)) unlinkSync(PROGRESS_FILE);
+}
+
+async function guard(step, label, fn) {
+  if (isStepDone(step)) { console.log(`${OK} ${label}——已完成，跳过`); return; }
+  console.log(`\n${STEP} ${label}…`);
+  try {
+    await fn();
+    saveProgress(step);
+    console.log(`${OK} ${label}完成`);
+  } catch (e) {
+    console.log(`\n${ERR} ${label}失败`);
+    console.log(`  ${INFO} 请修复问题后重新运行本脚本，将从断点继续。`);
+    console.log(`  ${INFO} 如需从头开始：node scripts/setup-deploy.mjs --retry（或删除 .setup-progress 文件）`);
+    throw e;
+  }
 }
 
 async function ask(question, def = '') {
@@ -36,7 +62,6 @@ async function ask(question, def = '') {
   const ans = await rl.question(`${question}${suffix} `);
   return ans.trim() || def;
 }
-
 async function askSecret(question, confirm = false) {
   for (;;) {
     const a = await rl.question(`${question}（输入时不会显示） `);
@@ -49,41 +74,34 @@ async function askSecret(question, confirm = false) {
 }
 
 function parseD1Id(out) {
-  // "Created database 'blog-db' at edge" + 表格 database_id 列
   const m = out.match(/database_id[^\n]*?\|\s*([0-9a-f-]{36})/i);
   if (m) return m[1].trim();
   const m2 = out.match(/database_id[^\n]*?([0-9a-f]{32})/i);
   return m2 ? m2[1] : null;
 }
-
-function hasEnv() {
-  return existsSync('.env');
-}
+function hasEnv() { return existsSync('.env'); }
 
 async function ensureWranglerLoggedIn() {
-  console.log(`\n${STEP} 检查 Cloudflare 登录状态…`);
   try {
     runOut('pnpm exec wrangler whoami');
-    console.log(`${OK} 已登录`);
+    console.log(`${OK} 已登录 Cloudflare`);
     return true;
   } catch {
-    console.log(`\n${INFO} 尚未登录 Cloudflare。请在浏览器中打开授权页面，按提示登录你的 Cloudflare 账号。`);
+    console.log(`\n${INFO} 尚未登录 Cloudflare。请在浏览器中打开授权页面，按提示登录。`);
     run('pnpm exec wrangler login');
     try {
       runOut('pnpm exec wrangler whoami');
       console.log(`${OK} 登录成功`);
       return true;
     } catch {
-      console.log(`${ERR} 登录失败，请重试或手动执行 pnpm exec wrangler login`);
+      console.log(`${ERR} 登录失败，请手动执行 pnpm exec wrangler login`);
       return false;
     }
   }
 }
 
 async function setupD1() {
-  console.log(`\n${STEP} 创建云数据库（D1）…`);
   let id = null;
-  // 若已有 .env 的 BLOG_D1_ID，直接复用
   if (hasEnv()) {
     const envText = readFileSync('.env', 'utf8');
     const m = envText.match(/BLOG_D1_ID=([^\s]+)/);
@@ -96,19 +114,13 @@ async function setupD1() {
     const out = runOut('pnpm exec wrangler d1 create blog-db --no-describe');
     id = parseD1Id(out);
     console.log(out);
-    if (!id) {
-      console.log(`${INFO} 未能自动解析 D1 ID，请手动运行 pnpm exec wrangler d1 list 查看完整 ID。`);
-    }
+    if (!id) throw new Error('无法获取 D1 数据库 ID。请手动运行 pnpm exec wrangler d1 list 查看 ID，并写入 .env 的 BLOG_D1_ID=');
   }
   return id;
 }
 
 async function setupR2() {
-  console.log(`\n${STEP} 创建图片存储桶（R2）…`);
-  try {
-    runOut('pnpm exec wrangler r2 bucket list');
-  } catch { /* ignore */ }
-  console.log(`${INFO} 正在创建桶 blog-images（已存在则报错，可忽略）…`);
+  console.log(`${INFO} 正在创建桶 blog-images…`);
   try {
     runOut('pnpm exec wrangler r2 bucket create blog-images');
     console.log(`${OK} 桶已创建`);
@@ -118,11 +130,6 @@ async function setupR2() {
 }
 
 async function writeDotEnv(d1Id) {
-  console.log(`\n${STEP} 生成 .env 配置文件 …`);
-  if (!d1Id) {
-    console.log(`${ERR} D1 ID 缺失，无法生成 .env`);
-    return;
-  }
   const content = `# 由部署向导自动生成。真实资源 ID 仅存本机，不入库。\nBLOG_D1_ID=${d1Id}\n`;
   if (hasEnv()) {
     const old = readFileSync('.env', 'utf8');
@@ -138,9 +145,7 @@ async function writeDotEnv(d1Id) {
 }
 
 async function setupSecrets() {
-  console.log(`\n${STEP} 设置生产密钥（Secret）…`);
-  console.log(`${INFO} 以下是各密钥的说明。若没有对应用途可留空跳过（但 BLOG_ADMIN_PASSWORD 必须设置）。`);
-
+  console.log(`${INFO} 以下各密钥的说明。若没有对应用途可留空跳过（但 BLOG_ADMIN_PASSWORD 必须设置）。`);
   const secrets = [
     { name: 'BLOG_ADMIN_PASSWORD', desc: '管理员登录密码（必须，≥8 位）', required: true },
     { name: 'BLOG_SESSION_SECRET', desc: '会话签名密钥（32 字节以上随机串）', required: true },
@@ -149,9 +154,7 @@ async function setupSecrets() {
     { name: 'SMTP_PASS', desc: 'SMTP 授权码（QQ 邮箱需在设置中生成）', required: false },
     { name: 'SMTP_FROM', desc: '发件显示地址（通常同 SMTP_USER）', required: false },
   ];
-
   const skipAll = await ask(`是否现在设置所有密钥？(y=全部设置 / n=跳过到下一步）`, 'y') !== 'n';
-
   for (const s of secrets) {
     if (!skipAll) { console.log(`${INFO} 跳过 ${s.name}`); continue; }
     console.log(`\n  ${INFO} ${s.name} — ${s.desc}`);
@@ -160,7 +163,6 @@ async function setupSecrets() {
       let val;
       if (use === 'g') {
         val = runOut("node -e \"process.stdout.write(require('crypto').randomBytes(32).toString('hex'))\"").trim();
-        console.log(`${INFO} 已生成随机密钥（不会回显，直接写入）`);
       } else {
         val = await askSecret('请输入加密主密钥（64 位十六进制）');
       }
@@ -168,53 +170,60 @@ async function setupSecrets() {
       continue;
     }
     const val = await askSecret(`请输入 ${s.name}（留空则跳过）`);
-    if (val) {
-      run(`echo "${val}" | pnpm exec wrangler secret put ${s.name}`);
-    } else {
-      console.log(`${INFO} 跳过 ${s.name}`);
-    }
-  }
-}
-
-async function migrate() {
-  console.log(`\n${STEP} 应用数据库迁移 + 种子…`);
-  run('pnpm exec wrangler d1 migrations apply blog-db --remote');
-  const seed = await ask('是否导入演示种子数据？(y/n）', 'n');
-  if (seed === 'y') {
-    run('pnpm exec wrangler d1 execute blog-db --remote --file=db/seed.sql');
+    if (val) run(`echo "${val}" | pnpm exec wrangler secret put ${s.name}`);
+    else console.log(`${INFO} 跳过 ${s.name}`);
   }
 }
 
 async function main() {
+  if (process.argv.includes('--retry')) {
+    clearProgress();
+    console.log(`${OK} 已清除进度缓存，下次运行将从第一步开始`);
+    rl.close(); return;
+  }
+
+  if (existsSync(PROGRESS_FILE)) {
+    const done = loadProgress();
+    if (done.size > 0) {
+      console.log(`\n${INFO} 检测到已有部署进度（已完成 ${done.size} 步：${[...done].join(' → ')}）`);
+      const resume = await ask('继续从中断处继续？(y=继续 / n=从头开始）', 'y');
+      if (resume !== 'y') clearProgress();
+    }
+  }
+
   console.log(`\n${'='.repeat(60)}`);
   console.log(` ${VER}  月下独酌 · 一键部署向导`);
   console.log(`${'='.repeat(60)}`);
-  console.log(`${INFO} 本向导将引导你从零把博客部署到 Cloudflare。整个过程约 5-10 分钟。`);
-  console.log(`${INFO} 如果你看到这一步，说明 Node.js 和 pnpm 已安装 ✅`);
+  console.log(`${INFO} 本向导将引导你从零把博客部署到 Cloudflare\n`);
 
-  console.log(`\n${STEP} 安装依赖…`);
-  if (!existsSync('node_modules')) {
-    run('pnpm install');
-  } else {
-    console.log(`${OK} node_modules 已存在，跳过安装`);
-  }
+  await guard('deps', '安装依赖', () => {
+    if (!existsSync('node_modules')) run('pnpm install');
+    else console.log(`${OK} node_modules 已存在`);
+  });
 
-  if (!await ensureWranglerLoggedIn()) return;
+  await guard('login', '登录 Cloudflare', async () => {
+    if (!await ensureWranglerLoggedIn()) throw new Error('登录失败');
+  });
 
-  const d1Id = await setupD1();
-  await setupR2();
-  await writeDotEnv(d1Id);
-  await setupSecrets();
+  let d1Id;
+  await guard('d1', '创建 D1 数据库', async () => { d1Id = await setupD1(); });
+  await guard('r2', '创建 R2 存储桶', async () => { await setupR2(); });
+  await guard('dotenv', '生成 .env', async () => { if (d1Id) await writeDotEnv(d1Id); });
+  await guard('secrets', '设置生产密钥', async () => { await setupSecrets(); });
 
-  console.log(`\n${STEP} 生成部署配置…`);
-  run('pnpm -C admin install');
-  run('pnpm exec wrangler d1 execute blog-db --remote --file=db/reset.sql && pnpm exec wrangler d1 migrations apply blog-db --remote');
+  await guard('config', '生成部署配置', () => {
+    run('pnpm -C admin install');
+    run('pnpm exec wrangler d1 migrations apply blog-db --remote');
+  });
 
-  await migrate();
+  await guard('migrate', '迁移 + 种子', () => {
+    run('pnpm exec wrangler d1 migrations apply blog-db --remote');
+  });
 
-  console.log(`\n${STEP} 构建并部署…`);
-  run('pnpm run deploy');
+  await guard('build', '构建', () => { run('pnpm run build'); });
+  await guard('deploy', '部署 Worker', () => { run('pnpm exec wrangler deploy'); });
 
+  clearProgress();
   console.log(`\n${'='.repeat(60)}`);
   console.log(`${OK}  部署完成！`);
   console.log(`${'='.repeat(60)}`);
@@ -224,12 +233,13 @@ async function main() {
   console.log(`\n${INFO} 接下来（后台设置页）：`);
   console.log(`  1. 邮件(SMTP)：填入 smtp.qq.com、端口 465、QQ 邮箱、授权码，点「测试并保存」`);
   console.log(`  2. AI 摘要：配置服务商 / API Key / 模型（若使用）`);
-  console.log(`  3. 写完文章后可到数据看板查看统计`);
   rl.close();
 }
 
 main().catch((e) => {
-  console.error(`${ERR} 部署过程中出错：`, e);
+  console.error(`\n${ERR} 部署过程中出错：`, e.message || e);
+  console.log(`\n${INFO} 修复问题后重新运行本脚本，将从断点继续。`);
+  console.log(`${INFO} 如需从头开始：node scripts/setup-deploy.mjs --retry`);
   rl.close();
   process.exit(1);
 });

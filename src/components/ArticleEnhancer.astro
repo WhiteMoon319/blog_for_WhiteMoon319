@@ -1,57 +1,66 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-// 文章增强：KaTeX 公式样式（公式由服务端渲染，此处只引入样式）、代码高亮主题、
-// mermaid 与 markmap 图表的运行时渲染。仅文章/预览等渲染正文的页面引入。
-import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github-dark.css';
+// 文章增强：按需加载渲染资源。
+// - KaTeX 公式与 hljs 高亮由服务端渲染，仅当正文包含对应产物时才注入样式
+// - mermaid / markmap 图表运行时改为动态 import，仅页面存在图表容器时才拉取对应 chunk
+interface Props {
+  /** 服务端渲染后的正文 HTML，用于探测是否包含公式/高亮产物 */
+  html?: string;
+}
+
+const { html = '' } = Astro.props;
+const needsKatex = html.includes('katex');
+const needsHljs = html.includes('hljs') || html.includes('<pre');
 ---
 
-<script>
-  import mermaid from 'mermaid';
-  import { Transformer } from 'markmap-lib';
-  import { Markmap } from 'markmap-view';
+{needsKatex && <link rel="stylesheet" href="/_assets/katex.min.css" />}
+{needsHljs && <link rel="stylesheet" href="/_assets/github-dark.css" />}
 
-  // 仅在存在图表容器时初始化，避免空页浪费
+<script>
+  // 仅在存在图表容器时才动态加载对应运行时（Vite 自动拆分为独立 chunk）
   const has = (cls: string) => document.querySelectorAll(`.diagram.${cls}`).length > 0;
 
-  if (has('mermaid') || has('markmap')) {
-    const init = async () => {
-      // ---- mermaid ----
-      if (has('mermaid')) {
-        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
-        await Promise.all(
-          Array.from(document.querySelectorAll<HTMLDivElement>('.diagram.mermaid')).map(async (el, i) => {
-            try {
-              const { svg } = await mermaid.render(`mermaid-${i}`, el.textContent ?? '');
-              el.innerHTML = svg;
-              el.classList.add('diagram-rendered');
-            } catch {
-              el.classList.add('diagram-error');
-            }
-          }),
-        );
-      }
-
-      // ---- markmap ----
-      if (has('markmap')) {
-        const transformer = new Transformer();
-        document.querySelectorAll<HTMLDivElement>('.diagram.markmap').forEach((el) => {
+  const init = async () => {
+    if (has('mermaid')) {
+      const { default: mermaid } = await import('mermaid');
+      mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
+      await Promise.all(
+        Array.from(document.querySelectorAll<HTMLDivElement>('.diagram.mermaid')).map(async (el, i) => {
           try {
-            const { root } = transformer.transform(el.textContent ?? '');
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('class', 'markmap-svg');
-            el.appendChild(svg);
-            const mm = Markmap.create(svg, { autoFit: true, initialExpandLevel: 2 }, root);
+            const { svg } = await mermaid.render(`mermaid-${i}`, el.textContent ?? '');
+            el.innerHTML = svg;
             el.classList.add('diagram-rendered');
-            // 挂到元素上便于主题/缩放调整（如打印前展开）
-            (el as HTMLDivElement & { _markmap?: typeof mm })._markmap = mm;
           } catch {
             el.classList.add('diagram-error');
           }
-        });
-      }
-    };
+        }),
+      );
+    }
+
+    if (has('markmap')) {
+      const [{ Transformer }, { Markmap }] = await Promise.all([
+        import('markmap-lib'),
+        import('markmap-view'),
+      ]);
+      const transformer = new Transformer();
+      document.querySelectorAll<HTMLDivElement>('.diagram.markmap').forEach((el) => {
+        try {
+          const { root } = transformer.transform(el.textContent ?? '');
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('class', 'markmap-svg');
+          el.appendChild(svg);
+          const mm = Markmap.create(svg, { autoFit: true, initialExpandLevel: 2 }, root);
+          el.classList.add('diagram-rendered');
+          (el as HTMLDivElement & { _markmap?: typeof mm })._markmap = mm;
+        } catch {
+          el.classList.add('diagram-error');
+        }
+      });
+    }
+  };
+
+  if (has('mermaid') || has('markmap')) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => void init());
     } else {

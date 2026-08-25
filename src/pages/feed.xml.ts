@@ -17,6 +17,10 @@ export const prerender = false;
 
 const MAX_ITEMS = 50;
 
+// 模块级内存缓存：代际 key 为全部条目的 id+时间戳指纹，内容无变化时复用上次渲染的 XML，
+// 避免每次请求重渲染 50 篇 markdown。Worker 单实例隔离缓存，多实例下各自独立（可接受）。
+let feedCache: { key: string; xml: string } | null = null;
+
 function fmtDate(d: string): string {
   // D1 返回的日期格式为 "2026-08-20 08:04:51"，需转为 ISO 8601 再格式化
   const iso = d.includes('T') ? d : d.replace(' ', 'T') + 'Z';
@@ -36,6 +40,17 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
 
   const posts = await listPublishedPosts(env.DB, { limit: MAX_ITEMS });
+
+  // 代际 key：任一文章增删改（id/created_at/updated_at 变化）即失效
+  const cacheKey = posts.map((p) => `${p.id}:${p.created_at}:${p.updated_at}`).join('|');
+  if (feedCache && feedCache.key === cacheKey) {
+    return new Response(feedCache.xml, {
+      headers: {
+        'content-type': 'application/rss+xml; charset=utf-8',
+        'cache-control': 'public, max-age=300',
+      },
+    });
+  }
 
   // 收集文集 slug 映射
   const colIds = [...new Set(posts.map((p) => p.collection_id).filter((id): id is number => id !== null))];
@@ -76,6 +91,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
     '</channel>',
     '</rss>',
     ''].join('\n');
+
+  feedCache = { key: cacheKey, xml };
 
   return new Response(xml, {
     headers: {

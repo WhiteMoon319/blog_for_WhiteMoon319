@@ -145,17 +145,20 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ post_id: postId, parent_id: replyParentId, body, attachments: images }),
     });
-    const data = await res.json() as { error?: string };
+    const data = await res.json() as { error?: string; status?: string };
     if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
     if (!res.ok) { renderStatus(data.error || '发表失败', true); return; }
     inputEl.value = ''; images.length = 0; attachEl.innerHTML = ''; replyParentId = null;
-    renderStatus('评论已提交，审核通过后可见');
-    // 在列表末尾插入一条占位提示
-    emptyEl.style.display = 'none';
-    const pendingEl = document.createElement('div');
-    pendingEl.className = 'comment-pending';
-    pendingEl.textContent = '您的评论已提交，等待审核中…';
-    listEl.appendChild(pendingEl);
+    if (data.status === 'approved') {
+      renderStatus('已发表');
+      await loadComments();
+    } else {
+      renderStatus('评论已提交，审核通过后可见');
+      const pendingEl = document.createElement('div');
+      pendingEl.className = 'comment-pending';
+      pendingEl.textContent = '您的评论已提交，等待审核中…';
+      listEl.appendChild(pendingEl);
+    }
   });
 
   listEl.addEventListener('click', (e) => {

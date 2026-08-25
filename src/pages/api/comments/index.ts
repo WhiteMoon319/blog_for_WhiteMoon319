@@ -63,13 +63,15 @@ export async function POST(ctx: APIContext): Promise<Response> {
     attachments,
   });
 
-  // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
+    // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
   const settings = await getAllSettings(env.DB);
   const keywords = settings.comment_review_keywords ?? '';
   const needsReview = keywords
     ? keywords.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean).some((w) => commentBody.toLowerCase().includes(w))
     : false;
+  let finalStatus: 'pending' | 'approved' = 'pending';
   if (!needsReview) {
+    finalStatus = 'approved';
     await env.DB.prepare(`UPDATE comments SET status = 'approved' WHERE id = ?`).bind(comment!.id).run();
   }
 
@@ -86,5 +88,5 @@ export async function POST(ctx: APIContext): Promise<Response> {
     }
   }
 
-  return json({ comment }, 201);
+  return json({ comment: { ...comment, status: finalStatus }, status: finalStatus }, 201);
 }

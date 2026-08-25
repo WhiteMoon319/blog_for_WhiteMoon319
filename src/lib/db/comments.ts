@@ -26,7 +26,7 @@ export interface CommentFlat extends CommentRow {
 }
 
 export interface CommentTree extends CommentFlat {
-  floor: number;
+  floor: string;
   children: CommentTree[];
   likes_count: number;
   liked_by_me: boolean;
@@ -65,21 +65,23 @@ export async function listApprovedComments(db: D1Database, postId: number, curre
     ...r,
     likes_count: r.likes_count ?? 0,
     liked_by_me: likedIds.has(r.id),
-    floor: 0,
+    floor: '',
     children: [] as CommentTree[],
   }));
   const byId = new Map<number, CommentTree>();
   for (const c of all) byId.set(c.id, c);
 
+  // 楼层号（派生展示值，不存库）：顶层 1、2、3…；回复 1_1、1_2…（父楼层_序号）。
+  // 仅对已批准评论编号，被驳回的楼层留下空洞但不影响后续编号稳定性。
   const tops: CommentTree[] = [];
   for (const c of all) {
     if (c.parent_id === null) tops.push(c);
     else byId.get(c.parent_id)?.children.push(c);
   }
 
-  tops.forEach((t, i) => { t.floor = i + 1; });
+  tops.forEach((t, i) => { t.floor = String(i + 1); });
   for (const t of tops) {
-    t.children.forEach((c, i) => { c.floor = i + 1; });
+    t.children.forEach((c, i) => { c.floor = `${t.floor}_${i + 1}`; });
   }
   return tops;
 }

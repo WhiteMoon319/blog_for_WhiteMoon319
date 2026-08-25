@@ -72,16 +72,18 @@ function renderMath(tex: string, display: boolean): string {
 
 // 把渲染后的 HTML 中的数学占位符回填为 KaTeX 输出
 function restoreMath(html: string, math: Array<{ tex: string; display: boolean }>): string {
-  return html.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) =>
-    renderMath(math[Number(idx)].tex, math[Number(idx)].display),
-  );
+  return html.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) => {
+    const item = math[Number(idx)];
+    if (!item) return '';
+    return renderMath(item.tex, item.display);
+  });
 }
 
 const DIAGRAM_LANGS = new Set(['mermaid', 'markmap']);
 
 // 把占位符替换回原始 LaTeX，用于生成标题 id 与 TOC 文本（避免占位符泄露进 id）
 function rawTextOf(text: string, math: Array<{ tex: string; display: boolean }>): string {
-  return text.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) => math[Number(idx)].tex);
+  return text.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) => math[Number(idx)]?.tex ?? '');
 }
 
 export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {

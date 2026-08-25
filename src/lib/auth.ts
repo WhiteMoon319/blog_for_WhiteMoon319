@@ -74,48 +74,42 @@ export function clearSessionCookie(ctx: APIContext): void {
   ctx.cookies.delete(COOKIE_NAME, { path: '/' });
 }
 
-export async function getSession(ctx: APIContext): Promise<Session | null> {
+// 解析 cookie token 并加载对应用户（单次 DB 查询）。
+// 旧版 sub='admin' 不再接受（统一用户体系后自然失效，需重新登录）。
+async function loadSessionUser(ctx: APIContext): Promise<{ session: Session; user: UserRow } | null> {
   const env = await envOf();
   if (!env.BLOG_SESSION_SECRET || env.BLOG_SESSION_SECRET.length < 16) return null;
   const token = ctx.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  // 解析 token 获取版本号（不校验版本，只取 sub 用于查用户）
   const [payload] = token.split('.');
   if (!payload) return null;
   let parsed: Session;
   try { parsed = JSON.parse(new TextDecoder().decode(fromB64url(payload))); } catch { return null; }
-  // 旧版 admin sub 兼容：用全局版本号校验
-  if (parsed.sub === 'admin') {
-    const ver = await getSessionVersion(env.DB);
-    return verifyToken(env.BLOG_SESSION_SECRET, token, ver);
-  }
-  // 新版 user:{id}
   const m = parsed.sub?.match(/^user:(\d+)$/);
   if (!m) return null;
   const user = await getUserById(env.DB, Number(m[1]));
   if (!user || user.status !== 'active') return null;
-  return verifyToken(env.BLOG_SESSION_SECRET, token, user.session_version);
+  const session = await verifyToken(env.BLOG_SESSION_SECRET, token, user.session_version);
+  return session ? { session, user } : null;
+}
+
+export async function getSession(ctx: APIContext): Promise<Session | null> {
+  const loaded = await loadSessionUser(ctx);
+  return loaded?.session ?? null;
 }
 
 export async function resolveUser(ctx: APIContext): Promise<{ user: UserRow; emailVerified: boolean } | null> {
-  const session = await getSession(ctx);
-  if (!session) return null;
-  const m = session.sub?.match(/^user:(\d+)$/);
-  if (!m) return null;
-  const env = await envOf();
-  const user = await getUserById(env.DB, Number(m[1]));
-  if (!user || user.status !== 'active') return null;
-  return { user, emailVerified: user.email_verified === 1 };
+  const loaded = await loadSessionUser(ctx);
+  if (!loaded) return null;
+  return { user: loaded.user, emailVerified: loaded.user.email_verified === 1 };
 }
 
 export type AuthResult = { ok: true; session: Session; user: UserRow } | { ok: false; response: Response };
 
 export async function requireAdmin(ctx: APIContext): Promise<AuthResult> {
-  const session = await getSession(ctx);
-  if (!session) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
-  const resolved = await resolveUser(ctx);
-  if (!resolved || resolved.user.role !== 'admin') return { ok: false, response: json({ error: 'unauthorized' }, 401) };
-  return { ok: true, session, user: resolved.user };
+  const loaded = await loadSessionUser(ctx);
+  if (!loaded || loaded.user.role !== 'admin') return { ok: false, response: json({ error: 'unauthorized' }, 401) };
+  return { ok: true, session: loaded.session, user: loaded.user };
 }
 
 // 保留 requireAuth 作为 requireAdmin 的别名（兼容现有调用）
@@ -126,11 +120,9 @@ export type AnyUserResult =
   | { ok: false; response: Response };
 
 export async function requireAnyUser(ctx: APIContext): Promise<AnyUserResult> {
-  const session = await getSession(ctx);
-  if (!session) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
-  const resolved = await resolveUser(ctx);
-  if (!resolved) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
-  return { ok: true, session, user: resolved.user, emailVerified: resolved.emailVerified };
+  const loaded = await loadSessionUser(ctx);
+  if (!loaded) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
+  return { ok: true, session: loaded.session, user: loaded.user, emailVerified: loaded.user.email_verified === 1 };
 }
 
 // 检查是否为管理员（用于公开页面的显示逻辑，非鉴权）

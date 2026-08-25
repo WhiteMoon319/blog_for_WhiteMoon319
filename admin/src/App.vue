@@ -43,8 +43,8 @@ async function logout() {
   try {
     await api.logout();
   } finally {
-    setAuthed(false);
-    router.push('/login');
+    setAuthed(false, '');
+    window.location.href = '/login/?redirect=/admin/';
   }
 }
 </script>

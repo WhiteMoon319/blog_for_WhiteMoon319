@@ -41,8 +41,21 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
 
   const profile: { display_name?: string; avatar_url?: string; notify_email?: number } = {};
-  if (typeof body.display_name === 'string' && body.display_name.trim()) profile.display_name = body.display_name.trim();
-  if (typeof body.avatar_url === 'string') profile.avatar_url = body.avatar_url;
+  if (typeof body.display_name === 'string' && body.display_name.trim()) {
+    if (body.display_name.trim().length > 30) return json({ error: '昵称最长 30 字' }, 400);
+    profile.display_name = body.display_name.trim();
+  }
+  if (typeof body.avatar_url === 'string') {
+    // 头像仅允许本站 R2 路径（avatar/ 前缀）或空（清除）
+    const av = body.avatar_url;
+    if (av === '') {
+      profile.avatar_url = '';
+    } else if (/^\/?avatar\/[0-9a-zA-Z-]+\.(png|jpg|jpeg|webp|gif)$/i.test(av)) {
+      profile.avatar_url = av.startsWith('/') ? av : `/${av}`;
+    } else {
+      return json({ error: '头像地址无效' }, 400);
+    }
+  }
   if (body.notify_email === true) profile.notify_email = 1;
   else if (body.notify_email === false) profile.notify_email = 0;
 

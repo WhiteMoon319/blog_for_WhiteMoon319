@@ -22,6 +22,7 @@ export interface CommentRow {
 export interface CommentFlat extends CommentRow {
   username: string;
   display_name: string;
+  avatar_url: string;
 }
 
 export interface CommentTree extends CommentFlat {
@@ -34,7 +35,7 @@ export interface CommentTree extends CommentFlat {
 export async function listApprovedComments(db: D1Database, postId: number, currentUserId?: number): Promise<CommentTree[]> {
   const rows = await db
     .prepare(
-      `SELECT c.*, u.username, u.display_name,
+      `SELECT c.*, u.username, u.display_name, u.avatar_url,
               (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes_count
        FROM comments c
        JOIN users u ON u.id = c.user_id

@@ -36,5 +36,22 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?`).bind(id).first<{ n: number }>();
+
+  // 文章点赞通知管理员（预留多作者时改为通知作者本人）
+  if (!existing) {
+    (async () => {
+      try {
+        const admin = await env.DB.prepare("SELECT email, email_verified, notify_email FROM users WHERE role = 'admin' LIMIT 1").first<{ email: string; email_verified: number; notify_email: number }>();
+        if (admin && admin.email_verified && admin.notify_email && admin.email !== auth.user.email) {
+          const { sendEmail } = await import('../../../../lib/email');
+          const post = await env.DB.prepare('SELECT title FROM posts WHERE id = ?').bind(id).first<{ title: string }>();
+          if (post) await sendEmail(admin.email, `「${post.title}」收到新点赞 - 月下独酌`,
+            `${auth.user.display_name || auth.user.username} 赞了您的文章「${post.title}」。\n\nhttps://blog.whitemoon319.xyz/posts/${id}`,
+          );
+        }
+      } catch { /* 静默 */ }
+    })();
+  }
+
   return json({ liked: !existing, likes_count: count?.n ?? 0 });
 }

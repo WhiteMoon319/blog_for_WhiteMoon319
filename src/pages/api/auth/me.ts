@@ -29,6 +29,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
     role: user.role,
     username: user.username,
     display_name: user.display_name,
+    avatar_url: user.avatar_url,
     email_verified: user.email_verified === 1,
     exp: session.exp,
   });

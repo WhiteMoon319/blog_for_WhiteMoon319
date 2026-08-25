@@ -95,11 +95,15 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
     const replyBtn = c.parent_id === null ? `<button type="button" class="btn btn-ghost mini comment-reply" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
     const floor = c.parent_id === null ? `#${c.floor}` : `#${c.floor}`;
     const likeBtn = `<button type="button" class="btn btn-ghost mini comment-like" data-id="${c.id}" data-liked="${c.liked_by_me ? '1' : '0'}">${c.liked_by_me ? '❤' : '♡'} <span class="comment-like-count">${c.likes_count ?? 0}</span></button>`;
+    const avatar = c.avatar_url ? `<img src="${esc(c.avatar_url)}" class="comment-avatar" />` : `<span class="comment-avatar comment-avatar-placeholder">${(c.display_name || c.username || '?')[0].toUpperCase()}</span>`;
     return `
       <div class="comment-head">
-        <span class="comment-floor">${floor}</span>
-        <span class="comment-author">${esc(c.display_name || c.username || '匿名')}</span>
-        <span class="comment-time">${esc((c.created_at || '').slice(0, 16).replace('T', ' '))}</span>
+        ${avatar}
+        <div class="comment-head-text">
+          <span class="comment-author">${esc(c.display_name || c.username || '匿名')}</span>
+          <span class="comment-floor">${floor}</span>
+          <span class="comment-time">${esc((c.created_at || '').slice(0, 16).replace('T', ' '))}</span>
+        </div>
       </div>
       <div class="comment-body">${esc(c.body)}</div>
       ${attach ? `<div class="comment-attach">${attach}</div>` : ''}
@@ -207,7 +211,10 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   .comments-list { list-style: none; margin: 0; padding: 0; }
   .comment { padding: 1em 0 1em 0; }
   .comment + .comment { border-top: 1px solid var(--hairline); }
-  .comment-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .comment-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .comment-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .comment-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--cinnabar); color: #fff; font-size: 0.85rem; font-weight: 600; flex-shrink: 0; }
+  .comment-head-text { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .comment-floor { color: var(--ink-light); font-size: 0.75rem; min-width: 2em; }
   .comment-author { font-size: 0.9rem; color: var(--ink-deep); font-weight: 600; }
   .comment-time { font-size: 0.72rem; color: var(--ink-light); }

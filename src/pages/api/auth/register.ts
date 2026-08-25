@@ -40,7 +40,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const displayName = typeof body.display_name === 'string' && body.display_name.trim() ? body.display_name.trim() : username;
 
   if (username.length < 2 || username.length > 64) return json({ error: '用户名 2-64 字符' }, 400);
-  if (!/^[a-zA-Z0-9_\u4e00-\u9fff]+$/.test(username)) return json({ error: '用户名仅允许字母、数字、下划线与中文' }, 400);
+  if (!/^[a-zA-Z0-9]+$/.test(username)) return json({ error: '用户名仅允许英文字母与数字' }, 400);
 
   if (email.length > 254) return json({ error: 'email 过长' }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'email 格式无效' }, 400);

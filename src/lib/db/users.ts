@@ -18,8 +18,10 @@ export interface UserRow {
   password_hash: string;
   role: 'reader' | 'author' | 'admin';
   website_url: string;
+  avatar_url: string;
   status: 'active' | 'banned';
   session_version: number;
+  notify_email: number;
   created_at: string;
 }
 
@@ -94,6 +96,22 @@ export async function banUser(db: D1Database, userId: number): Promise<boolean> 
     .prepare(`UPDATE users SET status = CASE WHEN status = 'active' THEN 'banned' ELSE 'active' END, session_version = session_version + 1 WHERE id = ? AND role != 'admin' RETURNING id`)
     .bind(userId)
     .first<{ id: number }>();
+  return !!row;
+}
+
+export async function updateProfile(db: D1Database, userId: number, data: { display_name?: string; avatar_url?: string; notify_email?: number }): Promise<boolean> {
+  const sets: string[] = [];
+  const vals: (string | number)[] = [];
+  if (data.display_name !== undefined) { sets.push('display_name = ?'); vals.push(data.display_name.trim()); }
+  if (data.avatar_url !== undefined) { sets.push('avatar_url = ?'); vals.push(data.avatar_url); }
+  if (data.notify_email !== undefined) { sets.push('notify_email = ?'); vals.push(data.notify_email); }
+  if (sets.length === 0) return false;
+  const row = await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? RETURNING id`).bind(...vals, userId).first<{ id: number }>();
+  return !!row;
+}
+
+export async function updateEmail(db: D1Database, userId: number, email: string): Promise<boolean> {
+  const row = await db.prepare(`UPDATE users SET email = ?, email_verified = 0 WHERE id = ? RETURNING id`).bind(email.trim().toLowerCase(), userId).first<{ id: number }>();
   return !!row;
 }
 

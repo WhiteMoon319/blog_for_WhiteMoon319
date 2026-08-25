@@ -68,18 +68,33 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
       li.innerHTML = commentHtml(c);
       listEl.appendChild(li);
       if (c.children?.length) {
+        const wrap = document.createElement('div');
+        wrap.className = 'comment-replies-wrap';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-ghost mini comment-toggle-replies';
+        toggle.textContent = `回复 ${c.children.length} 条`;
         const ul = document.createElement('ul');
         ul.className = 'comment-replies';
+        ul.hidden = true;
         for (const ch of c.children) { const l = document.createElement('li'); l.className = 'comment'; l.innerHTML = commentHtml(ch); ul.appendChild(l); }
-        li.appendChild(ul);
+        wrap.appendChild(toggle);
+        wrap.appendChild(ul);
+        toggle.addEventListener('click', () => {
+          const open = ul.hidden;
+          ul.hidden = !open;
+          toggle.textContent = open ? '收起回复' : `回复 ${c.children.length} 条`;
+        });
+        li.appendChild(wrap);
       }
     }
   }
 
   function commentHtml(c: any): string {
     const attach = parseAttachments(c.attachments).map((k: string) => `<img src="${r2Base}/${esc(k)}" loading="lazy" class="comment-img" />`).join('');
-    const replyBtn = c.parent_id === null ? `<button class="btn btn-ghost mini comment-reply" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
+    const replyBtn = c.parent_id === null ? `<button type="button" class="btn btn-ghost mini comment-reply" data-name="${esc(c.display_name || c.username)}">回复</button>` : '';
     const floor = c.parent_id === null ? `#${c.floor}` : `#${c.floor}`;
+    const likeBtn = `<button type="button" class="btn btn-ghost mini comment-like" data-id="${c.id}" data-liked="${c.liked_by_me ? '1' : '0'}">${c.liked_by_me ? '❤' : '♡'} <span class="comment-like-count">${c.likes_count ?? 0}</span></button>`;
     return `
       <div class="comment-head">
         <span class="comment-floor">${floor}</span>
@@ -88,7 +103,7 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
       </div>
       <div class="comment-body">${esc(c.body)}</div>
       ${attach ? `<div class="comment-attach">${attach}</div>` : ''}
-      <div class="comment-actions">${replyBtn}</div>`;
+      <div class="comment-actions">${replyBtn}${likeBtn}</div>`;
   }
 
   function renderAuth() {
@@ -140,10 +155,33 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
 
   listEl.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.comment-reply');
-    if (!btn) return;
-    inputEl.value = `@${btn.dataset.name} `; inputEl.focus();
-    window.scrollTo({ top: formEl.offsetTop, behavior: 'smooth' });
+    if (btn) {
+      inputEl.value = `@${btn.dataset.name} `; inputEl.focus();
+      window.scrollTo({ top: formEl.offsetTop, behavior: 'smooth' });
+      return;
+    }
+    const likeBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.comment-like');
+    if (likeBtn) {
+      void toggleLike(likeBtn);
+    }
   });
+
+  async function toggleLike(btn: HTMLButtonElement) {
+    if (!me) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
+    if (!me.email_verified) { location.href = '/verify-email/'; return; }
+    const id = Number(btn.dataset.id);
+    if (!id) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/comments/${id}/like`, { method: 'POST', credentials: 'same-origin' });
+      const data = await res.json() as { liked?: boolean; likes_count?: number; error?: string };
+      if (!res.ok) { renderStatus(data.error || '点赞失败', true); return; }
+      btn.dataset.liked = data.liked ? '1' : '0';
+      btn.innerHTML = `${data.liked ? '❤' : '♡'} <span class="comment-like-count">${data.likes_count ?? 0}</span>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   loadMe().then((u) => { me = u; renderAuth(); });
   loadComments();
@@ -177,7 +215,11 @@ const r2Base = await import('../lib/db').then((m) => m.envOf()).then((env) => (e
   .comment-attach { margin-top: 8px; }
   .comment-img { max-width: 100%; max-height: 400px; border-radius: 6px; margin-top: 4px; }
   .comment-actions { margin-top: 8px; display: flex; gap: 8px; }
-  .comment-replies { list-style: none; margin: 0.6em 0 0 1.6em; padding: 0; border-left: 2px solid var(--hairline); padding-left: 1em; }
+  .comment-like { padding: 2px 8px; }
+  .comment-like-count { margin-left: 2px; }
+  .comment-replies-wrap { margin-top: 8px; }
+  .comment-toggle-replies { margin-bottom: 4px; }
+  .comment-replies { list-style: none; margin: 0.6em 0 0 0; padding: 0; border-left: 2px solid var(--hairline); padding-left: 1em; }
   .comment-replies > .comment { border: none; }
   .comments-empty { color: var(--ink-light); font-size: 0.85rem; padding: 1.2em 0; }
   .comment-pending { color: var(--cinnabar); font-size: 0.85rem; padding: 0.8em 0; border-bottom: 1px dashed var(--hairline); }

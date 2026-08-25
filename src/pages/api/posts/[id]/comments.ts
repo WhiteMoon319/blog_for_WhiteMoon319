@@ -9,7 +9,7 @@
 import type { APIContext } from 'astro';
 import { envOf } from '../../../../lib/db';
 import { listApprovedComments } from '../../../../lib/db/comments';
-import { json } from '../../../../lib/auth';
+import { resolveUser, json } from '../../../../lib/auth';
 
 export const prerender = false;
 
@@ -17,6 +17,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const id = Number(ctx.params.id);
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
   const env = await envOf();
-  const comments = await listApprovedComments(env.DB, id);
+  const user = await resolveUser(ctx);
+  const currentUserId = user?.user.id;
+  const comments = await listApprovedComments(env.DB, id, currentUserId);
   return json({ comments });
 }

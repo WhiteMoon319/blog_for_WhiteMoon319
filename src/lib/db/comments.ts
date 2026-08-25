@@ -27,21 +27,42 @@ export interface CommentFlat extends CommentRow {
 export interface CommentTree extends CommentFlat {
   floor: number;
   children: CommentTree[];
+  likes_count: number;
+  liked_by_me: boolean;
 }
 
-export async function listApprovedComments(db: D1Database, postId: number): Promise<CommentTree[]> {
+export async function listApprovedComments(db: D1Database, postId: number, currentUserId?: number): Promise<CommentTree[]> {
   const rows = await db
     .prepare(
-      `SELECT c.*, u.username, u.display_name
+      `SELECT c.*, u.username, u.display_name,
+              (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes_count
        FROM comments c
        JOIN users u ON u.id = c.user_id
        WHERE c.post_id = ? AND c.status = 'approved'
        ORDER BY c.created_at ASC, c.id ASC`,
     )
     .bind(postId)
-    .all<CommentFlat>();
+    .all<CommentFlat & { likes_count: number }>();
 
-  const all = (rows.results ?? []).map((r) => ({ ...r, floor: 0, children: [] as CommentTree[] }));
+  // 获取当前用户点赞状态
+  const likedIds = new Set<number>();
+  if (currentUserId && rows.results?.length) {
+    const ids = (rows.results ?? []).map((r) => r.id);
+    const chips = ids.map(() => '?').join(',');
+    const liked = await db
+      .prepare(`SELECT comment_id FROM comment_likes WHERE comment_id IN (${chips}) AND user_id = ?`)
+      .bind(...ids, currentUserId)
+      .all<{ comment_id: number }>();
+    for (const l of liked.results ?? []) likedIds.add(l.comment_id);
+  }
+
+  const all = (rows.results ?? []).map((r) => ({
+    ...r,
+    likes_count: r.likes_count ?? 0,
+    liked_by_me: likedIds.has(r.id),
+    floor: 0,
+    children: [] as CommentTree[],
+  }));
   const byId = new Map<number, CommentTree>();
   for (const c of all) byId.set(c.id, c);
 
@@ -51,7 +72,6 @@ export async function listApprovedComments(db: D1Database, postId: number): Prom
     else byId.get(c.parent_id)?.children.push(c);
   }
 
-  // 楼层号：顶层 1、2、3…，回复 X_1、X_2…（按时间序）。不重排（透视留空洞由后端存续控制）
   tops.forEach((t, i) => { t.floor = i + 1; });
   for (const t of tops) {
     t.children.forEach((c, i) => { c.floor = i + 1; });

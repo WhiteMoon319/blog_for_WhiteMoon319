@@ -48,6 +48,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         const cached = await cache.match(context.request);
         if (cached) {
           const headers = new Headers(cached.headers);
+          headers.set('X-Cache', 'HIT');
           for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
             if (!headers.has(name)) headers.append(name, value);
           }
@@ -62,6 +63,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
           }
           headers.set('Cache-Control', 'public, max-age=60');
           headers.set('CDN-Cache-Control', 'public, s-maxage=60');
+          headers.set('X-Cache', 'MISS');
           const res = new Response(response.body, { status: response.status, statusText: response.statusText, headers });
           await cache.put(context.request, res.clone());
           return res;

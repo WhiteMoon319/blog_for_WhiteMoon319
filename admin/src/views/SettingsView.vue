@@ -11,7 +11,32 @@ interface SiteSettings {
   SITE_SLOGAN: string;
   SITE_POEM: string;
   SITE_URL: string;
+  site_tagline: string;
+  footer_line: string;
+  search_placeholder: string;
+  hero_note: string;
+  site_locale: string;
 }
+
+const COPY_KEYS = ['site_tagline', 'footer_line', 'search_placeholder', 'hero_note', 'site_locale'] as const;
+
+function emptySiteSettings(): SiteSettings {
+  return {
+    SITE_NAME: '',
+    SITE_SLOGAN: '',
+    SITE_POEM: '',
+    SITE_URL: '',
+    site_tagline: '',
+    footer_line: '',
+    search_placeholder: '',
+    hero_note: '',
+    site_locale: 'zh-CN',
+  };
+}
+
+const form = reactive<SiteSettings>(emptySiteSettings());
+
+const original = reactive<SiteSettings>(emptySiteSettings());
 
 interface AiSettings {
   ai_provider: string;
@@ -23,20 +48,6 @@ interface AiSettings {
   ai_api_key_configured?: boolean;
   ai_api_key_masked?: string | boolean;
 }
-
-const form = reactive<SiteSettings>({
-  SITE_NAME: '',
-  SITE_SLOGAN: '',
-  SITE_POEM: '',
-  SITE_URL: '',
-});
-
-const original = reactive<SiteSettings>({
-  SITE_NAME: '',
-  SITE_SLOGAN: '',
-  SITE_POEM: '',
-  SITE_URL: '',
-});
 
 const aiForm = reactive({
   provider: 'deepseek',
@@ -106,14 +117,10 @@ const pwdState = reactive({ oldPassword: '', newPassword: '', confirmPassword: '
 const pwdSaving = ref(false);
 
 function applyToForm(s: SiteSettings) {
-  form.SITE_NAME = s.SITE_NAME;
-  form.SITE_SLOGAN = s.SITE_SLOGAN;
-  form.SITE_POEM = s.SITE_POEM;
-  form.SITE_URL = s.SITE_URL;
-  original.SITE_NAME = s.SITE_NAME;
-  original.SITE_SLOGAN = s.SITE_SLOGAN;
-  original.SITE_POEM = s.SITE_POEM;
-  original.SITE_URL = s.SITE_URL;
+  for (const k of [...('SITE_NAME SITE_SLOGAN SITE_POEM SITE_URL'.split(' ')), ...COPY_KEYS] as (keyof SiteSettings)[]) {
+    form[k] = s[k];
+    original[k] = s[k];
+  }
 }
 
 const commentAutoApprove = ref('');
@@ -240,6 +247,11 @@ async function save() {
       SITE_SLOGAN: form.SITE_SLOGAN.trim(),
       SITE_POEM: form.SITE_POEM.trim(),
       SITE_URL: form.SITE_URL.trim(),
+      site_tagline: form.site_tagline.trim(),
+      footer_line: form.footer_line.trim(),
+      search_placeholder: form.search_placeholder.trim(),
+      hero_note: form.hero_note.trim(),
+      site_locale: form.site_locale,
     });
     applyToForm(form);
     emit('notify', result.saved ? `已保存：${result.saved.join('、')}` : '无需变更');
@@ -350,6 +362,29 @@ async function deleteAiKey() {
       <label>站点 URL（含协议、不含尾斜杠）</label>
       <input v-model="form.SITE_URL" maxlength="500" class="input" placeholder="https://example.com" />
     </div>
+    <div class="field">
+      <label>界面语言（i18n，站点级）</label>
+      <select v-model="form.site_locale" class="select">
+        <option value="zh-CN">简体中文</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>默认描述（site_tagline，meta description / 主题副题）</label>
+      <input v-model="form.site_tagline" maxlength="200" class="input" placeholder="一座写在 Cloudflare 上的小书斋。" />
+    </div>
+    <div class="field">
+      <label>页脚文案行（footer_line，留空回退扉页诗句）</label>
+      <input v-model="form.footer_line" maxlength="200" class="input" />
+    </div>
+    <div class="field">
+      <label>搜索框占位文案（search_placeholder）</label>
+      <input v-model="form.search_placeholder" maxlength="100" class="input" />
+    </div>
+    <div class="field">
+      <label>首页题记位（hero_note，可选，留空不显示）</label>
+      <input v-model="form.hero_note" maxlength="200" class="input" />
+    </div>
     <div style="margin-top:20px;display:flex;gap:12px;align-items:center;">
       <button class="btn btn-primary" :disabled="saving" @click="save">
         {{ saving ? '保存中…' : '保存设置' }}
@@ -358,7 +393,8 @@ async function deleteAiKey() {
         form.SITE_NAME !== original.SITE_NAME ||
         form.SITE_SLOGAN !== original.SITE_SLOGAN ||
         form.SITE_POEM !== original.SITE_POEM ||
-        form.SITE_URL !== original.SITE_URL
+        form.SITE_URL !== original.SITE_URL ||
+        COPY_KEYS.some((k) => (form as any)[k] !== (original as any)[k])
       " style="color:var(--cinnabar);font-size:0.82rem;">
         有未保存的修改
       </span>

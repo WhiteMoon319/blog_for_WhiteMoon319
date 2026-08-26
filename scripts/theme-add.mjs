@@ -9,7 +9,7 @@
 // pnpm theme:add <来源> —— 安装主题
 // 来源：官方 <slug> | 本地 ./x.zip | https://...zip | git 仓库 URL
 
-import { existsSync, readFileSync, readdirSync, statSync, rmSync, mkdtempSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, rmSync, mkdtempSync, cpSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -115,7 +115,7 @@ async function main() {
         console.error(`❌ 目标已存在：src/themes/${slug}（覆盖请加 --force）`);
         process.exit(1);
       }
-      execSync(`${process.platform === 'win32' ? 'xcopy /E /I /Y' : 'cp -r'} "${themeRoot}" "${target}"`, { stdio: 'inherit', shell: true });
+      cpSync(themeRoot, target, { recursive: true });
       console.log('✅ 安装完成（git 来源，未经官方审核）');
       console.log(`   切换：pnpm theme ${slug}`);
     } finally {

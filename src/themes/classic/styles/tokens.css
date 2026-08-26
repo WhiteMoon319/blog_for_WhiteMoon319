@@ -21,6 +21,8 @@
   --ink-deep: #2a2a3e;
   --ink-mid: #5b5b6e;
   --ink-light: #6f6f7d;
+  --ink-soft: #8a8a99;
+  --ink-faint: rgba(0, 0, 0, 0.06);
   --hairline: rgba(0, 0, 0, 0.06);
 
   /* 纸色 */
@@ -64,6 +66,8 @@
     --ink-deep: #eee8e1;
     --ink-mid: #bcb3ab;
     --ink-light: #948e89;
+    --ink-soft: #a5a19e;
+    --ink-faint: rgba(255, 255, 255, 0.11);
     --hairline: rgba(255, 255, 255, 0.11);
     --paper-warm: #141316;
     --paper-card: #1d1b20;

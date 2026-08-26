@@ -26,6 +26,7 @@ function envRepo() {
   }
   return 'WhiteMoon319/themes_for_blog';
 }
+export { envRepo };
 
 async function viaRaw(repo, slug, ref) {
   const url = `https://raw.githubusercontent.com/${repo}/${ref}/${slug}/${slug}.zip`;
@@ -42,6 +43,7 @@ async function viaApi(repo, slug, ref) {
 }
 
 function viaGitClone(repo, slug, ref) {
+  if (!/^[A-Za-z0-9._\/-]{1,80}$/.test(ref)) throw new Error('非法 ref');
   const tmp = mkdtempSync(join(tmpdir(), 'themeclone-'));
   try {
     execSync(`git clone --depth 1 --branch "${ref}" "https://github.com/${repo}.git" "${tmp}/repo"`, {

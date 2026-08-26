@@ -22,7 +22,7 @@ import { unzipSync, zipSync } from 'fflate';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export const HARD_LIMITS = {
-  maxZipBytes: 10 * 1024 * 1024,
+  maxZipBytes: 4 * 1024 * 1024,
   maxEntries: 200,
   maxFileBytes: 512 * 1024,
   maxCompressionRatio: 20,
@@ -96,12 +96,9 @@ export function validateExtracted(files, expectedSlug = null, allowReserved = fa
   const entries = Object.keys(files);
   // 找顶层目录（允许无顶层目录的双层兼容）
   let topDir = '';
-  const tops = new Set(entries.map((e) => e.split('/')[0]));
-  if (!(entries.includes('theme.json') || entries.some((e) => e.endsWith('/theme.json') === false && e === 'theme.json'))) {
-    // noop——统一在下方归一化处理
-  }
   const hasRootManifest = entries.includes('theme.json');
   if (!hasRootManifest) {
+    const tops = new Set(entries.map((e) => e.split('/')[0]));
     if (tops.size === 1) topDir = [...tops][0] + '/';
     else fail(errors, `zip 根缺 theme.json 且存在多个顶层目录（${[...tops].join(', ')}），无法定位主题根`);
   }
@@ -170,6 +167,8 @@ export function inspectZip(buf, expectedSlug = null, allowReserved = false) {
   } catch (e) {
     return { errors: [`zip 解析失败：${e.message}`], warnings: [], manifest: null };
   }
+  const names = Object.keys(entries);
+  if (names.length === 0) return { errors: ['zip 无文件条目'], warnings: [], manifest: null };
   // 压缩比炸弹检测：总解压大小 vs 压缩大小由 fflate 解出后按字节近似
   let totalUncompressed = 0;
   for (const data of Object.values(entries)) totalUncompressed += data.length;
@@ -201,8 +200,8 @@ export function packDir(dir, dirName) {
 export function unpackZip(buf, destDir, expectedSlug = null, allowReserved = false) {
   const inspected = inspectZip(buf, expectedSlug, allowReserved);
   if (inspected.errors.length > 0) return inspected;
-  // 剥离单一公共顶层目录（zip 通常带 <slug>/ 前缀，安装时应收平一层）
   const rels = Object.keys(inspected.files);
+  if (rels.length === 0) { inspected.errors.push('zip 无文件条目'); return inspected; }
   const firstTop = rels.length ? rels[0].split('/')[0] : null;
   const singleTop = firstTop != null && rels.every((r) => r.startsWith(`${firstTop}/`));
   for (const [p, data] of Object.entries(inspected.files)) {
@@ -232,7 +231,8 @@ if (isMain()) {
   };
   switch (cmd) {
     case 'check-zip': {
-      const r = inspectZip(readFileSync(resolve(a)));
+      // 可选第二参数：期望 slug（用于强制 manifest.slug 与目录名一致）
+      const r = inspectZip(readFileSync(resolve(a)), b ?? null);
       process.exit(print(r));
       break;
     }

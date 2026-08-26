@@ -16,7 +16,7 @@
         "./src/core/*"
       ],
       "@theme/*": [
-        "./src/themes/classic/*",
+        "./src/themes/modern/*",
         "./src/themes/classic/*"
       ]
     }

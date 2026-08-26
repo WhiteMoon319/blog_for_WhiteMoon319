@@ -12,7 +12,7 @@
 //
 // 系统保护主题：classic 永远存在且回退链依赖它，禁止删除/改名。
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -83,7 +83,14 @@ function writeEnvTheme(slug) {
   } else {
     content = content.replace(/\n*$/, '\n') + `BLOG_THEME=${slug}\n`;
   }
-  writeFileSync(ENV_FILE, content);
+  atomicWrite(ENV_FILE, content);
+}
+
+/** 先写临时文件再原子改名，避免进程中断留下半截文件 */
+function atomicWrite(file, content) {
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, content);
+  renameSync(tmp, file);
 }
 
 function writeTsconfigFor(active) {
@@ -97,7 +104,7 @@ function writeTsconfigFor(active) {
   // 排除未激活的非保护主题，避免半成品打红 astro check
   const excluded = listThemes().filter((t) => t !== active && t !== 'classic').map((t) => `src/themes/${t}`);
   json.exclude = ['dist', 'admin', 'node_modules', ...excluded];
-  writeFileSync(TSCONFIG, JSON.stringify(json, null, 2) + '\n');
+  atomicWrite(TSCONFIG, JSON.stringify(json, null, 2) + '\n');
 }
 
 async function main() {

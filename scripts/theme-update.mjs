@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, rmSync, renameSync, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { unpackZip } from './lib/theme-validate.mjs';
-import { fetchOfficialZip } from './lib/official-zip.mjs';
+import { fetchOfficialZip, envRepo as remoteRepo } from './lib/official-zip.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const THEMES_DIR = join(ROOT, 'src', 'themes');
@@ -22,7 +22,13 @@ async function main() {
     console.error('用法：pnpm theme:update <slug>[@version]');
     process.exit(2);
   }
-  const [slug, wantVersion] = arg.split('@');
+  const [slug, wantVersionRaw] = arg.split('@');
+  const wantVersion = wantVersionRaw ? `${wantVersionRaw}` : '';
+  // 版本号必须为合法 semver/tag 片段，防注入 git ref
+  if (wantVersion && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,40}$/.test(wantVersion)) {
+    console.error(`❌ 非法版本号：${wantVersion}`);
+    process.exit(2);
+  }
   const target = join(THEMES_DIR, slug);
   if (!existsSync(join(target, 'theme.json'))) {
     console.error(`❌ 本地未安装：src/themes/${slug}（首次请用 theme:add ${slug}）`);
@@ -64,7 +70,7 @@ async function main() {
   renameOrMove(staging, target);
 
   console.log(`✅ ${local.version} → ${remote.version}`);
-  console.log(`   更新日志：https://github.com/${repo}/blob/main/${slug}/README.md`);
+  console.log(`   更新日志：https://github.com/${remoteRepo()}/blob/main/${slug}/README.md`);
 }
 
 function renameOrMove(from, to) {

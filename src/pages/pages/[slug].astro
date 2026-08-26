@@ -1,11 +1,10 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import StandaloneTemplate from '@theme/templates/standalone.astro';
 import { envOf } from '../../lib/db/index.ts';
 import { getPageBySlug } from '../../lib/db/pages.ts';
 import { renderMarkdown } from '../../lib/markdown.ts';
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
 
 export const prerender = false;
 
@@ -19,12 +18,4 @@ import { getSiteContext } from "../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout ctx={siteCtx} title={page.title}>
-  <article class="page-content">
-    <div class="page-head">
-      <h1>{page.title}</h1>
-    </div>
-    <Fragment set:html={html} />
-  </article>
-  <ArticleEnhancer html={html} />
-</BaseLayout>
+<StandaloneTemplate ctx={siteCtx} title={page.title} html={html} />

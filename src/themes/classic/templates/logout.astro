@@ -1,0 +1,48 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 退出登录页模板：纯展示 + 内联 fetch 逻辑（随标记搬入），数据一律经 props.ctx。
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface Props {
+  ctx: SiteContext;
+}
+
+const { ctx } = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title="退出登录" noindex>
+  <div class="logout-page">
+    <div class="logout-card">
+      <h1>退出登录</h1>
+      <p>点击下方按钮注销当前会话（已签发会话立即失效）。</p>
+      <button id="logout-btn" class="btn btn-danger" type="button" style="width:100%;justify-content:center;">退出登录</button>
+      <p id="logout-err" class="auth-error" style="display:none;color:var(--cinnabar);font-size:0.85rem;text-align:center;margin-top:0.8em;"></p>
+      <p class="auth-alt"><a href="/">返回首页</a></p>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  const btn = document.getElementById('logout-btn')! as HTMLButtonElement;
+  const errEl = document.getElementById('logout-err')! as HTMLElement;
+  btn.addEventListener('click', async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      location.href = '/';
+    } catch {
+      errEl.textContent = '网络错误，请重试。';
+      errEl.style.display = 'block';
+    }
+  });
+</script>
+
+<style>
+  .logout-page { max-width: 360px; margin: 6em auto; padding: 0 20px; }
+  .logout-card { background: var(--paper-card); border: 1px solid var(--hairline); border-radius: 12px; padding: 2.5em 2em; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+  .logout-card h1 { font-family: var(--font-brush); font-size: 1.5rem; font-weight: 400; letter-spacing: 0.15em; text-align: center; margin: 0 0 1em; color: var(--ink-deep); }
+  .logout-card p { font-size: 0.9rem; color: var(--ink-mid); text-align: center; line-height: 1.7; }
+  .auth-alt { text-align: center; font-size: 0.82rem; color: var(--ink-light); margin-top: 1.4em; }
+  .auth-alt a { color: var(--cinnabar); }
+</style>

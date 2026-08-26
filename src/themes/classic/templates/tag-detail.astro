@@ -1,0 +1,56 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TagResults from '../components/TagResults.astro';
+
+interface UnionCollection {
+  id: number;
+  title: string;
+  summary: string;
+  post_count: number;
+}
+interface UnionPost {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  collection_slug: string | null;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 标签名（Astro.params 解码后） */
+  name: string;
+  keyword: string;
+  /** 标签下文集/文章计数（页面壳 getTagPage 查询所得） */
+  collectionsCount: number;
+  postsCount: number;
+  collections: UnionCollection[];
+  posts: UnionPost[];
+  /** collection_id -> 该集内命中文章 */
+  collectionPosts: Map<number, UnionPost[]>;
+}
+
+const { ctx, name, keyword, collectionsCount, postsCount, collections, posts, collectionPosts } = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title={`标签「${name}」`} description={`标签「${name}」下的文集与文章。`}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/tags/">← 回到标签</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">标 引</p>
+      <h1>「{name}」</h1>
+      <p class="lead">
+        {collectionsCount} 部文集 · {postsCount} 篇{keyword ? `（寻「${keyword}」）` : ''}
+      </p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    <div style="margin-top:36px;">
+      <TagResults names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} />
+    </div>
+  </section>
+</BaseLayout>

@@ -1,8 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import TagResults from '@theme/components/TagResults.astro';
+import TagIndexTemplate from '@theme/templates/tag-index.astro';
 import { envOf, listAllTagCounts, getTagsUnion } from '../../lib/db';
 
 export const prerender = false;
@@ -12,96 +11,17 @@ const env = await envOf();
 const selected = Astro.url.searchParams.getAll('t').filter(Boolean);
 const keyword = Astro.url.searchParams.get('q') ?? '';
 const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
-
-function toggleHref(name: string): string {
-  const next = selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name];
-  const params = new URLSearchParams();
-  next.forEach((n) => params.append('t', n));
-  if (keyword.trim()) params.set('q', keyword.trim());
-  const qs = params.toString();
-  return qs ? `/tags/?${qs}` : '/tags/';
-}
 import { getSiteContext } from "../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 const union = await getTagsUnion(env.DB, selected, keyword);
 ---
 
-<BaseLayout ctx={siteCtx} title="标签" description="按题材标签寻览诸作。">
-  <div class="page-hero">
-    <a class="page-back reveal in" href="/">← 回到卷首</a>
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">标 引</p>
-      <h1>标签</h1>
-      <p class="lead">
-        {selected.length > 0 ? `已选 ${selected.join(' · ')}${keyword ? `，寻「${keyword}」` : ''}` : '按题材寻览，一标即得。'}
-      </p>
-    </div>
-  </div>
-
-  <section class="section" style="padding-top:56px;">
-    {
-      tags.length > 0 && (
-        <div class="tag-cloud">
-          {tags.map((t) => (
-            <a
-              class={`tag-chip${selected.includes(t.name) ? ' is-active' : ''}`}
-              href={toggleHref(t.name)}
-            >
-              {t.name}
-              <span class="tag-count">文集 {t.collections} · 文章 {t.posts}</span>
-            </a>
-          ))}
-        </div>
-      )
-    }
-
-    {
-      selected.length > 0 && (
-        <form class="tag-search reveal in" action="/tags/" method="get" role="search">
-          {selected.map((n) => (
-            <input type="hidden" name="t" value={n} />
-          ))}
-          <input
-            class="tag-search-input"
-            type="search"
-            name="q"
-            value={keyword}
-            placeholder={`在所选标签内寻章……`}
-            aria-label="标签内搜索"
-          />
-          <button class="btn btn-ghost" type="submit">寻</button>
-        </form>
-      )
-    }
-
-    <div style="margin-top:36px;">
-      <TagResults names={selected} keyword={keyword} collections={union.collections} posts={union.posts} collectionPosts={union.collectionPosts} />
-    </div>
-  </section>
-</BaseLayout>
-
-<style>
-  .tag-search {
-    display: flex;
-    gap: 12px;
-    max-width: 520px;
-    margin: 24px auto 0;
-  }
-  .tag-search-input {
-    flex: 1;
-    min-width: 0;
-    padding: 10px 14px;
-    font-family: var(--font-serif);
-    font-size: 0.95rem;
-    color: var(--ink-deep);
-    background: var(--paper-card);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-md);
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  .tag-search-input:focus {
-    border-color: var(--cinnabar);
-    box-shadow: 0 0 0 3px var(--cinnabar-line);
-  }
-</style>
+<TagIndexTemplate
+  ctx={siteCtx}
+  selected={selected}
+  keyword={keyword}
+  tags={tags}
+  collections={union.collections}
+  posts={union.posts}
+  collectionPosts={union.collectionPosts}
+/>

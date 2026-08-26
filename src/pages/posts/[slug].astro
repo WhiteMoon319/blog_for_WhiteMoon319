@@ -1,14 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
+import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
-import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
-import Comments from '@theme/components/Comments.astro';
-import PostLike from '@theme/components/PostLike.astro';
 import { resolveUser } from '../../lib/auth';
 import { safeJsonLd } from '../../lib/seo';
+import PostTemplate from '@theme/templates/post.astro';
+import { getSiteContext } from "../../lib/theme-context";
 
 const env = await envOf();
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
@@ -37,8 +35,6 @@ const { html, toc } = renderMarkdown(post.content_md);
 const user = await resolveUser(Astro);
 const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
-const postHref = (s: string, collectionSlug?: string | null) =>
-  collectionSlug ? `/collections/${encodeURI(collectionSlug)}/${encodeURI(s)}/` : `/posts/${encodeURI(s)}/`;
 const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
 const postUrl = `${siteUrl}/posts/${encodeURI(post.slug)}/`;
 const jsonLd = {
@@ -59,57 +55,29 @@ const jsonLd = {
   author: { '@type': 'Person', name: env.SITE_NAME },
   publisher: { '@type': 'Organization', name: env.SITE_NAME },
 };
-import { getSiteContext } from "../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout ctx={siteCtx} title={post.title} description={post.summary} keywords={post.meta_keywords}>
-  <script type="application/ld+json" set:html={safeJsonLd(jsonLd)} />
-  <div class="page-hero" style="--cc: #c23a30;">
-    <a class="page-back reveal in" href="/">← 回到卷首</a>
-
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">未分类 · {fmtDate(post.created_at)}</p>
-      <h1>{post.title}</h1>
-      {post.summary && <p class="lead">{post.summary}</p>}
-      <div class="facts">
-        <span>成于 {fmtDate(post.created_at)}</span>
-        {post.updated_at !== post.created_at && <span>改于 {fmtDate(post.updated_at)}</span>}
-        <span>阅 {viewCount}</span>
-      </div>
-      {effectiveTags.length > 0 && (
-        <div class="facts tag-row">
-          {effectiveTags.map((t) => (
-            <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>{t.name}</a>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-
-  <article class="article">
-    {post.cover_url && <img class="article-cover" src={post.cover_url} alt="" loading="eager" decoding="async" />}
-    <div class="article-body reveal in" set:html={html} />
-
-    {toc.length > 1 && (
-      <nav class="article-toc" aria-label="目录">
-        <p class="toc-title">目 录</p>
-        <ol>
-          {toc.map((t) => (
-            <li class={`toc-lv${t.level}`}>
-              <a href={`#${t.id}`}>{t.text}</a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    )}
-
-    <nav class="article-pagination">
-      {prev && <a class="btn btn-ghost" href={postHref(prev.slug, prev.collection_slug)}>← {prev.title}</a>}
-      {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
-    </nav>
-  </article>
-  <PostLike postId={post.id} likes={likeCount?.n ?? 0} liked={liked} />
-  <Comments postId={post.id} r2Base={siteCtx.r2Base} />
-  <ArticleEnhancer html={html} />
-</BaseLayout>
+<PostTemplate
+  ctx={siteCtx}
+  postId={post.id}
+  title={post.title}
+  summary={post.summary}
+  coverUrl={post.cover_url}
+  keywords={post.meta_keywords}
+  createdAt={post.created_at}
+  updatedAt={post.updated_at}
+  viewCount={viewCount}
+  html={html}
+  toc={toc}
+  tags={effectiveTags}
+  prev={prev}
+  next={next}
+  likes={likeCount?.n ?? 0}
+  liked={liked}
+  accentColor="#c23a30"
+  backHref="/"
+  backLabel="← 回到卷首"
+  kicker="未分类"
+  jsonLd={safeJsonLd(jsonLd)}
+/>

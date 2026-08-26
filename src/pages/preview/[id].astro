@@ -1,12 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import { envOf, getPostById, getCollectionById, fmtDate } from '../../lib/db';
+import { envOf, getPostById, getCollectionById } from '../../lib/db';
 import { postHref } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { resolveUser } from '../../lib/auth';
-import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
+import PostTemplate from '@theme/templates/post.astro';
+import { getSiteContext } from "../../lib/theme-context";
 
 export const prerender = false;
 
@@ -25,83 +25,34 @@ if (!post) {
 const collection = post.collection_id ? await getCollectionById(env.DB, post.collection_id) : null;
 const { html, toc } = renderMarkdown(post.content_md);
 const theme = collection?.theme_color ?? '#8a6d3b';
-import { getSiteContext } from "../../lib/theme-context";
+
+const backHref = collection ? `/collections/${encodeURI(collection.slug)}/` : '/archive/';
+const backLabel = collection ? `← ${collection.title}` : '← 归档';
+const kicker = collection?.title ?? '未分类';
+const publishedHref =
+  post.status === 'published' && collection ? postHref(post.slug, collection.slug) : undefined;
+
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout ctx={siteCtx}
+<PostTemplate
+  ctx={siteCtx}
+  isPreview
+  previewBadgeText={post.status === 'draft' ? '（未刊发）' : '（已刊发）'}
+  postId={post.id}
   title={post.title}
-  description={post.summary}
-  image={post.cover_url ? post.cover_url : undefined}
+  summary={post.summary}
+  coverUrl={post.cover_url}
+  createdAt={post.created_at}
+  updatedAt={post.updated_at}
+  viewCount={post.view_count}
+  html={html}
+  toc={toc}
+  accentColor={theme}
+  backHref={backHref}
+  backLabel={backLabel}
+  kicker={kicker}
+  ogImage={post.cover_url ? post.cover_url : undefined}
   noindex
->
-  <div class="preview-banner">
-    草稿预览 · 仅你可见
-    {post.status === 'draft' ? '（未刊发）' : '（已刊发）'}
-  </div>
-
-  <div class="page-hero" style={`--cc: ${theme};`}>
-    {collection ? (
-      <a class="page-back reveal in" href={`/collections/${encodeURI(collection.slug)}/`}>
-        ← {collection.title}
-      </a>
-    ) : (
-      <a class="page-back reveal in" href="/archive/">← 归档</a>
-    )}
-
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">
-        {collection?.title ?? '未分类'} · {fmtDate(post.created_at)}
-      </p>
-      <h1>{post.title}</h1>
-      {post.summary && <p class="lead">{post.summary}</p>}
-      <div class="facts">
-        <span>成于 {fmtDate(post.created_at)}</span>
-        {post.updated_at !== post.created_at && <span>改于 {fmtDate(post.updated_at)}</span>}
-        <span>阅 {post.view_count}</span>
-      </div>
-    </div>
-  </div>
-
-  <article class="article">
-    {post.cover_url && <img class="article-cover" src={post.cover_url} alt="" loading="eager" decoding="async" />}
-    <div class="article-body reveal in" set:html={html} />
-
-    {toc.length > 1 && (
-      <nav class="article-toc" aria-label="目录">
-        <p class="toc-title">目 录</p>
-        <ol>
-          {toc.map((t) => (
-            <li class={`toc-lv${t.level}`}>
-              <a href={`#${t.id}`}>{t.text}</a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    )}
-
-    <nav class="article-pagination">
-      {post.status === 'published' && collection && (
-        <a class="btn btn-ghost" href={postHref(post.slug, collection.slug)}>
-          查看正式页面 →
-        </a>
-      )}
-    </nav>
-  </article>
-  <ArticleEnhancer html={html} />
-</BaseLayout>
-
-<style>
-  .preview-banner {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    text-align: center;
-    padding: 8px 16px;
-    background: var(--cinnabar);
-    color: var(--paper-warm);
-    font-family: var(--font-serif);
-    font-size: 0.85rem;
-    letter-spacing: 0.12em;
-  }
-</style>
+  publishedHref={publishedHref}
+/>

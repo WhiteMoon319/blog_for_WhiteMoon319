@@ -1,0 +1,187 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 注册页模板：纯展示 + 内联 fetch 逻辑（随标记搬入），数据一律经 props.ctx。
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface Props {
+  ctx: SiteContext;
+}
+
+const { ctx } = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title="注册" noindex>
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1>注 册</h1>
+      <p class="sub">{ctx.siteName}</p>
+
+      <!-- 第一步：注册表单 -->
+      <form id="register-form">
+        <div class="auth-field">
+          <label for="username">用户名（仅英文字母和数字）</label>
+          <input id="username" name="username" class="input" placeholder="仅英文字母和数字" autocomplete="username" required />
+        </div>
+        <div class="auth-field">
+          <label for="email">邮箱</label>
+          <input id="email" name="email" class="input" type="email" placeholder="用于接收验证码" autocomplete="email" required />
+        </div>
+        <div class="auth-field">
+          <label for="password">密码（至少 8 位，含字母和数字/特殊字符）</label>
+          <input id="password" name="password" class="input" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="auth-field">
+          <label for="display_name">昵称（可选）</label>
+          <input id="display_name" name="display_name" class="input" placeholder="评论显示名" />
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;">注册并发送验证码</button>
+        <p id="register-error" class="auth-error" style="display:none;"></p>
+      </form>
+
+      <!-- 第二步：验证码输入 -->
+      <div id="verify-stage" style="display:none;">
+        <p class="verify-hint">验证码已发送至 <strong id="verify-email"></strong>，5 分钟内有效。</p>
+        <div class="auth-field">
+          <label for="code">验证码</label>
+          <input id="code" name="code" class="input" inputmode="numeric" maxlength="6" placeholder="6 位数字" required />
+        </div>
+        <button id="verify-btn" class="btn btn-primary" type="button" style="width:100%;justify-content:center;">验证并登录</button>
+        <button id="resend-btn" class="btn btn-ghost" type="button" style="width:100%;justify-content:center;margin-top:8px;">重新发送</button>
+        <p id="verify-error" class="auth-error" style="display:none;"></p>
+      </div>
+
+      <p class="auth-alt">已有账号？<a href="/login/">登录</a></p>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  const registerForm = document.getElementById('register-form')! as HTMLFormElement;
+  const regErr = document.getElementById('register-error')!;
+  const verifyStage = document.getElementById('verify-stage')!;
+  const verifyEmail = document.getElementById('verify-email')!;
+  const verifyBtn = document.getElementById('verify-btn')! as HTMLButtonElement;
+  const resendBtn = document.getElementById('resend-btn')! as HTMLButtonElement;
+  const verifyErr = document.getElementById('verify-error')!;
+  const redirect = new URLSearchParams(location.search).get('redirect') ?? '/';
+  // 防开放重定向：仅允许站内路径
+  const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
+  let userId: number | null = null;
+  let email = '';
+
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(registerForm as HTMLFormElement);
+    regErr.style.display = 'none';
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: fd.get('username'),
+          email: fd.get('email'),
+          password: fd.get('password'),
+          display_name: fd.get('display_name'),
+        }),
+      });
+      const data = await res.json() as { error?: string; user_id?: number };
+      if (!res.ok) {
+        regErr.textContent = res.status === 429 ? '尝试过于频繁，请稍后再试。' : (data.error ?? '注册失败');
+        regErr.style.display = 'block';
+        return;
+      }
+      userId = typeof data.user_id === 'number' ? data.user_id : null;
+      email = String(fd.get('email'));
+      verifyEmail.textContent = email;
+      verifyStage.style.display = 'block';
+      registerForm.style.display = 'none';
+    } catch {
+      regErr.textContent = '网络错误，请重试。';
+      regErr.style.display = 'block';
+    }
+  });
+
+  async function doVerify() {
+    const code = (document.getElementById('code') as HTMLInputElement).value.trim();
+    if (!code || userId === null) return;
+    verifyErr.style.display = 'none';
+    verifyBtn.disabled = true;
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, code }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) {
+        verifyErr.textContent = data.error ?? '验证失败';
+        verifyErr.style.display = 'block';
+        return;
+      }
+      // 验证成功：自动登录
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: (document.getElementById('username') as HTMLInputElement).value, password: (document.getElementById('password') as HTMLInputElement).value }),
+      });
+      if (loginRes.ok) {
+        location.href = safeRedirect;
+      } else {
+        location.href = '/login/?redirect=' + encodeURIComponent(redirect);
+      }
+    } catch {
+      verifyErr.textContent = '网络错误，请重试。';
+      verifyErr.style.display = 'block';
+    } finally {
+      verifyBtn.disabled = false;
+    }
+  }
+
+  verifyBtn.addEventListener('click', doVerify);
+  (document.getElementById('code') as HTMLInputElement).addEventListener('keydown', (e) => { if (e.key === 'Enter') doVerify(); });
+
+  resendBtn.addEventListener('click', async () => {
+    resendBtn.disabled = true;
+    verifyErr.style.display = 'none';
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { verifyErr.textContent = data.error ?? '重发失败，请 60 秒后重试'; verifyErr.style.display = 'block'; }
+      else verifyErr.textContent = ''; // 静默（勿暴露邮箱状态）
+    } catch {
+      /* ignore */
+    } finally {
+      setTimeout(() => { resendBtn.disabled = false; }, 60 * 1000);
+    }
+  });
+</script>
+
+<style>
+  .auth-page { max-width: 440px; margin: 3em auto; padding: 0 20px; }
+  .auth-card {
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 2.5em 2em;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+  }
+  .auth-card h1 { font-family: var(--font-brush); font-size: 1.6rem; font-weight: 400; letter-spacing: 0.15em; text-align: center; margin: 0 0 4px; color: var(--ink-deep); }
+  .auth-card .sub { text-align: center; color: var(--ink-light); font-size: 0.8rem; letter-spacing: 0.2em; margin: 0 0 1.6em; }
+  .auth-field { margin-bottom: 1em; }
+  .auth-field label { display: block; font-size: 0.82rem; color: var(--ink-mid); margin-bottom: 5px; }
+  .auth-field .input { width: 100%; box-sizing: border-box; }
+  .auth-error { color: var(--cinnabar); font-size: 0.85rem; margin-top: 0.8em; text-align: center; }
+  .auth-alt { text-align: center; font-size: 0.82rem; color: var(--ink-light); margin-top: 1.4em; }
+  .auth-alt a { color: var(--cinnabar); }
+  .verify-hint { font-size: 0.85rem; color: var(--ink-mid); margin: 0 0 1em; text-align: center; }
+</style>

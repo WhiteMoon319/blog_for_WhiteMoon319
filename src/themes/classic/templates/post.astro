@@ -1,0 +1,181 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 文章详情模板：整合三处来源（独立文章 / 文集内文章 / 草稿预览）的展示标记。
+// 纯展示组件，一切数据经 props 下传，禁止自行访问 DB/env。
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostLike from '../components/PostLike.astro';
+import Comments from '../components/Comments.astro';
+import ArticleEnhancer from '../components/ArticleEnhancer.astro';
+
+interface TocItem {
+  id: string;
+  text: string;
+  level: number;
+}
+
+interface AdjacentLink {
+  slug: string;
+  title: string;
+  collection_slug?: string | null;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 文章 id（点赞/评论组件定位用） */
+  postId: number;
+  title: string;
+  summary?: string | null;
+  coverUrl?: string | null;
+  /** SEO 关键词（仅独立文章详情页传入） */
+  keywords?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  viewCount: number;
+  /** 服务端渲染后的正文 HTML */
+  html: string;
+  toc: TocItem[];
+  tags?: { name: string }[];
+  /** 上一篇/下一篇（预览源不传） */
+  prev?: AdjacentLink | null;
+  next?: AdjacentLink | null;
+
+  // —— 三源渲染差异，由页面壳计算后传入 ——
+  /** 页首 hero 色条 --cc（独立文 #c23a30 / 文集 theme_color / 预览回退 #8a6d3b） */
+  accentColor: string;
+  /** 返回链接地址与完整文案（含「← 」前缀，逐字保持原文案） */
+  backHref: string;
+  backLabel: string;
+  /** kicker 前缀文案（文集标题或「未分类」） */
+  kicker: string;
+
+  // —— head/meta 差异 ——
+  /** og:image（文集内文章与预览传封面；独立文章页原样未传） */
+  ogImage?: string | null;
+  noindex?: boolean;
+  /** 页面壳生成的 JSON-LD 安全字符串（仅独立文章详情页注入 BlogPosting） */
+  jsonLd?: string | null;
+
+  // —— 交互区差异 ——
+  /** 点赞数；不传则不渲染点赞组件（预览源无） */
+  likes?: number;
+  liked?: boolean;
+  /** 是否渲染评论区（默认 true，预览源为 false） */
+  showComments?: boolean;
+
+  // —— 预览态 ——
+  /** 草稿预览：渲染顶部「草稿预览 · 仅你可见」横幅 */
+  isPreview?: boolean;
+  /** 草稿预览横幅第二行文案（「（未刊发）/（已刊发）」，由页面壳按 status 计算） */
+  previewBadgeText?: string;
+  /** 「查看正式页面 →」链接目标（仅预览态且已刊发且属文集时由页面壳传入） */
+  publishedHref?: string | null;
+}
+
+const {
+  ctx,
+  postId,
+  title,
+  summary = '',
+  coverUrl = '',
+  keywords,
+  createdAt,
+  updatedAt,
+  viewCount,
+  html,
+  toc,
+  tags = [],
+  prev,
+  next,
+  accentColor,
+  backHref,
+  backLabel,
+  kicker,
+  ogImage,
+  noindex = false,
+  jsonLd,
+  likes,
+  liked = false,
+  showComments = true,
+  isPreview = false,
+  previewBadgeText = '',
+  publishedHref,
+} = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title={title} description={summary ?? undefined} keywords={keywords ?? undefined} image={ogImage ?? undefined} noindex={noindex}>
+  {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
+
+  {isPreview && (
+    <div class="preview-banner">
+      草稿预览 · 仅你可见
+      {previewBadgeText}
+    </div>
+  )}
+
+  <div class="page-hero" style={`--cc: ${accentColor};`}>
+    <a class="page-back reveal in" href={backHref}>{backLabel}</a>
+
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{kicker} · {fmtDate(createdAt)}</p>
+      <h1>{title}</h1>
+      {summary && <p class="lead">{summary}</p>}
+      <div class="facts">
+        <span>成于 {fmtDate(createdAt)}</span>
+        {updatedAt !== createdAt && <span>改于 {fmtDate(updatedAt)}</span>}
+        <span>阅 {viewCount}</span>
+      </div>
+      {tags.length > 0 && (
+        <div class="facts tag-row">
+          {tags.map((t) => (
+            <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>{t.name}</a>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+
+  <article class="article">
+    {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
+    <div class="article-body reveal in" set:html={html} />
+
+    {toc.length > 1 && (
+      <nav class="article-toc" aria-label="目录">
+        <p class="toc-title">目 录</p>
+        <ol>
+          {toc.map((t) => (
+            <li class={`toc-lv${t.level}`}>
+              <a href={`#${t.id}`}>{t.text}</a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    )}
+
+    <nav class="article-pagination">
+      {prev && <a class="btn btn-ghost" href={postHref(prev.slug, prev.collection_slug)}>← {prev.title}</a>}
+      {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
+      {publishedHref && <a class="btn btn-ghost" href={publishedHref}>查看正式页面 →</a>}
+    </nav>
+  </article>
+  {typeof likes === 'number' && <PostLike postId={postId} likes={likes} liked={liked} />}
+  {showComments && <Comments postId={postId} r2Base={ctx.r2Base} />}
+  <ArticleEnhancer html={html} />
+</BaseLayout>
+
+<style>
+  .preview-banner {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    text-align: center;
+    padding: 8px 16px;
+    background: var(--cinnabar);
+    color: var(--paper-warm);
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+  }
+</style>

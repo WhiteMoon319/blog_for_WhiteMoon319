@@ -1,14 +1,11 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, fmtDate } from '../../../lib/db';
-import { postHref } from '../../../lib/utils';
+import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags } from '../../../lib/db';
 import { renderMarkdown } from '../../../lib/markdown';
-import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
-import Comments from '@theme/components/Comments.astro';
-import PostLike from '@theme/components/PostLike.astro';
 import { resolveUser } from '../../../lib/auth';
+import PostTemplate from '@theme/templates/post.astro';
+import { getSiteContext } from "../../../lib/theme-context";
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
@@ -24,63 +21,32 @@ await recordDailyView(env.DB, post.id, Astro.request);
 const effectiveTags = await listPostEffectiveTags(env.DB, post.id);
 const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);
-const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
 // 文章点赞：计数 + 当前用户是否已赞
 const user = await resolveUser(Astro);
 const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
-import { getSiteContext } from "../../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout ctx={siteCtx} title={post.title} description={post.summary} image={post.cover_url ? post.cover_url : undefined}>
-  <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
-    <a class="page-back reveal in" href={collectionHref}>
-      ← {collection.title}
-    </a>
-
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">{collection.title} · {fmtDate(post.created_at)}</p>
-      <h1>{post.title}</h1>
-      {post.summary && <p class="lead">{post.summary}</p>}
-      <div class="facts">
-        <span>成于 {fmtDate(post.created_at)}</span>
-        {post.updated_at !== post.created_at && <span>改于 {fmtDate(post.updated_at)}</span>}
-        <span>阅 {viewCount}</span>
-      </div>
-      {effectiveTags.length > 0 && (
-        <div class="facts tag-row">
-          {effectiveTags.map((t) => (
-            <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>{t.name}</a>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-
-  <article class="article">
-    {post.cover_url && <img class="article-cover" src={post.cover_url} alt="" loading="eager" decoding="async" />}
-    <div class="article-body reveal in" set:html={html} />
-
-    {toc.length > 1 && (
-      <nav class="article-toc" aria-label="目录">
-        <p class="toc-title">目 录</p>
-        <ol>
-          {toc.map((t) => (
-            <li class={`toc-lv${t.level}`}>
-              <a href={`#${t.id}`}>{t.text}</a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    )}
-
-    <nav class="article-pagination">
-      {prev && <a class="btn btn-ghost" href={postHref(prev.slug, prev.collection_slug)}>← {prev.title}</a>}
-      {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
-    </nav>
-  </article>
-  <PostLike postId={post.id} likes={likeCount?.n ?? 0} liked={liked} />
-  <Comments postId={post.id} r2Base={siteCtx.r2Base} />
-  <ArticleEnhancer html={html} />
-</BaseLayout>
+<PostTemplate
+  ctx={siteCtx}
+  postId={post.id}
+  title={post.title}
+  summary={post.summary}
+  coverUrl={post.cover_url}
+  createdAt={post.created_at}
+  updatedAt={post.updated_at}
+  viewCount={viewCount}
+  html={html}
+  toc={toc}
+  tags={effectiveTags}
+  prev={prev}
+  next={next}
+  likes={likeCount?.n ?? 0}
+  liked={liked}
+  accentColor={collection.theme_color}
+  backHref={`/collections/${encodeURI(collection.slug)}/`}
+  backLabel={`← ${collection.title}`}
+  kicker={collection.title}
+  ogImage={post.cover_url ? post.cover_url : undefined}
+/>

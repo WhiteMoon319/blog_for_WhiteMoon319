@@ -1,9 +1,8 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import Pagination from '@theme/components/Pagination.astro';
-import { envOf, getCollectionBySlug, listPublishedPosts, countPublishedPosts, fmtDate } from '../../lib/db';
+import CollectionTemplate from '@theme/templates/collection.astro';
+import { envOf, getCollectionBySlug, listPublishedPosts, countPublishedPosts } from '../../lib/db';
 import { safeJsonLd } from '../../lib/seo';
 import { postHref } from '../../lib/utils';
 
@@ -51,42 +50,12 @@ import { getSiteContext } from "../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout ctx={siteCtx} title={collection.title} description={collection.summary}>
-  <script type="application/ld+json" set:html={safeJsonLd(jsonLd)} />
-  <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
-    <a class="page-back reveal in" href="/">← 回到卷首</a>
-
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">文 集</p>
-      <h1>{collection.title}</h1>
-      {collection.summary && <p class="lead">{collection.summary}</p>}
-      <div class="facts">
-        <span>{total} 篇</span>
-        <span>序 {collection.sort_order}</span>
-      </div>
-    </div>
-  </div>
-
-  <section class="section" style="padding-top:56px;">
-    {
-      posts.length > 0 ? (
-        <div class="posts-grid">
-          {posts.map((p, i) => (
-            <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, collection.slug)} style={`--cc: ${collection.theme_color};`}>
-              {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-              <h3 class="post-title">{p.title}</h3>
-              {p.summary && <p class="post-summary">{p.summary}</p>}
-              <div class="post-meta">
-                <span class="post-tag">{collection.title}</span>
-                <span>{fmtDate(p.created_at)}</span>
-              </div>
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p class="section-lead reveal in" style="text-align:center;">此集尚空，静候主人落笔。</p>
-      )
-    }
-    <Pagination current={page} totalPages={totalPages} base={`/collections/${collection.slug}/`} query="" />
-  </section>
-</BaseLayout>
+<CollectionTemplate
+  ctx={siteCtx}
+  jsonLd={safeJsonLd(jsonLd)}
+  collection={collection}
+  posts={posts}
+  total={total}
+  page={page}
+  totalPages={totalPages}
+/>

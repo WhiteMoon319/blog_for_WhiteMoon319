@@ -1,11 +1,10 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
+import StandaloneTemplate from '@theme/templates/standalone.astro';
 import { envOf } from '../lib/db';
 import { getPageBySlug } from '../lib/db/pages.ts';
 import { renderMarkdown } from '../lib/markdown.ts';
-import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
 
 const env = await envOf();
 const dbPage = await getPageBySlug(env.DB, 'about');
@@ -15,36 +14,23 @@ const pageDesc = `关于「${env.SITE_NAME}」`;
 const bodyHtml = dbPage?.published === 1
   ? renderMarkdown(dbPage.content_md).html
   : null;
-import { getSiteContext } from "../lib/theme-context";
-const siteCtx = await getSiteContext(Astro);
----
-
-<BaseLayout ctx={siteCtx} title={pageTitle} description={pageDesc}>
-  <div class="page-hero">
-    <a class="page-back reveal in" href="/">← 回到卷首</a>
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">跋</p>
-      <h1>{pageTitle}</h1>
-      <p class="lead">{env.SITE_SLOGAN}</p>
-    </div>
-  </div>
-
-  <article class="article">
-    {
-      bodyHtml ? (
-        <div class="article-body reveal in" set:html={bodyHtml} />
-      ) : (
-        <div class="article-body reveal in">
-          <p>
+// 缺页兜底文案（原 about 页内置区块，经 props 下传模板）
+const fallbackHtml = `<p>
             吾名江逐月，亦可称吾江榫。闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
           </p>
           <blockquote>希君生羽翼，一化北溟鱼。</blockquote>
           <p>
             如若相谈，可联系 <a href="mailto:3287047638@qq.com">3287047638@qq.com</a>。
-          </p>
-        </div>
-      )
-    }
-  </article>
-  <ArticleEnhancer html={bodyHtml ?? ''} />
-</BaseLayout>
+          </p>`;
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
+---
+
+<StandaloneTemplate
+  ctx={siteCtx}
+  title={pageTitle}
+  description={pageDesc}
+  hero={{ kicker: '跋', lead: env.SITE_SLOGAN }}
+  html={bodyHtml}
+  fallbackHtml={fallbackHtml}
+/>

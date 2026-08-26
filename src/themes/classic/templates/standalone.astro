@@ -1,0 +1,56 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleEnhancer from '../components/ArticleEnhancer.astro';
+
+interface Props {
+  ctx: SiteContext;
+  title: string;
+  description?: string;
+  /** 页首横幅（about 形态）；省略时用 page-content 紧凑形态（独立页面形态） */
+  hero?: { kicker: string; lead: string };
+  /** 正文 HTML（markdown 渲染产物），null 表示无正文 */
+  html: string | null;
+  /** html 为空时的兜底正文 HTML（about 缺页兜底文案） */
+  fallbackHtml?: string;
+}
+
+const { ctx, title, description, hero, html, fallbackHtml } = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title={title} description={description}>
+  {
+    hero && (
+      <div class="page-hero">
+        <a class="page-back reveal in" href="/">← 回到卷首</a>
+        <div class="page-hero-card reveal in">
+          <p class="character-kicker">{hero.kicker}</p>
+          <h1>{title}</h1>
+          <p class="lead">{hero.lead}</p>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    hero ? (
+      <article class="article">
+        {html ? (
+          <div class="article-body reveal in" set:html={html} />
+        ) : (
+          <div class="article-body reveal in" set:html={fallbackHtml ?? ''} />
+        )}
+      </article>
+    ) : (
+      <article class="page-content">
+        <div class="page-head">
+          <h1>{title}</h1>
+        </div>
+        <Fragment set:html={html} />
+      </article>
+    )
+  }
+  <ArticleEnhancer html={html ?? ''} />
+</BaseLayout>

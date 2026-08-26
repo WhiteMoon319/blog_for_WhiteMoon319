@@ -1,0 +1,161 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface CollectionRow {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string;
+  theme_color: string;
+}
+interface PostRow {
+  id: number;
+  collection_id: number | null;
+  slug: string;
+  title: string;
+  summary: string;
+  cover_url: string;
+  created_at: string;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 站名/口号/题记：取原始 env 文案（不经 settings 覆盖链），保持卷首文案与历史版本一致 */
+  siteName: string;
+  slogan: string;
+  poem: string;
+  collections: CollectionRow[];
+  pinnedPosts: PostRow[];
+  latestPosts: PostRow[];
+}
+
+const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
+const heroSeal = Array.from(siteName)[0] ?? '书';
+---
+
+<BaseLayout ctx={ctx} title="卷首" description={slogan}>
+  <header class="hero" id="top">
+    <span class="ink-blob b1"></span>
+    <span class="ink-blob b2"></span>
+
+    <div class="seal lg hero-seal reveal in">{heroSeal}</div>
+    <h1 class="hero-title reveal in" data-delay="1">{siteName}</h1>
+    <p class="hero-en reveal in" data-delay="2">{slogan}</p>
+    <p class="hero-poem reveal in" data-delay="2">{poem}</p>
+
+    <div class="hero-cta reveal in" data-delay="3">
+      <a class="btn btn-primary" href="#portals">展卷详阅</a>
+      <a class="btn btn-ghost" href="#about">关于</a>
+    </div>
+
+    <div class="scroll-cue">SCROLL</div>
+  </header>
+
+  <section class="section" id="portals">
+    <div class="section-head reveal">
+      <span class="kicker">目 录</span>
+      <h2 class="section-title">诸集</h2>
+      <p class="section-lead">各集文集，各有归处。</p>
+    </div>
+
+    {
+      collections.length > 0 ? (
+        <div class="portal-grid">
+          {collections.map((c, i) => (
+            <a class="portal-card reveal" data-delay={String(i + 1)} href={`/collections/${encodeURI(c.slug)}/`} style={`--pc: ${c.theme_color};`}>
+              <div class="portal-seal">{Array.from(c.title)[0]}</div>
+              <h3>{c.title}</h3>
+              <p class="portal-sub">{c.summary}</p>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead reveal in">尚无文集，静候主人落笔。</p>
+      )
+    }
+  </section>
+
+  {
+    pinnedPosts.length > 0 && (
+      <section class="section" id="pinned">
+        <div class="section-head reveal">
+          <span class="kicker">置 顶</span>
+          <h2 class="section-title">置于案头</h2>
+          <p class="section-lead">主人置顶，常读常新。</p>
+        </div>
+
+        <div class="posts-grid">
+          {pinnedPosts.map((p, i) => {
+            const col = collections.find((c) => c.id === p.collection_id);
+            return (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+                {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" id="latest">
+    <div class="section-head reveal">
+      <span class="kicker">近 作</span>
+      <h2 class="section-title">新近文章</h2>
+      <p class="section-lead">墨迹未干，先睹为快。</p>
+    </div>
+
+    {
+      latestPosts.length > 0 ? (
+        <div class="posts-grid">
+          {latestPosts.map((p, i) => {
+            const col = collections.find((c) => c.id === p.collection_id);
+            return (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+                {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      ) : (
+        <p class="section-lead reveal in">尚无文章，静候主人落笔。</p>
+      )
+    }
+  </section>
+
+  <section class="epigraph" id="epigraph">
+    <div class="reveal">
+      <div class="epigraph-mark">“</div>
+      <blockquote>朝暮有书声，案头无闲墨。</blockquote>
+      <cite>—— 博客题记</cite>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="colophon reveal">
+      <div class="seal lg">尽</div>
+      <p>此为「{siteName}」卷首。</p>
+      <p>{slogan}</p>
+      <p style="margin-top:24px;">
+        <a class="btn btn-primary" href="/archive/">展开归档</a>
+        <a class="btn btn-ghost" href="#top" style="margin-left:8px;">回到卷首</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,65 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Pagination from '../components/Pagination.astro';
+
+interface ArchivePost {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+}
+interface Group {
+  year: string;
+  posts: { post: ArchivePost; collection: { slug: string; title: string } | null }[];
+}
+
+interface Props {
+  ctx: SiteContext;
+  total: number;
+  page: number;
+  totalPages: number;
+  groups: Group[];
+}
+
+const { ctx, total, page, totalPages, groups } = Astro.props;
+---
+
+<BaseLayout ctx={ctx} title="归档" description="全部文章按时间铺陈。">
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">← 回到卷首</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">档 案</p>
+      <h1>文章归档</h1>
+      <p class="lead">共 {total} 篇，按落笔先后铺陈。</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    {
+      groups.length > 0 ? (
+        <div class="timeline">
+          {groups.map((g) => (
+            <>
+              <div class="tl-era">{g.year} 年 <small>共 {g.posts.length} 篇</small></div>
+              {g.posts.map(({ post, collection }) => (
+                <div class="tl-item">
+                  <a href={postHref(post.slug, collection?.slug)}>
+<div class="tl-event">{collection?.title ?? '未分类'} · {post.title}</div>
+                <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
+                  </a>
+                </div>
+              ))}
+            </>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead reveal in" style="text-align:center;">尚无文章。</p>
+      )
+    }
+    <Pagination current={page} totalPages={totalPages} base="/archive/" query="" />
+  </section>
+</BaseLayout>

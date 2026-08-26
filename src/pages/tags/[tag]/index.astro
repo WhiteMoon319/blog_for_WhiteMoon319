@@ -1,8 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '@theme/layouts/BaseLayout.astro';
-import TagResults from '@theme/components/TagResults.astro';
+import TagDetailTemplate from '@theme/templates/tag-detail.astro';
 import { envOf, getTagPage } from '../../../lib/db';
 
 export const prerender = false;
@@ -22,21 +21,13 @@ import { getTagsUnion } from '../../../lib/db';
 const union = await getTagsUnion(env.DB, [name], keyword);
 ---
 
-<BaseLayout ctx={siteCtx} title={`标签「${name}」`} description={`标签「${name}」下的文集与文章。`}>
-  <div class="page-hero">
-    <a class="page-back reveal in" href="/tags/">← 回到标签</a>
-    <div class="page-hero-card reveal in">
-      <p class="character-kicker">标 引</p>
-      <h1>「{name}」</h1>
-      <p class="lead">
-        {page.collections.length} 部文集 · {page.posts.length} 篇{keyword ? `（寻「${keyword}」）` : ''}
-      </p>
-    </div>
-  </div>
-
-  <section class="section" style="padding-top:56px;">
-    <div style="margin-top:36px;">
-      <TagResults names={[name]} keyword={keyword} collections={union.collections} posts={union.posts} collectionPosts={union.collectionPosts} />
-    </div>
-  </section>
-</BaseLayout>
+<TagDetailTemplate
+  ctx={siteCtx}
+  name={name}
+  keyword={keyword}
+  collectionsCount={page.collections.length}
+  postsCount={page.posts.length}
+  collections={union.collections}
+  posts={union.posts}
+  collectionPosts={union.collectionPosts}
+/>

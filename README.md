@@ -65,14 +65,36 @@ scripts/
   merge-admin.mjs        把 admin/dist 合并进 dist/client/admin
   build-worker.mjs       生成 scheduled-worker.mjs 包装入口
 src/
-  pages/                 页面与 API 路由（见下方「路由」）
-  lib/                   db/（D1 访问，按域拆 10 模块）、ai.ts（AI 调用适配层）、ai-credentials.ts（AES-256-GCM）、markdown.ts（KaTeX/Mermaid/MarkMap/hljs）、auth.ts、utils.ts 等
-  components/            ArticleEnhancer.astro（mermaid/markmap 运行时渲染）
-  styles/                tokens.css、base.css
+  pages/                 核心路由壳（数据查询 + 渲染主题模板，见下方「主题系统」）
+  lib/                   db/（D1 访问，按域拆 10 模块）、theme-context.ts（SiteContext 契约）、i18n.ts（t 工厂）、ai.ts（AI 调用适配层）、ai-credentials.ts（AES-256-GCM）、markdown.ts（KaTeX/Mermaid/MarkMap/hljs）、auth.ts、utils.ts 等
+  core/                  跨主题共享件：SiteHead.astro（CSP/canonical/og 封装）、utils.ts、i18n 出口
+  themes/                主题目录：modern（默认，简约现代）/ classic（纸墨风）；每套含 layouts/templates/components/styles/i18n
 tests/                   node:test 单测 + e2e（按域拆分）
 wrangler.jsonc.template  Workers 配置模板（占位符，可提交）
 .env.example             真实资源 ID 的填法示例
 ```
+
+## 主题系统
+
+站点外观由 `src/themes/<slug>/` 整体定义——每个页面类型一个模板组件（home/collection/post/archive/tag-index/tag-detail/search/standalone/not-found + 可选认证五页），页面壳只负责查数据并把上下文传进来：
+
+```
+src/pages/posts/[slug].astro   # 数据查询 + 守卫
+  └─ <PostTemplate ctx={siteCtx} ... />   # @theme/templates/post.astro
+```
+
+**切换**：`pnpm theme` 查看；`pnpm theme <slug>` 切换（写 `.env` 的 `BLOG_THEME` 并同步 tsconfig），本地 `pnpm dev` 预览、`pnpm deploy` 上线。未设置时默认 `modern`。
+
+**新建主题三步**：
+1. 复制任一现有主题目录为 `src/themes/<slug>/`，改 `theme.json` 的 name/slug；
+2. 改样式与模板——缺失的文件自动回退 `classic`（文件级继承），可只覆盖想改的部分；
+3. `pnpm theme <slug>` 切换预览。
+
+**约束契约**：模板内禁止访问 DB/env（一切经 props 的 `SiteContext`），安全头/CSP 由核心 `<SiteHead>` 统一封装；纯函数（postHref/fmtDate 等）从 `@core/utils` 引用。完整契约见官方主题仓库的 `THEME_DEVELOPMENT.md`。
+
+### 站点文案与语言
+
+后台「设置 → 站点信息」可直接修改界面语言（zh-CN / en）与文案变量：默认描述 `site_tagline`、页脚文案 `footer_line`、搜索框占位 `search_placeholder`、首页题记 `hero_note`。回退链：settings 表 → 环境变量（同名大写键）→ 内置默认。界面词汇归各主题自带词典（`themes/<slug>/i18n.ts`）。
 
 ## 路由
 

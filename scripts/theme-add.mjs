@@ -9,33 +9,15 @@
 // pnpm theme:add <来源> —— 安装主题
 // 来源：官方 <slug> | 本地 ./x.zip | https://...zip | git 仓库 URL
 
-import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, rmSync, mkdtempSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { assertInstallableSlug, inspectZip, unpackZip } from './lib/theme-validate.mjs';
+import { assertInstallableSlug, unpackZip } from './lib/theme-validate.mjs';
+import { fetchOfficialZip } from './lib/official-zip.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const THEMES_DIR = join(ROOT, 'src', 'themes');
-
-function readEnvRepo() {
-  const envFile = join(ROOT, '.env');
-  if (existsSync(envFile)) {
-    const m = /^THEMES_REPO=(.+)$/m.exec(readFileSync(envFile, 'utf8'));
-    if (m) return m[1].trim();
-  }
-  return 'WhiteMoon319/themes_for_blog';
-}
-
-function officialZipUrl(slug, ref = 'main') {
-  return `https://raw.githubusercontent.com/${readEnvRepo()}/${ref}/${slug}/${slug}.zip`;
-}
-
-async function fetchBuffer(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`下载失败 ${res.status}：${url}`);
-  return Buffer.from(await res.arrayBuffer());
-}
 
 function installFromBuffer(buf, slug, { official, force = false }) {
   const problems = assertInstallableSlug(slug);
@@ -73,14 +55,14 @@ async function main() {
     process.exit(2);
   }
 
-  // 官方 slug（保留字/合法性先于网络请求）
+  // 官方 slug（保留字/合法性先于网络请求；下载走多通道回退）
   if (!source.includes('/') && !source.includes('\\') && !source.endsWith('.zip')) {
     const pre = assertInstallableSlug(source);
     if (pre.length > 0) {
       console.error(`❌ ${pre.join('；')}（--force 不豁免保留字）`);
       process.exit(1);
     }
-    const buf = await fetchBuffer(officialZipUrl(source));
+    const buf = await fetchOfficialZip(source);
     installFromBuffer(buf, source, { official: true, force });
     return;
   }
@@ -95,7 +77,12 @@ async function main() {
   // 远程 zip URL
   if (/^https?:\/\//.test(source) && source.endsWith('.zip')) {
     console.log('⚠️  该来源未经官方审核，安装前请自行确认内容可信。');
-    const buf = await fetchBuffer(source);
+    const res = await fetch(source);
+    if (!res.ok) {
+      console.error(`❌ 下载失败 ${res.status}：${source}`);
+      process.exit(1);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
     const slugGuess = basename(new URL(source).pathname).replace(/\.zip$/i, '');
     installFromBuffer(buf, slugGuess, { official: false, force });
     return;
@@ -110,7 +97,6 @@ async function main() {
       const repoDir = join(tmp, 'repo');
       let themeRoot = repoDir;
       if (!existsSync(join(repoDir, 'theme.json'))) {
-        const { readdirSync, statSync } = await import('node:fs');
         const candidates = readdirSync(repoDir).filter((n) => statSync(join(repoDir, n)).isDirectory() && existsSync(join(repoDir, n, 'theme.json')));
         if (candidates.length !== 1) {
           console.error('❌ 仓库根与其子目录中未能唯一定位 theme.json');

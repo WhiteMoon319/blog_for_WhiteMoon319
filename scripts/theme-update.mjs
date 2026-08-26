@@ -11,18 +11,10 @@
 import { existsSync, readFileSync, rmSync, renameSync, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { unpackZip } from './lib/theme-validate.mjs';
+import { fetchOfficialZip } from './lib/official-zip.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const THEMES_DIR = join(ROOT, 'src', 'themes');
-
-function readEnvRepo() {
-  const envFile = join(ROOT, '.env');
-  if (existsSync(envFile)) {
-    const m = /^THEMES_REPO=(.+)$/m.exec(readFileSync(envFile, 'utf8'));
-    if (m) return m[1].trim();
-  }
-  return 'WhiteMoon319/themes_for_blog';
-}
 
 async function main() {
   const arg = process.argv[2];
@@ -38,17 +30,17 @@ async function main() {
   }
   const local = JSON.parse(readFileSync(join(target, 'theme.json'), 'utf8'));
 
-  const repo = readEnvRepo();
   const ref = wantVersion ? `refs/tags/${slug}-v${wantVersion}` : 'main';
-  const url = `https://raw.githubusercontent.com/${repo}/${ref}/${slug}/${slug}.zip`;
-  console.log(`⬇️  拉取 ${url}`);
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`❌ 下载失败 ${res.status}（${wantVersion ? `tag ${slug}-v${wantVersion} 不存在？` : '检查网络或仓库名'}）`);
+  let buf;
+  try {
+    buf = await fetchOfficialZip(slug, {
+      ref,
+      onChannel: (name) => console.log(`ℹ  主通道不可达，回退 ${name}…`),
+    });
+  } catch (e) {
+    console.error(`❌ ${e.message}`);
     process.exit(1);
   }
-  const buf = Buffer.from(await res.arrayBuffer());
 
   // 校验通过后原子替换：先解到临时目录再整体换名
   const staging = join(THEMES_DIR, `.${slug}.staging`);

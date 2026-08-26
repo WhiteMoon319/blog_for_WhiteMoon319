@@ -13,6 +13,8 @@ interface Props {
   noindex?: boolean;
   image?: string;
   faviconHref?: string;
+  /** RSS 订阅标题（词汇归主题，由调用方按 locale 翻译后传入） */
+  rssTitle?: string;
 }
 
 const { ctx, title, keywords, noindex = false, faviconHref } = Astro.props;
@@ -37,7 +39,7 @@ const fullTitle = title ? `${title}｜${ctx.siteName}` : ctx.siteName;
 {keywords && <meta name="keywords" content={keywords} />}
 <meta name="theme-color" content="#faf7f2" />
 {noindex && <meta name="robots" content="noindex, nofollow" />}
-<link rel="alternate" type="application/rss+xml" title={ctx.t('rss.title')} href="/feed.xml" />
+<link rel="alternate" type="application/rss+xml" title={Astro.props.rssTitle ?? 'RSS'} href="/feed.xml" />
 <link rel="canonical" href={canonical} />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content={ctx.siteName} />

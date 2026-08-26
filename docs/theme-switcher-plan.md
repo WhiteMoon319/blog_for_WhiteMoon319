@@ -99,13 +99,13 @@ scripts/          collection-anim.ts 等主题自有脚本（随组件走）
 
 存储与回退链：settings 表「站点文案」组 → 同名 Workers 变量 → 内置默认（复用 `/api/settings` 既有的 `entries ?? env ?? defaults` 合并模式，新增键进白名单即可）。**优先级规则**：同 key 时 `copy.*` 覆盖 `t()` 默认值，且 copy 无 locale 维度——站长自配文案不随语言翻译属预期行为。
 
-### 2.4 i18n（站点级）
+### 2.4 i18n（站点级，v3.2 定稿：词汇归主题、机制归核心）
 
-- `src/lib/i18n.ts`：字典 `{ 'zh-CN', 'en' }` + `t(key, params?)`；settings 选 locale。v1 仅站点级。
-- **服务端**：核心全部 UI 字符串过 t()；日期经 `Intl.DateTimeFormat(locale)`。
-- **客户端**（评审补充的机制缺口）：标准模式 = 服务端将所需 key 序列化为 `data-i18n` 属性或 `define:vars` JSON island，配核心提供的轻量客户端查表运行时；登录错误提示、nav aria-label、评论 UI 等浏览器端文案一律走此通道。纳入 engine_version="1" 首发契约。
-- **范围裁定**：classic/modern 两套官方主题的 chrome 字符串（区块标题、CTA、空态等）全量 t() 化；第三方主题不承诺翻译（作者可用 t 亦可自带文案）。
-- 首发语言 zh-CN 完整、en 全量；SiteContext 增加 `locale/t/copy` 随本次并入契约首发。
+- **机制层** `@core/i18n`（唯一合法主题导入路径）：`LOCALES/isLocale/makeT(locale, dicts)` 纯机制，零词典；lib/i18n 为其单源。
+- **词典层归主题**：各主题在自身目录维护字典并导出 t 工厂（如 `themes/classic/i18n.ts` 的 `classicT(locale)`）；第三方主题同理自带词汇——与 WP 主题 text-domain 模型同构。
+- **契约**：SiteContext 仅携带 `locale` 与路由键 `nav: [{key, href}]`（home/archive/tags/search/about），不预置任何语言文案；主题按 key 自行取词。核心组件（SiteHead）所需个别词条由调用方翻译后经 props 传入（如 rssTitle）。
+- **客户端字符串**：标准模式 = 服务端将所需 key 序列化为 `data-i18n` 属性或 `define:vars` JSON island + 核心轻量查表运行时；纳入 engine_version="1" 契约。
+- **范围**：站点 locale 由 settings 驱动（v1 仅站点级）；日期经 `Intl.DateTimeFormat(locale)`。首发 zh-CN 完整、en 覆盖 classic 全部 chrome 词表；第三方主题不承诺翻译。
 
 ## 3. 解析、切换与类型检查（评审修订）
 

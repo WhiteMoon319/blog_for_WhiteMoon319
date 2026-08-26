@@ -14,7 +14,7 @@ import type { APIContext } from 'astro';
 import { envOf } from './db/index.ts';
 import { resolveUser } from './auth.ts';
 import { getAllSettings } from './db/settings.ts';
-import { DEFAULT_LOCALE, isLocale, makeT, ogLocale, type Locale, type TFunc } from './i18n.ts';
+import { DEFAULT_LOCALE, isLocale, type Locale } from './i18n.ts';
 
 export interface SiteUser {
   loggedIn: boolean;
@@ -23,9 +23,10 @@ export interface SiteUser {
   emailVerified: boolean;
 }
 
+/** 路由键是核心契约，词汇由主题按 key 自行翻译（见各主题 i18n 字典） */
 export interface NavLink {
+  key: 'home' | 'archive' | 'tags' | 'search' | 'about';
   href: string;
-  label: string;
 }
 
 export interface SiteContext {
@@ -41,7 +42,6 @@ export interface SiteContext {
   /** 首页可选题记位（copy.hero_note），空串表示不展示 */
   heroNote: string;
   locale: Locale;
-  t: TFunc;
   user: SiteUser;
   nav: NavLink[];
   /** R2 公开基址（尾斜杠剥离），供评论图片等使用 */
@@ -71,11 +71,10 @@ export async function getSiteContext(ctx: APIContext): Promise<SiteContext> {
   } catch (e) {
     // 上下文组装失败时降级为最小可用上下文，保证页面仍可渲染（与计划的降级保障一致）
     console.error('[theme-context] build failed:', e);
-    const t = makeT(DEFAULT_LOCALE);
     return {
       siteName: 'blog', siteUrl: '', slogan: '', footerLine: '',
       tagline: COPY_DEFAULTS.site_tagline, searchPlaceholder: '', heroNote: '',
-      locale: DEFAULT_LOCALE, t,
+      locale: DEFAULT_LOCALE,
       user: { loggedIn: false, name: '', isAdmin: false, emailVerified: false },
       nav: [], r2Base: '',
     };
@@ -95,7 +94,6 @@ async function buildSiteContext(ctx: APIContext): Promise<SiteContext> {
 
   const localeRaw = firstNonEmpty(entries['site_locale'], '');
   const locale: Locale = isLocale(localeRaw) ? localeRaw : DEFAULT_LOCALE;
-  const t = makeT(locale);
 
   const raw = ctx.cookies.get('blog_session')?.value ? await resolveUser(ctx) : null;
   const user: SiteUser = raw
@@ -113,20 +111,17 @@ async function buildSiteContext(ctx: APIContext): Promise<SiteContext> {
     slogan: pick('SITE_SLOGAN', env.SITE_SLOGAN, ''),
     footerLine: pick('footer_line', env.FOOTER_LINE, '') || pick('SITE_POEM', env.SITE_POEM, '月下少辞令，醉后自逍遥。'),
     tagline: pick('site_tagline', env.SITE_TAGLINE, COPY_DEFAULTS.site_tagline),
-    searchPlaceholder: pick('search_placeholder', env.SEARCH_PLACEHOLDER, t('nav.search') + '……'),
+    searchPlaceholder: pick('search_placeholder', env.SEARCH_PLACEHOLDER, ''),
     heroNote: pick('hero_note', env.HERO_NOTE, ''),
     locale,
-    t,
     user,
     nav: [
-      { href: '/', label: t('nav.home') },
-      { href: '/archive/', label: t('nav.archive') },
-      { href: '/tags/', label: t('nav.tags') },
-      { href: '/search/', label: t('nav.search') },
-      { href: '/about/', label: t('nav.about') },
+      { key: 'home', href: '/' },
+      { key: 'archive', href: '/archive/' },
+      { key: 'tags', href: '/tags/' },
+      { key: 'search', href: '/search/' },
+      { key: 'about', href: '/about/' },
     ],
     r2Base: (env.R2_PUBLIC_URL || '').replace(/\/+$/, ''),
   };
 }
-
-export { ogLocale };

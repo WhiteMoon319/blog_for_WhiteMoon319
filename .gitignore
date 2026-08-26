@@ -17,3 +17,7 @@ PLAN.md
 #agent目录
 .pai
 docs/comments-readers-plan.md
+
+/src/themes/*
+!/src/themes/classic
+!/src/themes/modern

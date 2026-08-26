@@ -69,6 +69,9 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       miniflare:
         specifier: 5.20260811.1-alpha
         version: 5.20260811.1-alpha
@@ -2524,6 +2527,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   find-process@2.1.1:
     resolution: {integrity: sha512-SrQDx3QhlmHM90iqn9rdjCQcw/T+WlpOkHFsjoRgB+zTpDfltNA1VSNYeYELwhUTJy12UFxqjWhmhOrJc+o4sA==}
@@ -6122,6 +6128,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
+
+  fflate@0.8.3: {}
 
   find-process@2.1.1:
     dependencies:

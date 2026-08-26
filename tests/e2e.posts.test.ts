@@ -227,17 +227,19 @@ test('e2e：搜索页按关键字命中已刊文章', async () => {
 
   const miss = await c.get('/search/?q=不存在的关键字XYZ');
   assert.equal(miss.status, 200);
-  assert.ok((await miss.text()).includes('未寻得'));
+  const missHtml = await miss.text();
+  // 主题无关：classic「未寻得…」/ modern「未找到与…」
+  assert.ok(missHtml.includes('未寻得') || missHtml.includes('未找到'), '空态应渲染无结果文案');
 });
 
 test('e2e：文章页阅读量递增并展示', async () => {
   if (!HAS_BUILD) return;
   const first = await c.get('/collections/essays/first-post/');
   assert.equal(first.status, 200);
-  const m1 = (await first.text()).match(/阅 (\d+)/);
+  const m1 = (await first.text()).match(/data-views="(\d+)"/);
   assert.ok(m1, '文章页应展示阅读数');
   const second = await c.get('/collections/essays/first-post/');
-  const m2 = (await second.text()).match(/阅 (\d+)/);
+  const m2 = (await second.text()).match(/data-views="(\d+)"/);
   assert.ok(m2);
   assert.ok(Number(m2[1]) > Number(m1[1]), '再次访问阅读数应递增');
 });
@@ -585,11 +587,13 @@ test('e2e：删除文集后冲突文章确定性改 slug 并保持可访问', as
   await c.login();
   const col = await c.post('/api/collections', { title: '散集', slug: 'scatter-col' });
   assert.equal(col.status, 201);
-  const colId = (await col.json()).collection.id as number;
+  const colId = ((await col.json()).collection).id as number;
   const inCol = await c.post('/api/posts', { title: '入集篇', slug: 'shared-x', collection_id: colId, status: 'published' });
   assert.equal(inCol.status, 201);
+  const inColId = ((await inCol.json()).post).id as number;
   const uncat = await c.post('/api/posts', { title: '散落篇', slug: 'shared-x', status: 'published' });
   assert.equal(uncat.status, 201);
+  const uncatId = ((await uncat.json()).post).id as number;
 
   const delCol = await c.del(`/api/collections/${colId}`);
   assert.equal(delCol.status, 200, '删除文集不应因冲突而 500');
@@ -597,13 +601,11 @@ test('e2e：删除文集后冲突文章确定性改 slug 并保持可访问', as
   const list = await c.get('/api/posts?status=all');
   const body = await list.json();
   const posts = body.posts as Array<{ id: number; slug: string; collection_id: number | null }>;
-  const inColId = (await inCol.json()).post.id as number;
   const moved = posts.find((p) => p.id === inColId);
   assert.ok(moved, '集内文章应保留');
   assert.equal(moved.collection_id, null, '文集删除后转未分类');
   assert.equal(moved.slug, 'shared-x-2', '冲突者获得确定性后缀 -2');
 
-  const uncatId = (await uncat.json()).post.id as number;
   const keeper = posts.find((p) => p.id === uncatId);
   assert.equal(keeper?.slug, 'shared-x', '较新一篇保留原 slug');
 
@@ -829,8 +831,8 @@ test('e2e：搜索单独 # 时展示空态，不按字面检索', async () => {
   const res = await c.get('/search/?q=%23');
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.ok(!html.includes('未寻得「#」'), '不得按字面 # 检索');
-  assert.ok(html.includes('输入关键字，遍寻全卷'), '应展示空态提示');
+  assert.ok(!html.includes('未寻得「#」') && !html.includes('未找到与「#」'), '不得按字面 # 检索');
+  assert.ok(html.includes('action="/search/"'), '应展示搜索表单（空态提示区）');
 });
 
 test('e2e：批量刊发/撤稿推进版本史，过期编辑器保存 409', async () => {

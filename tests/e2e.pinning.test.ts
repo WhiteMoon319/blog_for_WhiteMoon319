@@ -59,7 +59,7 @@ test('e2e：首页置顶区——仅已发布未删除的置顶文章，时间�
   assert.equal(home.status, 200);
   const html = await home.text();
   assert.ok(html.includes('id="pinned"'), '应渲染置顶区');
-  assert.ok(html.includes('置于案头'), '置顶区标题');
+  assert.ok(html.includes('置于案头') || html.includes('置顶'), '置顶区标题');
   const iNewer = html.indexOf('/posts/pin-newer/');
   const iOlder = html.indexOf('/posts/pin-older/');
   assert.ok(iNewer !== -1 && iOlder !== -1, '两篇置顶都应出现');

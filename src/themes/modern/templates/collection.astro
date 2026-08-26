@@ -1,0 +1,82 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Pagination from '@theme/components/Pagination.astro';
+import { modernT } from '../i18n';
+
+interface CollectionRow {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string;
+  theme_color: string;
+  sort_order: number;
+  post_order: 'asc' | 'desc';
+}
+interface PostRow {
+  id: number;
+  collection_id: number | null;
+  slug: string;
+  title: string;
+  summary: string;
+  cover_url: string;
+  created_at: string;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** JSON-LD 序列化产物（页面壳经 safeJsonLd 生成） */
+  jsonLd: string;
+  collection: CollectionRow;
+  posts: PostRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+const { ctx, jsonLd, collection, posts, total, page, totalPages } = Astro.props;
+const t = modernT(ctx.locale);
+---
+
+<BaseLayout ctx={ctx} title={collection.title} description={collection.summary}>
+  <script type="application/ld+json" set:html={jsonLd} />
+  <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
+    <a class="page-back reveal in" href="/">{t('common.back_home')}</a>
+
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('collection.kicker')}</p>
+      <h1>{collection.title}</h1>
+      {collection.summary && <p class="lead">{collection.summary}</p>}
+      <div class="facts">
+        <span>{t('collection.total', { total })}</span>
+        <span>{t('collection.order', { order: collection.sort_order })}</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:48px;">
+    {
+      posts.length > 0 ? (
+        <div class="posts-grid">
+          {posts.map((p) => (
+            <a class="post-card reveal" href={postHref(p.slug, collection.slug)} style={`--cc: ${collection.theme_color};`}>
+              {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+              <h3 class="post-title">{p.title}</h3>
+              {p.summary && <p class="post-summary">{p.summary}</p>}
+              <div class="post-meta">
+                <span class="post-tag">{collection.title}</span>
+                <span>{fmtDate(p.created_at)}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead" style="text-align:center;">{t('collection.empty')}</p>
+      )
+    }
+    <Pagination current={page} totalPages={totalPages} base={`/collections/${collection.slug}/`} query="" />
+  </section>
+</BaseLayout>

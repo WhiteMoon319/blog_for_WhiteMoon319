@@ -1,0 +1,134 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TagResults from '../components/TagResults.astro';
+import { modernT } from '../i18n';
+
+interface TagCountRow {
+  id: number;
+  name: string;
+  created_at: string;
+  collections: number;
+  posts: number;
+  total: number;
+}
+interface UnionCollection {
+  id: number;
+  title: string;
+  summary: string;
+  post_count: number;
+}
+interface UnionPost {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  collection_slug: string | null;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 已选标签名（searchParams 解码后） */
+  selected: string[];
+  keyword: string;
+  tags: TagCountRow[];
+  collections: UnionCollection[];
+  posts: UnionPost[];
+  /** collection_id -> 该集内命中文章 */
+  collectionPosts: Map<number, UnionPost[]>;
+}
+
+const { ctx, selected, keyword, tags, collections, posts, collectionPosts } = Astro.props;
+const t = modernT(ctx.locale);
+
+function toggleHref(name: string): string {
+  const next = selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name];
+  const params = new URLSearchParams();
+  next.forEach((n) => params.append('t', n));
+  if (keyword.trim()) params.set('q', keyword.trim());
+  const qs = params.toString();
+  return qs ? `/tags/?${qs}` : '/tags/';
+}
+
+const lead =
+  selected.length > 0
+    ? `${t('tags.selected_lead', { names: selected.join(' · ') })}${keyword ? t('tags.selected_keyword', { keyword }) : ''}`
+    : t('tags.default_lead');
+---
+
+<BaseLayout ctx={ctx} title={t('tags.title')} description={t('tags.default_lead')}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">{t('common.back_home')}</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('tags.kicker')}</p>
+      <h1>{t('tags.title')}</h1>
+      <p class="lead">{lead}</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:48px;">
+    {
+      tags.length > 0 && (
+        <div class="tag-cloud">
+          {tags.map((tag) => (
+            <a class={`tag-chip${selected.includes(tag.name) ? ' is-active' : ''}`} href={toggleHref(tag.name)}>
+              {tag.name}
+              <span class="tag-count">{t('tags.count', { collections: tag.collections, posts: tag.posts })}</span>
+            </a>
+          ))}
+        </div>
+      )
+    }
+
+    {
+      selected.length > 0 && (
+        <form class="tag-search reveal in" action="/tags/" method="get" role="search">
+          {selected.map((n) => (
+            <input type="hidden" name="t" value={n} />
+          ))}
+          <input
+            class="tag-search-input"
+            type="search"
+            name="q"
+            value={keyword}
+            placeholder={t('tags.search_placeholder')}
+            aria-label={t('tags.search_aria')}
+          />
+          <button class="btn btn-ghost" type="submit">{t('tags.search_button')}</button>
+        </form>
+      )
+    }
+
+    <div style="margin-top:36px;">
+      <TagResults locale={ctx.locale} names={selected} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} />
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .tag-search {
+    display: flex;
+    gap: 12px;
+    max-width: 520px;
+    margin: 24px auto 0;
+  }
+  .tag-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 14px;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--ink-deep);
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+  .tag-search-input:focus {
+    border-color: var(--cinnabar);
+    box-shadow: 0 0 0 3px var(--cinnabar-line);
+  }
+</style>

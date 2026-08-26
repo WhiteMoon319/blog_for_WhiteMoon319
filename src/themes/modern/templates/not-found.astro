@@ -1,0 +1,36 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { modernT } from '../i18n';
+
+interface Props {
+  ctx: SiteContext;
+}
+
+const { ctx } = Astro.props;
+const t = modernT(ctx.locale);
+---
+
+<BaseLayout ctx={ctx} title={t('nf.title')} description={t('nf.lead')}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">{t('common.back_home')}</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('nf.kicker')}</p>
+      <h1>{t('nf.title')}</h1>
+      <p class="lead">{t('nf.lead')}</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:48px;">
+    <div class="colophon reveal">
+      <p>{t('nf.line')}</p>
+      <p style="margin-top:20px;">
+        <a class="btn btn-primary" href="/">{t('nf.home')}</a>
+        <a class="btn btn-ghost" href="/archive/" style="margin-left:8px;">{t('nf.archive')}</a>
+        <a class="btn btn-ghost" href="/search/" style="margin-left:8px;">{t('nf.search')}</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

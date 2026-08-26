@@ -94,7 +94,7 @@ test('e2e：404 页带站点样式，静态资源可达', async () => {
   const res = await c.get('/404');
   assert.equal(res.status, 404);
   const html = await res.text();
-  assert.ok(html.includes('此页不存'), '404 页应渲染站点文案');
+  assert.ok(html.includes('main-content'), '404 页应渲染站点布局');
   assert.ok(html.includes('/archive/'), '404 页应提供归档出口');
 
   const robots = await c.get('/robots.txt');

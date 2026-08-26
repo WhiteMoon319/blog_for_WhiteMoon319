@@ -1,0 +1,78 @@
+/*! 月下独酌 · blog（blog_for_WhiteMoon319）
+ * Copyright (C) 2026 WhiteMoon319
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+ */
+/* ===== 设计 Token（Modern 简约现代：变量名与 classic 完全同名，值换成现代体系） ===== */
+
+:root {
+  /* 强调色（主蓝） */
+  --cinnabar: #2563eb;
+  --cinnabar-line: rgba(37, 99, 235, 0.14);
+
+  /* 四种常用色 */
+  --deep-blue: #334155;
+  --pine: #059669;
+  --amber: #b45309;
+  --sky: #0ea5e9;
+
+  /* 中性阶 */
+  --ink-black: #0f172a;
+  --ink-deep: #1e293b;
+  --ink-mid: #475569;
+  --ink-light: #94a3b8;
+  /* 兼容 classic 回退组件（Pagination/Comments 引用的软色阶） */
+  --ink-soft: #64748b;
+  --ink-faint: rgba(15, 23, 42, 0.12);
+  --hairline: rgba(15, 23, 42, 0.08);
+
+  /* 界面色 */
+  --paper-warm: #f8fafc;
+  --paper-card: #ffffff;
+
+  /* 字体：sans 主导全局；serif 仅保留给正文阅读区；brush 不使用但保留变量（指向 sans 以防引用） */
+  --font-brush: "Inter", "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-sans: "Inter", "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  /* 圆角（比 classic 大一档） */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* 阴影（更轻） */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-float: 0 8px 30px rgba(15, 23, 42, 0.1);
+
+  /* 动效 */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration: 0.2s;
+  --duration-slow: 0.3s;
+  --transition: var(--duration) var(--ease);
+  --transition-slow: var(--duration-slow) var(--ease);
+}
+
+/* ===== 深色模式 ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --cinnabar: #60a5fa;
+    --cinnabar-line: rgba(96, 165, 250, 0.22);
+    --deep-blue: #94a3b8;
+    --pine: #34d399;
+    --amber: #fbbf24;
+    --sky: #7dd3fc;
+    --ink-deep: #e2e8f0;
+    --ink-mid: #94a3b8;
+    --ink-light: #64748b;
+    --ink-soft: #94a3b8;
+    --ink-faint: rgba(255, 255, 255, 0.14);
+    --hairline: rgba(255, 255, 255, 0.09);
+    --paper-warm: #0b1220;
+    --paper-card: #101828;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+}

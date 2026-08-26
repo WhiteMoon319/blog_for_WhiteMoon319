@@ -1,0 +1,74 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Pagination from '@theme/components/Pagination.astro';
+import { modernT } from '../i18n';
+
+interface ArchivePost {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+}
+interface Group {
+  year: string;
+  posts: { post: ArchivePost; collection: { slug: string; title: string } | null }[];
+}
+
+interface Props {
+  ctx: SiteContext;
+  total: number;
+  page: number;
+  totalPages: number;
+  groups: Group[];
+}
+
+const { ctx, total, page, totalPages, groups } = Astro.props;
+const t = modernT(ctx.locale);
+---
+
+<BaseLayout ctx={ctx} title={t('archive.title')} description={t('archive.lead', { total })}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">{t('common.back_home')}</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('archive.kicker')}</p>
+      <h1>{t('archive.title')}</h1>
+      <p class="lead">{t('archive.lead', { total })}</p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:48px;">
+    {
+      groups.length > 0 ? (
+        <div class="timeline">
+          {groups.map((g) => (
+            <>
+              <div class="tl-era">{t('archive.year_posts', { year: g.year, count: g.posts.length })}</div>
+              {g.posts.map(({ post, collection }) => (
+                <div class="tl-item">
+                  <a href={postHref(post.slug, collection?.slug)}>
+                    <div class="tl-event">{post.title}<span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span></div>
+                    <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
+                  </a>
+                </div>
+              ))}
+            </>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead" style="text-align:center;">{t('archive.empty')}</p>
+      )
+    }
+    <Pagination current={page} totalPages={totalPages} base="/archive/" query="" />
+  </section>
+</BaseLayout>
+
+<style>
+  .tl-col {
+    font-weight: 500;
+    color: var(--ink-light);
+  }
+</style>

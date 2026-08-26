@@ -1,0 +1,153 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { modernT } from '../i18n';
+
+interface CollectionRow {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string;
+  theme_color: string;
+}
+interface PostRow {
+  id: number;
+  collection_id: number | null;
+  slug: string;
+  title: string;
+  summary: string;
+  cover_url: string;
+  created_at: string;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 站名/口号/题记：取原始 env 文案（不经 settings 覆盖链），保持卷首文案与历史版本一致 */
+  siteName: string;
+  slogan: string;
+  poem: string;
+  collections: CollectionRow[];
+  pinnedPosts: PostRow[];
+  latestPosts: PostRow[];
+}
+
+const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
+const t = modernT(ctx.locale);
+---
+
+<BaseLayout ctx={ctx} title={t('home.title')} description={slogan}>
+  <header class="hero" id="top">
+    <h1 class="hero-title reveal in">{siteName}</h1>
+    <p class="hero-en">{slogan}</p>
+    {poem && <p class="hero-poem">{poem}</p>}
+
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#portals">{t('home.cta_primary')}</a>
+      <a class="btn btn-ghost" href="#about">{t('home.cta_about')}</a>
+    </div>
+  </header>
+
+  <section class="section" id="portals">
+    <div class="section-head reveal">
+      <span class="kicker">{t('home.portals_kicker')}</span>
+      <h2 class="section-title">{t('home.portals_title')}</h2>
+      <p class="section-lead">{t('home.portals_lead')}</p>
+    </div>
+
+    {
+      collections.length > 0 ? (
+        <div class="portal-grid">
+          {collections.map((c) => (
+            <a class="portal-card reveal" href={`/collections/${encodeURI(c.slug)}/`} style={`--pc: ${c.theme_color};`}>
+              <h3>{c.title}</h3>
+              <p class="portal-sub">{c.summary}</p>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead">{t('home.portals_empty')}</p>
+      )
+    }
+  </section>
+
+  {
+    pinnedPosts.length > 0 && (
+      <section class="section" id="pinned">
+        <div class="section-head reveal">
+          <span class="kicker">{t('home.pinned_kicker')}</span>
+          <h2 class="section-title">{t('home.pinned_title')}</h2>
+          <p class="section-lead">{t('home.pinned_lead')}</p>
+        </div>
+
+        <div class="posts-grid">
+          {pinnedPosts.map((p) => {
+            const col = collections.find((c) => c.id === p.collection_id);
+            return (
+              <a class="post-card reveal" href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
+                {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" id="latest">
+    <div class="section-head reveal">
+      <span class="kicker">{t('home.latest_kicker')}</span>
+      <h2 class="section-title">{t('home.latest_title')}</h2>
+      <p class="section-lead">{t('home.latest_lead')}</p>
+    </div>
+
+    {
+      latestPosts.length > 0 ? (
+        <div class="posts-grid">
+          {latestPosts.map((p) => {
+            const col = collections.find((c) => c.id === p.collection_id);
+            return (
+              <a class="post-card reveal" href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
+                {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{p.title}</h3>
+                {p.summary && <p class="post-summary">{p.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(p.created_at)}</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      ) : (
+        <p class="section-lead">{t('home.posts_empty')}</p>
+      )
+    }
+  </section>
+
+  <section class="epigraph" id="epigraph">
+    <div class="reveal">
+      <blockquote>{t('home.epigraph_quote')}</blockquote>
+      <cite>{t('home.epigraph_cite')}</cite>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="colophon reveal">
+      <p>{t('home.about_line', { name: siteName })}</p>
+      <p>{slogan}</p>
+      <p style="margin-top:20px;">
+        <a class="btn btn-primary" href="/archive/">{t('home.about_archive')}</a>
+        <a class="btn btn-ghost" href="#top" style="margin-left:8px;">{t('home.about_top')}</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

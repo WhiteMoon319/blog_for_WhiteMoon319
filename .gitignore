@@ -21,3 +21,4 @@ docs/comments-readers-plan.md
 /src/themes/*
 !/src/themes/classic
 !/src/themes/modern
+.vscode/settings.json

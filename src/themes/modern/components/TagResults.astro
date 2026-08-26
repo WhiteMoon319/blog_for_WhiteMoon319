@@ -1,0 +1,250 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 纯展示组件（Modern 版）：数据由页面壳查询后传入，此处禁止访问 DB/env。
+// 数据 props 签名与 classic 完全一致；文案改用本主题词典的现代语态。
+import { postHref, fmtDate } from '@core/utils';
+import { DEFAULT_LOCALE, type Locale } from '@core/i18n';
+import { modernT } from '../i18n';
+
+interface CollectionRow {
+  id: number;
+  title: string;
+  summary: string;
+  post_count: number;
+}
+interface PostRow {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  collection_slug: string | null;
+}
+
+interface Props {
+  names: string[];
+  keyword?: string;
+  collections: CollectionRow[];
+  posts: PostRow[];
+  /** collection_id -> 该集内命中文章 */
+  collectionPosts: Map<number, PostRow[]>;
+  /** 可选：调用模板有 ctx 时传入以支持 en 词表，缺省回退站点默认语言 */
+  locale?: Locale;
+}
+
+const { names, keyword = '', collections, posts, collectionPosts, locale = DEFAULT_LOCALE } = Astro.props;
+const t = modernT(locale);
+const active = names.length > 0;
+const blockMeta = (count: number): string =>
+  active ? t('tr.block_meta', { count, names: names.join(' / ') }) : t('tr.meta_plain', { count });
+---
+
+{
+  collections.length > 0 && (
+    <div class="tag-collections">
+      {collections.map((c) => {
+        const members = collectionPosts.get(c.id) ?? [];
+        return (
+          <details class="collection-block">
+            <summary>
+              <div class="collection-title-row">
+                <h3 class="post-title">{c.title}</h3>
+                <span class="collection-meta">{blockMeta(c.post_count)}</span>
+              </div>
+              {c.summary && <p class="post-summary">{c.summary}</p>}
+            </summary>
+            {members.length > 0 && (
+              <div class="collection-anim">
+                <ul class="collection-members">
+                  {members.map((p) => (
+                    <li>
+                      <a href={postHref(p.slug, p.collection_slug)}>
+                        {p.title}
+                        <span class="member-date">{fmtDate(p.created_at)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </details>
+        );
+      })}
+    </div>
+  )
+}
+
+{
+  posts.length > 0 && (
+    <>
+      <div class="section-head" style="margin-top:44px;">
+        <span class="kicker">{t('tr.kicker')}</span>
+        <h2 class="section-title">{keyword ? t('tr.title_keyword') : t('tr.title_plain')}</h2>
+      </div>
+      <div class="posts-grid">
+        {posts.map((p) => (
+          <a class="post-card" href={postHref(p.slug, p.collection_slug)}>
+            <h3 class="post-title">{p.title}</h3>
+            {p.summary && <p class="post-summary">{p.summary}</p>}
+            <div class="post-meta">
+              <span>{fmtDate(p.created_at)}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </>
+  )
+}
+
+{
+  collections.length === 0 && posts.length === 0 && (
+    <p class="section-lead" style="text-align:center;">
+      {keyword ? t('tr.empty_keyword', { keyword }) : active ? t('tr.empty_tag') : t('tr.empty_all')}
+    </p>
+  )
+}
+
+<style>
+  .tag-collections {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .collection-block {
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    transition: border-color var(--transition);
+  }
+  .collection-block:hover,
+  .collection-block[open] {
+    border-color: color-mix(in srgb, var(--cinnabar) 30%, transparent);
+  }
+  .collection-block summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    padding-left: 1.2em;
+    position: relative;
+  }
+  .collection-block summary::-webkit-details-marker {
+    display: none;
+  }
+  .collection-block summary::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    top: 0.12em;
+    color: var(--cinnabar);
+    transition: transform var(--transition);
+  }
+  .collection-block[open] summary::before {
+    transform: rotate(90deg);
+  }
+  .collection-block summary:hover .post-title {
+    color: var(--cinnabar);
+  }
+  .collection-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .collection-title-row .post-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ink-deep);
+  }
+  .collection-meta {
+    font-size: 0.72rem;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+  .collection-title-row + .post-summary {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--ink-mid);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .collection-anim {
+    overflow: hidden;
+    height: 0;
+    transition: height var(--duration-slow) var(--ease);
+  }
+  .collection-members {
+    margin: 14px 0 0;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--hairline);
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .collection-members li {
+    font-size: 0.92rem;
+    line-height: 2.1;
+  }
+  .collection-members a {
+    color: var(--ink-mid);
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+  }
+  .collection-members a:hover {
+    color: var(--cinnabar);
+    background: color-mix(in srgb, var(--cinnabar) 6%, transparent);
+  }
+  .member-date {
+    font-size: 0.75rem;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  // 文集卡开合高度动画（简化版）：展开走原生 toggle，收起先动画到 0 再真正关闭
+  const dur = 300;
+  document.querySelectorAll<HTMLDetailsElement>('details.collection-block').forEach((details) => {
+    const inner = details.querySelector<HTMLElement>('.collection-anim');
+    const summary = details.querySelector<HTMLElement>('summary');
+    if (!inner || !summary) return;
+
+    const animateTo = (from: number, target: number, done?: () => void) => {
+      inner.style.transition = 'none';
+      inner.style.height = `${from}px`;
+      void inner.offsetHeight;
+      inner.style.transition = '';
+      inner.style.height = `${target}px`;
+      inner.addEventListener('transitionend', function onEnd() {
+        inner.removeEventListener('transitionend', onEnd);
+        done?.();
+      });
+    };
+
+    details.addEventListener('toggle', () => {
+      if (details.open && !inner.dataset.closing) animateTo(0, inner.scrollHeight);
+    });
+
+    summary.addEventListener('click', (e) => {
+      if (!details.open || inner.dataset.closing === '1') return;
+      e.preventDefault();
+      inner.dataset.closing = '1';
+      setTimeout(() => {
+        delete inner.dataset.closing;
+        details.open = false;
+        inner.style.height = '0px';
+      }, dur);
+      animateTo(inner.scrollHeight, 0);
+    });
+  });
+</script>

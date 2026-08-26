@@ -1,0 +1,58 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import type { SiteContext } from '../../../lib/theme-context.ts';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TagResults from '../components/TagResults.astro';
+import { modernT } from '../i18n';
+
+interface UnionCollection {
+  id: number;
+  title: string;
+  summary: string;
+  post_count: number;
+}
+interface UnionPost {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  collection_slug: string | null;
+}
+
+interface Props {
+  ctx: SiteContext;
+  /** 标签名（Astro.params 解码后） */
+  name: string;
+  keyword: string;
+  /** 标签下文集/文章计数（页面壳 getTagPage 查询所得） */
+  collectionsCount: number;
+  postsCount: number;
+  collections: UnionCollection[];
+  posts: UnionPost[];
+  /** collection_id -> 该集内命中文章 */
+  collectionPosts: Map<number, UnionPost[]>;
+}
+
+const { ctx, name, keyword, collectionsCount, postsCount, collections, posts, collectionPosts } = Astro.props;
+const t = modernT(ctx.locale);
+---
+
+<BaseLayout ctx={ctx} title={`${t('tags.title')}「${name}」`} description={`${t('tags.default_lead')}`}>
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/tags/">{t('common.back_tags')}</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('tags.kicker')}</p>
+      <h1>{name}</h1>
+      <p class="lead">
+        {t('tags.detail_lead', { collections: collectionsCount, posts: postsCount })}{keyword ? t('tags.detail_keyword', { keyword }) : ''}
+      </p>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:48px;">
+    <div style="margin-top:36px;">
+      <TagResults locale={ctx.locale} names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} />
+    </div>
+  </section>
+</BaseLayout>

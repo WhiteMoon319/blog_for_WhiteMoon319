@@ -1,12 +1,24 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "src/**/*"],
-  "exclude": ["dist", "admin", "node_modules"],
+  "include": [
+    ".astro/types.d.ts",
+    "src/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "admin",
+    "node_modules"
+  ],
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "paths": {
-      "@core/*": ["./src/core/*"],
-      "@theme/*": ["./src/themes/classic/*"]
+      "@core/*": [
+        "./src/core/*"
+      ],
+      "@theme/*": [
+        "./src/themes/classic/*",
+        "./src/themes/classic/*"
+      ]
     }
   }
 }

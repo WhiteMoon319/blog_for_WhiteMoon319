@@ -1,0 +1,53 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 核心组件：安全与 SEO 的 <head> 不变量封装。主题经 props 定制文案，不得自行拼装 CSP/canonical。
+import type { SiteContext } from '../lib/theme-context.ts';
+import { ogLocale } from '../lib/i18n.ts';
+
+interface Props {
+  ctx: SiteContext;
+  title?: string;
+  description?: string;
+  keywords?: string;
+  noindex?: boolean;
+  image?: string;
+  faviconHref?: string;
+}
+
+const { ctx, title, keywords, noindex = false, faviconHref } = Astro.props;
+const description = Astro.props.description ?? ctx.tagline;
+const siteUrl = ctx.siteUrl;
+const pageQuery = Astro.url.searchParams.get('page') ? Astro.url.search : '';
+const canonical = `${siteUrl}${Astro.url.pathname}${pageQuery}`;
+const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
+const rawImage = Astro.props.image;
+const ogImage = rawImage ? (ABSOLUTE_URL_RE.test(rawImage) ? rawImage : `${siteUrl}/${rawImage.replace(/^\//, '')}`) : `${siteUrl}/og-default.png`;
+const fullTitle = title ? `${title}｜${ctx.siteName}` : ctx.siteName;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https: fonts.gstatic.com; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+/>
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+{keywords && <meta name="keywords" content={keywords} />}
+<meta name="theme-color" content="#faf7f2" />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+<link rel="alternate" type="application/rss+xml" title={ctx.t('rss.title')} href="/feed.xml" />
+<link rel="canonical" href={canonical} />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={ctx.siteName} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:locale" content={ogLocale(ctx.locale)} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />
+{faviconHref && <link rel="icon" href={faviconHref} />}

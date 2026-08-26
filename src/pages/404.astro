@@ -1,10 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title="失路" description="此页不在卷中">
+<BaseLayout ctx={siteCtx} title="失路" description="此页不在卷中">
   <div class="page-hero">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
     <div class="page-hero-card reveal in">

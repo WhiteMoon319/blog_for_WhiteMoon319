@@ -1,7 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf, listCollections, listPublishedPosts, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
@@ -11,9 +11,11 @@ const pinnedPosts = await listPublishedPosts(env.DB, { pinned: true, limit: 5 })
 const latestPosts = await listPublishedPosts(env.DB, { limit: 6 });
 
 const heroSeal = Array.from(env.SITE_NAME)[0] ?? '书';
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title="卷首" description={env.SITE_SLOGAN}>
+<BaseLayout ctx={siteCtx} title="卷首" description={env.SITE_SLOGAN}>
   <header class="hero" id="top">
     <span class="ink-blob b1"></span>
     <span class="ink-blob b2"></span>

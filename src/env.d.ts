@@ -19,6 +19,10 @@ declare global {
       SITE_SLOGAN: string;
       SITE_POEM: string;
       SITE_URL: string;
+      SITE_TAGLINE?: string;
+      FOOTER_LINE?: string;
+      SEARCH_PLACEHOLDER?: string;
+      HERO_NOTE?: string;
       BLOG_ADMIN_PASSWORD: string;
       BLOG_SESSION_SECRET: string;
       R2_PUBLIC_URL: string;

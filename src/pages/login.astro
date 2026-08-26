@@ -1,13 +1,15 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf } from '../lib/db';
 const env = await envOf();
 const redirect = Astro.url.searchParams.get('redirect') ?? '/';
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title="登录" noindex>
+<BaseLayout ctx={siteCtx} title="登录" noindex>
   <div class="auth-page">
     <div class="auth-card">
       <h1>登 录</h1>

@@ -1,13 +1,13 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../../../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, fmtDate } from '../../../lib/db';
 import { postHref } from '../../../lib/utils';
 import { renderMarkdown } from '../../../lib/markdown';
-import ArticleEnhancer from '../../../components/ArticleEnhancer.astro';
-import Comments from '../../../components/Comments.astro';
-import PostLike from '../../../components/PostLike.astro';
+import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
+import Comments from '@theme/components/Comments.astro';
+import PostLike from '@theme/components/PostLike.astro';
 import { resolveUser } from '../../../lib/auth';
 
 const env = await envOf();
@@ -29,9 +29,11 @@ const collectionHref = `/collections/${encodeURI(collection.slug)}/`;
 const user = await resolveUser(Astro);
 const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
+import { getSiteContext } from "../../../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title={post.title} description={post.summary} image={post.cover_url ? post.cover_url : undefined}>
+<BaseLayout ctx={siteCtx} title={post.title} description={post.summary} image={post.cover_url ? post.cover_url : undefined}>
   <div class="page-hero" style={`--cc: ${collection.theme_color};`}>
     <a class="page-back reveal in" href={collectionHref}>
       ← {collection.title}

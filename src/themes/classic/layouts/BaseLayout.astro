@@ -1,0 +1,136 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 主题布局：纯展示组件，一切数据经 props.ctx 下传，禁止自行访问 DB/env。
+import '../styles/tokens.css';
+import '../styles/base.css';
+import SiteHead from '@core/SiteHead.astro';
+import type { SiteContext } from '../../../lib/theme-context.ts';
+
+interface Props {
+  ctx: SiteContext;
+  title?: string;
+  description?: string;
+  keywords?: string;
+  noindex?: boolean;
+  /** og/twitter 图片覆盖 */
+  image?: string;
+}
+
+const { ctx, title, description, keywords, noindex = false, image } = Astro.props;
+const t = ctx.t;
+const FAVICON =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='4' y='4' width='40' height='40' rx='6' fill='%23c23a30'/%3E%3Ctext x='24' y='34' font-family='serif' font-size='26' fill='white' text-anchor='middle'%3E%E7%AD%BE%3C/text%3E%3C/svg%3E";
+---
+
+<!doctype html>
+<html lang={ctx.locale}>
+  <head>
+    <SiteHead ctx={ctx} title={title} description={description} keywords={keywords} noindex={noindex} image={image} faviconHref={FAVICON} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{t('a11y.skip')}</a>
+
+    <nav class="site-nav" id="siteNav">
+      <div class="site-nav-inner">
+        <a class="site-logo" href="/">
+          <span class="site-logo-seal">签</span>
+          <span class="site-logo-text">{ctx.siteName}</span>
+        </a>
+
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label={t('a11y.open_menu')}>
+          <span></span><span></span><span></span>
+        </button>
+
+        <ul class="nav-links" id="navLinks">
+          {
+            ctx.nav.map((l) => (
+              <li>
+                <a class="nav-link" href={l.href} aria-current={Astro.url.pathname === l.href || (l.href !== '/' && Astro.url.pathname.startsWith(l.href)) ? 'page' : undefined}>
+                  {l.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+
+        <form class="nav-search" action="/search/" method="get" role="search">
+          <input class="nav-search-input" type="search" name="q" placeholder={ctx.searchPlaceholder} aria-label={t('a11y.site_search')} />
+        </form>
+      </div>
+    </nav>
+
+    <main id="main-content">
+      <slot />
+    </main>
+
+    <button class="float-nav float-nav-pulse" id="floatNav" type="button" title={t('a11y.back_top')}>↑</button>
+
+    <footer class="site-footer">
+      <img class="footer-seal" src={FAVICON} alt="" />
+      <h3>{ctx.siteName}</h3>
+      <p>© {new Date().getFullYear()} · {ctx.footerLine}</p>
+      <p class="footer-user">
+        {ctx.user.loggedIn ? (
+          <>
+            <a href="/account/" class="footer-src">@{ctx.user.name}</a>
+            {ctx.user.isAdmin && <a href="/admin/" class="footer-src">{t('footer.admin')}</a>}
+            <a href="/logout/" class="footer-src">{t('footer.logout')}</a>
+          </>
+        ) : (
+          <a href="/login/" class="footer-src">{t('footer.login')}</a>
+        )}
+      </p>
+      <p class="footer-license">
+        本站由
+        <a href="https://github.com/WhiteMoon319/blog_for_WhiteMoon319" target="_blank" rel="noopener" class="footer-src" aria-label="本站源代码（GitHub）">
+          <svg class="footer-github" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          开源软件
+        </a>
+        ·
+        <a href="https://www.gnu.org/licenses/agpl-3.0.zh-cn.html" target="_blank" rel="noopener" class="footer-src">AGPL-3.0</a>
+      </p>
+    </footer>
+
+    <script>
+      const nav = document.getElementById('siteNav');
+      const toggle = document.querySelector('.nav-toggle');
+      const floatNav = document.getElementById('floatNav');
+
+      toggle?.addEventListener('click', () => {
+        const open = nav?.classList.toggle('menu-open') ?? false;
+        toggle.setAttribute('aria-expanded', String(open));
+      });
+      nav?.classList.add('mobile-nav-ready');
+
+      floatNav?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((en) => {
+            if (en.isIntersecting) {
+              en.target.classList.add('in');
+              io.unobserve(en.target);
+            }
+          });
+        },
+        { threshold: 0.01, rootMargin: '0px 0px -20px 0px' },
+      );
+      document.querySelectorAll('.reveal:not(.in)').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        if (r.top < vh - 20 && r.bottom > 0) {
+          el.classList.add('in');
+        } else {
+          io.observe(el);
+        }
+      });
+    </script>
+  </body>
+</html>

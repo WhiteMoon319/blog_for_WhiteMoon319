@@ -1,12 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById, fmtDate } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
-import ArticleEnhancer from '../../components/ArticleEnhancer.astro';
-import Comments from '../../components/Comments.astro';
-import PostLike from '../../components/PostLike.astro';
+import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
+import Comments from '@theme/components/Comments.astro';
+import PostLike from '@theme/components/PostLike.astro';
 import { resolveUser } from '../../lib/auth';
 import { safeJsonLd } from '../../lib/seo';
 
@@ -59,9 +59,11 @@ const jsonLd = {
   author: { '@type': 'Person', name: env.SITE_NAME },
   publisher: { '@type': 'Organization', name: env.SITE_NAME },
 };
+import { getSiteContext } from "../../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title={post.title} description={post.summary} keywords={post.meta_keywords}>
+<BaseLayout ctx={siteCtx} title={post.title} description={post.summary} keywords={post.meta_keywords}>
   <script type="application/ld+json" set:html={safeJsonLd(jsonLd)} />
   <div class="page-hero" style="--cc: #c23a30;">
     <a class="page-back reveal in" href="/">← 回到卷首</a>

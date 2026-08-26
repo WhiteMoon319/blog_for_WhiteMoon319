@@ -1,7 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf, searchPublishedPosts, getCollectionsByIds, findTagIds, fmtDate } from '../lib/db';
 import { postHref } from '../lib/utils';
 
@@ -57,9 +57,11 @@ for (const post of posts) {
   const collection = post.collection_id ? collections.get(post.collection_id) ?? null : null;
   results.push({ post, collection });
 }
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title="寻章" description="站内搜索">
+<BaseLayout ctx={siteCtx} title="寻章" description="站内搜索">
   <div class="page-hero">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
     <div class="page-hero-card reveal in">

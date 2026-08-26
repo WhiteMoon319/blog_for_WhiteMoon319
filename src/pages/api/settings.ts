@@ -21,6 +21,11 @@ const KEY_DEFAULTS: Record<string, string> = {
   SITE_SLOGAN: '读书写字，不紧不慢',
   SITE_POEM: '',
   SITE_URL: 'https://example.com',
+  site_tagline: '一座写在 Cloudflare 上的小书斋。',
+  footer_line: '',
+  search_placeholder: '',
+  hero_note: '',
+  site_locale: 'zh-CN',
   ai_provider: 'deepseek',
   ai_base_url: 'https://api.deepseek.com',
   ai_model: 'deepseek-v4-flash',
@@ -108,6 +113,8 @@ export async function PUT(ctx: APIContext): Promise<Response> {
         } catch {
           return json({ error: 'ai_prompt_templates 需为合法 JSON' }, 400);
         }
+      } else if (k === 'site_locale' && v && v !== 'zh-CN' && v !== 'en') {
+        return json({ error: 'site_locale 仅支持 zh-CN 或 en' }, 400);
       } else if (v.length > MAX_VALUE_LENGTH) {
         return json({ error: `${k} too long: 最多 ${MAX_VALUE_LENGTH} 字` }, 400);
       } else if (k === 'SITE_URL' && v && !isValidUrl(v)) {

@@ -3,6 +3,10 @@
   "include": [".astro/types.d.ts", "src/**/*"],
   "exclude": ["dist", "admin", "node_modules"],
   "compilerOptions": {
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@core/*": ["./src/core/*"],
+      "@theme/*": ["./src/themes/classic/*"]
+    }
   }
 }

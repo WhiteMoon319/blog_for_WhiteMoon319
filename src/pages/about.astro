@@ -1,11 +1,11 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf } from '../lib/db';
 import { getPageBySlug } from '../lib/db/pages.ts';
 import { renderMarkdown } from '../lib/markdown.ts';
-import ArticleEnhancer from '../components/ArticleEnhancer.astro';
+import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
 
 const env = await envOf();
 const dbPage = await getPageBySlug(env.DB, 'about');
@@ -15,9 +15,11 @@ const pageDesc = `关于「${env.SITE_NAME}」`;
 const bodyHtml = dbPage?.published === 1
   ? renderMarkdown(dbPage.content_md).html
   : null;
+import { getSiteContext } from "../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title={pageTitle} description={pageDesc}>
+<BaseLayout ctx={siteCtx} title={pageTitle} description={pageDesc}>
   <div class="page-hero">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
     <div class="page-hero-card reveal in">

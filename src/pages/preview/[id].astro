@@ -1,12 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import { envOf, getPostById, getCollectionById, fmtDate } from '../../lib/db';
 import { postHref } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { resolveUser } from '../../lib/auth';
-import ArticleEnhancer from '../../components/ArticleEnhancer.astro';
+import ArticleEnhancer from '@theme/components/ArticleEnhancer.astro';
 
 export const prerender = false;
 
@@ -25,9 +25,11 @@ if (!post) {
 const collection = post.collection_id ? await getCollectionById(env.DB, post.collection_id) : null;
 const { html, toc } = renderMarkdown(post.content_md);
 const theme = collection?.theme_color ?? '#8a6d3b';
+import { getSiteContext } from "../../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout
+<BaseLayout ctx={siteCtx}
   title={post.title}
   description={post.summary}
   image={post.cover_url ? post.cover_url : undefined}

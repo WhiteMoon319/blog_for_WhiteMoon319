@@ -1,8 +1,8 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import TagResults from '../../components/TagResults.astro';
+import BaseLayout from '@theme/layouts/BaseLayout.astro';
+import TagResults from '@theme/components/TagResults.astro';
 import { envOf, listAllTagCounts } from '../../lib/db';
 
 export const prerender = false;
@@ -21,9 +21,11 @@ function toggleHref(name: string): string {
   const qs = params.toString();
   return qs ? `/tags/?${qs}` : '/tags/';
 }
+import { getSiteContext } from "../../lib/theme-context";
+const siteCtx = await getSiteContext(Astro);
 ---
 
-<BaseLayout title="标签" description="按题材标签寻览诸作。">
+<BaseLayout ctx={siteCtx} title="标签" description="按题材标签寻览诸作。">
   <div class="page-hero">
     <a class="page-back reveal in" href="/">← 回到卷首</a>
     <div class="page-hero-card reveal in">

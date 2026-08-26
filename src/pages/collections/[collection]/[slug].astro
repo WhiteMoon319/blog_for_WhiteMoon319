@@ -81,6 +81,6 @@ const siteCtx = await getSiteContext(Astro);
     </nav>
   </article>
   <PostLike postId={post.id} likes={likeCount?.n ?? 0} liked={liked} />
-  <Comments postId={post.id} />
+  <Comments postId={post.id} r2Base={siteCtx.r2Base} />
   <ArticleEnhancer html={html} />
 </BaseLayout>

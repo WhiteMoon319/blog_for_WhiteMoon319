@@ -1,22 +1,33 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import { envOf, getTagsUnion, fmtDate } from '../../../lib/db';
-import { postHref } from '../../../lib/utils';
+// 纯展示组件：数据由页面壳经 getTagsUnion 查询后传入，此处禁止访问 DB/env。
+import { postHref, fmtDate } from '@core/utils';
 
-export const prerender = false;
+interface CollectionRow {
+  id: number;
+  title: string;
+  summary: string;
+  post_count: number;
+}
+interface PostRow {
+  slug: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  collection_slug: string | null;
+}
 
 interface Props {
   names: string[];
   keyword?: string;
+  collections: CollectionRow[];
+  posts: PostRow[];
+  /** collection_id -> 该集内命中文章 */
+  collectionPosts: Map<number, PostRow[]>;
 }
 
-const { names, keyword = '' } = Astro.props;
-const env = await envOf();
-const result = await getTagsUnion(env.DB, names, keyword);
-const collections = result.collections;
-const posts = result.posts;
-const collectionPosts = result.collectionPosts;
+const { names, keyword = '', collections, posts, collectionPosts } = Astro.props;
 const active = names.length > 0;
 ---
 

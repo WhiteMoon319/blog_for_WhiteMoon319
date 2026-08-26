@@ -3,7 +3,7 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import BaseLayout from '@theme/layouts/BaseLayout.astro';
 import TagResults from '@theme/components/TagResults.astro';
-import { envOf, listAllTagCounts } from '../../lib/db';
+import { envOf, listAllTagCounts, getTagsUnion } from '../../lib/db';
 
 export const prerender = false;
 
@@ -23,6 +23,7 @@ function toggleHref(name: string): string {
 }
 import { getSiteContext } from "../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
+const union = await getTagsUnion(env.DB, selected, keyword);
 ---
 
 <BaseLayout ctx={siteCtx} title="标签" description="按题材标签寻览诸作。">
@@ -74,7 +75,7 @@ const siteCtx = await getSiteContext(Astro);
     }
 
     <div style="margin-top:36px;">
-      <TagResults names={selected} keyword={keyword} />
+      <TagResults names={selected} keyword={keyword} collections={union.collections} posts={union.posts} collectionPosts={union.collectionPosts} />
     </div>
   </section>
 </BaseLayout>

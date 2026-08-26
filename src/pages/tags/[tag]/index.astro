@@ -18,6 +18,8 @@ if (!page) {
 }
 import { getSiteContext } from "../../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
+import { getTagsUnion } from '../../../lib/db';
+const union = await getTagsUnion(env.DB, [name], keyword);
 ---
 
 <BaseLayout ctx={siteCtx} title={`标签「${name}」`} description={`标签「${name}」下的文集与文章。`}>
@@ -34,7 +36,7 @@ const siteCtx = await getSiteContext(Astro);
 
   <section class="section" style="padding-top:56px;">
     <div style="margin-top:36px;">
-      <TagResults names={[name]} keyword={keyword} />
+      <TagResults names={[name]} keyword={keyword} collections={union.collections} posts={union.posts} collectionPosts={union.collectionPosts} />
     </div>
   </section>
 </BaseLayout>

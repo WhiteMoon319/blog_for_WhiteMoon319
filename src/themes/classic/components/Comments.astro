@@ -1,9 +1,12 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-interface Props { postId: number }
-const { postId } = Astro.props;
-const r2Base = await import('../../../lib/db').then((m) => m.envOf()).then((env) => (env.R2_PUBLIC_URL || '').replace(/\/+$/, ''));
+interface Props {
+  postId: number;
+  /** R2 公开基址（页面壳经 ctx.r2Base 传入，纯净层要求组件不自行访问 env） */
+  r2Base?: string;
+}
+const { postId, r2Base = '' } = Astro.props;
 ---
 
 <section class="comments" data-post-id={postId} data-r2={r2Base} id="comments">

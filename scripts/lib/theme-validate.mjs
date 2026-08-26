@@ -201,8 +201,13 @@ export function packDir(dir, dirName) {
 export function unpackZip(buf, destDir, expectedSlug = null, allowReserved = false) {
   const inspected = inspectZip(buf, expectedSlug, allowReserved);
   if (inspected.errors.length > 0) return inspected;
+  // 剥离单一公共顶层目录（zip 通常带 <slug>/ 前缀，安装时应收平一层）
+  const rels = Object.keys(inspected.files);
+  const firstTop = rels.length ? rels[0].split('/')[0] : null;
+  const singleTop = firstTop != null && rels.every((r) => r.startsWith(`${firstTop}/`));
   for (const [p, data] of Object.entries(inspected.files)) {
-    const target = resolve(destDir, p);
+    const rel = singleTop ? p.slice(firstTop.length + 1) : p;
+    const target = resolve(destDir, rel);
     if (!target.startsWith(resolve(destDir))) {
       inspected.errors.push(`路径逃逸：${p}`);
       continue;

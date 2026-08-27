@@ -17,7 +17,7 @@
 - 评论系统：嵌套回复（2 层）、楼层号（`1_1` 格式）、文字 + 图片（R2 附件）、点赞、敏感词人工审核
 - 文章/评论点赞
 - 边缘缓存：Workers Cache API 匿名公开页面 60s 边缘缓存 + 后台刷新
-- 古风水墨视觉风格：纸纹背景、印章、毛笔标题、朱砂强调色、深色模式
+- 主题系统：内置 `modern`（默认，简约现代）与 `classic`（古风水墨：纸纹、印章、毛笔标题、朱砂强调色）双主题，深色模式；`pnpm theme` 本地切换，支持从[官方主题仓库](https://github.com/WhiteMoon319/themes_for_blog) `theme:add` 安装（含 `theme:pack`/`theme:update`），第三方 PR 投稿经 CI 预审 + 人工审核
 
 **后台（`/admin`）**
 
@@ -85,12 +85,21 @@ src/pages/posts/[slug].astro   # 数据查询 + 守卫
 
 **切换**：`pnpm theme` 查看；`pnpm theme <slug>` 切换（写 `.env` 的 `BLOG_THEME` 并同步 tsconfig），本地 `pnpm dev` 预览、`pnpm deploy` 上线。未设置时默认 `modern`。
 
+**获取第三方主题**（官方主题仓库：[`themes_for_blog`](https://github.com/WhiteMoon319/themes_for_blog)）：
+
+```bash
+pnpm theme:add <slug>      # 从官方仓库安装（经人工审核；下载走 raw→api→git 多通道回退）
+pnpm theme:add ./x.zip     # 直装本地 zip
+pnpm theme:update <slug>[@version]   # 升级 / 按版本回滚
+pnpm theme <slug>          # 安装后切换
+```
+
 **新建主题三步**：
 1. 复制任一现有主题目录为 `src/themes/<slug>/`，改 `theme.json` 的 name/slug；
 2. 改样式与模板——缺失的文件自动回退 `classic`（文件级继承），可只覆盖想改的部分；
-3. `pnpm theme <slug>` 切换预览。
+3. `pnpm theme:pack src/themes/<slug>` 自检打包 → 提交 [PR 投稿](https://github.com/WhiteMoon319/themes_for_blog/blob/main/docs/CONTRIBUTING.md)。
 
-**约束契约**：模板内禁止访问 DB/env（一切经 props 的 `SiteContext`），安全头/CSP 由核心 `<SiteHead>` 统一封装；纯函数（postHref/fmtDate 等）从 `@core/utils` 引用。完整契约见官方主题仓库的 `THEME_DEVELOPMENT.md`。
+**约束契约**：模板内禁止访问 DB/env（一切经 props 的 `SiteContext`），安全头/CSP 由核心 `<SiteHead>` 统一封装；纯函数（postHref/fmtDate 等）从 `@core/utils` 引用。完整契约见官方主题仓库的 [`THEME_DEVELOPMENT.md`](https://github.com/WhiteMoon319/themes_for_blog/blob/main/docs/THEME_DEVELOPMENT.md)。
 
 ### 站点文案与语言
 

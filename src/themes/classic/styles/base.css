@@ -324,7 +324,7 @@ body {
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(250, 247, 242, 0.55), rgba(250, 247, 242, 0.78)),
-    url("/hero-bg.webp") center / cover no-repeat;
+    url("../assets/hero-bg.webp") center / cover no-repeat;
 }
 
 /* 左右压暗保证两侧文字对比、底部渐隐进纸色 */
@@ -1309,7 +1309,7 @@ section[id],
   .hero {
     background:
       linear-gradient(180deg, rgba(20, 19, 22, 0.6), rgba(20, 19, 22, 0.8)),
-      url("/hero-bg.webp") center / cover no-repeat;
+      url("../assets/hero-bg.webp") center / cover no-repeat;
   }
 
   .hero::before {

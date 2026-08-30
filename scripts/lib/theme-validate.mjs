@@ -26,7 +26,7 @@ export const HARD_LIMITS = {
   maxEntries: 200,
   maxFileBytes: 512 * 1024,
   maxCompressionRatio: 20,
-  allowedExtensions: ['.astro', '.ts', '.json', '.css', '.png', '.jpg', '.svg', '.woff', '.woff2', '.md'],
+  allowedExtensions: ['.astro', '.ts', '.json', '.css', '.png', '.jpg', '.svg', '.webp', '.woff', '.woff2', '.md'],
   slugPattern: /^[a-z0-9][a-z0-9-]{1,30}$/,
   reservedSlugs: ['classic', 'modern'],
   coreTemplates: ['home', 'collection', 'post', 'standalone', 'archive', 'search', 'not-found', 'tag-index', 'tag-detail'],

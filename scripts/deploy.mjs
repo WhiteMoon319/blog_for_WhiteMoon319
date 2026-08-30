@@ -14,7 +14,7 @@ import { execSync } from 'node:child_process';
 
 const SEP = '='.repeat(56);
 
-function run(cmd: string, label?: string) {
+function run(cmd, label) {
   console.log(`\n${SEP}\n${label ?? cmd}\n${SEP}`);
   execSync(cmd, { stdio: 'inherit', cwd: process.cwd() });
 }

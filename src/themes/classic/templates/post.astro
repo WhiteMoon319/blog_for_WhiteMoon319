@@ -5,6 +5,7 @@
 // 纯展示组件，一切数据经 props 下传，禁止自行访问 DB/env。
 import type { SiteContext } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
+import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostLike from '../components/PostLike.astro';
 import Comments from '../components/Comments.astro';
@@ -103,6 +104,7 @@ const {
   previewBadgeText = '',
   publishedHref,
 } = Astro.props;
+const t = classicT(ctx.locale);
 ---
 
 <BaseLayout ctx={ctx} title={title} description={summary ?? undefined} keywords={keywords ?? undefined} image={ogImage ?? undefined} noindex={noindex}>
@@ -138,6 +140,12 @@ const {
   </div>
 
   <article class="article">
+    <div class="article-toolbar" role="group" aria-label={t('post.font_scale')}>
+      <span class="article-toolbar-label">{t('post.font_scale')}</span>
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="-1" aria-label={t('post.font_smaller')}>A−</button>
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="0" aria-label={t('post.font_default')}>A</button>
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="1" aria-label={t('post.font_larger')}>A+</button>
+    </div>
     {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
     <div class="article-body reveal in" set:html={html} />
 
@@ -178,4 +186,78 @@ const {
     font-size: 0.85rem;
     letter-spacing: 0.12em;
   }
+
+  .article-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 24px;
+    padding: 4px 6px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-pill);
+    background: var(--paper-card);
+  }
+  .article-toolbar-label {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    margin-right: 4px;
+    margin-left: 6px;
+  }
+  .article-toolbar .font-scale-btn {
+    min-width: 34px;
+    padding: 2px 8px;
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    border-radius: var(--radius-pill);
+  }
+  .article-toolbar .font-scale-btn.is-active {
+    background: var(--cinnabar);
+    border-color: var(--cinnabar);
+    color: var(--paper-warm);
+  }
 </style>
+
+<script>
+  // 阅读字号：A− / A / A+（作用于 .article-body 的 --font-scale，仅正文缩放）
+  const BODY_SEL = '.article-body';
+  const STORAGE_KEY = 'classic-font-scale-level';
+  // 档位 → 缩放系数
+  const SCALES: Record<number, number> = { '-1': 0.9, 0: 1, 1: 1.15 };
+  const DEFAULT_LEVEL = 0;
+
+  const body = document.querySelector<HTMLDivElement>(BODY_SEL);
+  if (!body) throw new Error('.article-body 不存在');
+  const articleBody = body as HTMLDivElement;
+
+  let level: number = DEFAULT_LEVEL;
+  try {
+    const saved = Number(localStorage.getItem(STORAGE_KEY));
+    if (saved in SCALES) level = saved;
+  } catch {
+    /* localStorage 不可用则保持默认档 */
+  }
+
+  function applyScale() {
+    articleBody.style.setProperty('--font-scale', String(SCALES[level]));
+    document.querySelectorAll<HTMLButtonElement>('.font-scale-btn').forEach((btn) => {
+      btn.classList.toggle('is-active', Number(btn.dataset.fs) === level);
+    });
+  }
+
+  function setScale(next: number) {
+    if (!(next in SCALES)) return;
+    level = next;
+    try {
+      localStorage.setItem(STORAGE_KEY, String(level));
+    } catch {
+      /* 忽略存储失败 */
+    }
+    applyScale();
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.font-scale-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setScale(Number(btn.dataset.fs)));
+  });
+  applyScale();
+</script>

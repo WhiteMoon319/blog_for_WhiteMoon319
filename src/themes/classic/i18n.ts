@@ -23,6 +23,10 @@ const zhCN: Record<string, string> = {
   'footer.login': '登录',
   'footer.admin': '后台',
   'footer.logout': '退出',
+  'post.font_scale': '字号',
+  'post.font_smaller': '减小字号',
+  'post.font_default': '重置字号',
+  'post.font_larger': '增大字号',
 };
 
 const en: Record<string, string> = {
@@ -39,6 +43,10 @@ const en: Record<string, string> = {
   'footer.login': 'Sign in',
   'footer.admin': 'Admin',
   'footer.logout': 'Sign out',
+  'post.font_scale': 'Font size',
+  'post.font_smaller': 'Decrease font size',
+  'post.font_default': 'Reset font size',
+  'post.font_larger': 'Increase font size',
 };
 
 export const CLASSIC_DICTS: Record<Locale, Record<string, string>> = { 'zh-CN': zhCN, en };

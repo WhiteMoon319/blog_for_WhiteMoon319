@@ -6,6 +6,7 @@
 /* ===== 设计 Token（Modern 简约现代：变量名与 classic 完全同名，值换成现代体系） ===== */
 
 :root {
+  color-scheme: light dark;
   /* 强调色（主蓝） */
   --cinnabar: #2563eb;
   --cinnabar-line: rgba(37, 99, 235, 0.14);

@@ -151,6 +151,7 @@ const t = classicT(ctx.locale);
       <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="0" aria-label={t('post.font_default')}>A</button>
       <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="1" aria-label={t('post.font_larger')}>A+</button>
     </div>
+    <div class="reading-progress-pill" id="readingProgressPill" role="progressbar" aria-label={t('post.read_progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-prefix={t('post.read_progress')}>0%</div>
     {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
     <div class="article-body reveal in" set:html={html} />
 
@@ -221,12 +222,53 @@ const t = classicT(ctx.locale);
     border-color: var(--cinnabar);
     color: var(--paper-warm);
   }
+
+  .reading-progress-pill {
+    position: fixed;
+    left: 20px;
+    bottom: 24px;
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--ink-mid);
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-card);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+  }
+  .reading-progress-pill.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reading-progress-pill::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cinnabar);
+  }
+  @media (max-width: 599px) {
+    .reading-progress-pill {
+      left: 12px;
+      bottom: 16px;
+      padding: 5px 12px;
+    }
+  }
 </style>
 
 <script define:vars={{ initialPct: initialScrollPct, loggedIn: ctx.user.loggedIn, postIdNum: postId }}>
   // 阅读历史：进入恢复上次位置；离开静默上报当前位置（登录用户）
   const hasArticle = !!document.querySelector('.article-body');
   let readingPosted = false;
+  const progressPill = document.getElementById('readingProgressPill');
 
   function calcScrollPct() {
     const doc = document.documentElement;
@@ -235,12 +277,22 @@ const t = classicT(ctx.locale);
     return Math.round((window.scrollY / max) * 100);
   }
 
+  function updateProgressPill() {
+    if (!progressPill) return;
+    const pct = calcScrollPct();
+    progressPill.textContent = `${progressPill.dataset.prefix ?? ''}${pct}%`;
+    progressPill.setAttribute('aria-valuenow', String(pct));
+    if (pct >= 2 && hasArticle) progressPill.classList.add('is-visible');
+    else progressPill.classList.remove('is-visible');
+  }
+
   function restoreScroll() {
     if (typeof initialPct !== 'number' || !(initialPct > 0 && initialPct <= 100)) return;
     const target = () => {
       const doc = document.documentElement;
       const max = doc.scrollHeight - window.innerHeight;
       if (max > 0) window.scrollTo(0, (max * initialPct) / 100);
+      updateProgressPill();
     };
     // 等待正文/图表渲染完成后再恢复，避免高度未定导致位置偏移
     window.addEventListener('load', () => setTimeout(target, 120));
@@ -269,6 +321,8 @@ const t = classicT(ctx.locale);
     if (document.visibilityState === 'hidden') reportReading();
   });
   window.addEventListener('pagehide', reportReading);
+  window.addEventListener('scroll', () => updateProgressPill(), { passive: true });
+  window.addEventListener('load', updateProgressPill);
 
   restoreScroll();
 </script>

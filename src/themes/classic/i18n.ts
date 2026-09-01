@@ -27,6 +27,7 @@ const zhCN: Record<string, string> = {
   'post.font_smaller': '减小字号',
   'post.font_default': '重置字号',
   'post.font_larger': '增大字号',
+  'post.read_progress': '已读',
 };
 
 const en: Record<string, string> = {
@@ -47,6 +48,7 @@ const en: Record<string, string> = {
   'post.font_smaller': 'Decrease font size',
   'post.font_default': 'Reset font size',
   'post.font_larger': 'Increase font size',
+  'post.read_progress': 'Read',
 };
 
 export const CLASSIC_DICTS: Record<Locale, Record<string, string>> = { 'zh-CN': zhCN, en };

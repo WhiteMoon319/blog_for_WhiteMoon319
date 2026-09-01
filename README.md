@@ -11,6 +11,8 @@
 - 文集内文章走 `/collections/{collection}/{postSlug}/` 路径；无文集的旧路径 `/posts/{slug}/` 自动 301
 - 标签云、独立标签页、多标签交集检索、标签内关键词搜索
 - 阅读量统计（日聚合 + 去重）、上一篇/下一篇相邻导航
+- 阅读历史：登录用户在文章页滚动时静默记录进度，离开自动存档；首页「历史记录」区块展示最近阅读，再进文章恢复上次位置
+- 文章页字号调节（A−/A/A+，localStorage 记忆）与左下角悬浮阅读进度指示器
 - RSS（`/feed.xml`）、站点地图（`/sitemap.xml`）动态生成
 - KaTeX 数学公式、Mermaid 流程图、MarkMap 脑图、代码高亮（highlight.js），均按需加载（正文含对应内容才拉取资源）
 - 用户系统：注册（邮箱验证码）、登录（用户名或邮箱）、个人中心（昵称、头像、改密码、改邮箱、邮件提醒开关）
@@ -126,7 +128,7 @@ pnpm theme <slug>                 # 安装后切换
 
 | 路径 | 说明 |
 | --- | --- |
-| `/` | 首页：文集与最新文章 |
+| `/` | 首页：文集入口、置顶与最新文章；登录用户另见「历史记录」区块 |
 | `/collections/{collectionSlug}/` | 文集页 |
 | `/collections/{collectionSlug}/{postSlug}/` | 文章页（有文集的文章） |
 | `/posts/{postSlug}/` | 文章页（无文集的文章；有文集的旧路径访问自动 301） |
@@ -173,6 +175,7 @@ pnpm theme <slug>                 # 安装后切换
 | POST | `/api/comments/upload` | 评论图片附件 → R2 | 登录 |
 | GET/POST | `/api/users`，POST `/api/users/{id}/ban` | 用户列表与封禁 | 登录 |
 | POST | `/api/posts/{id}/like` | 文章点赞 | 公开 |
+| POST | `/api/reading` | 静默上报阅读进度（离开文章页时） | 登录 |
 | GET | `/api/export`，`/api/export/posts/{id}.md` | 数据导出 | 登录 |
 | GET | `/api/admin/comments`，`/api/admin/comments/{id}` | 评论审核管理 | 登录 |
 

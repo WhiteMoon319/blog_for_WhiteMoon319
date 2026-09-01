@@ -6,7 +6,7 @@
 
 **前台**
 
-- 首页（文集入口 + 最新文章）、文集页、文章页、归档页、关于页、站内搜索、独立页面（`/pages/{slug}/`）
+- 首页（文集入口 + 最新文章；登录用户另见「历史记录」区块）、文集页、文章页、归档页、关于页、站内搜索、独立页面（`/pages/{slug}/`）
 - 文章支持发布/草稿/定时发布、置顶、SEO 字段（title/description/canonical）
 - 文集内文章走 `/collections/{collection}/{postSlug}/` 路径；无文集的旧路径 `/posts/{slug}/` 自动 301
 - 标签云、独立标签页、多标签交集检索、标签内关键词搜索
@@ -33,7 +33,7 @@
 - 评论审核：待审/已准/已拒分栏、按文章筛选、批准/驳回/删除
 - 用户管理：列表、封禁/解封（封禁即踢下线）
 - 数据导出：全量 JSON 快照、单篇 Markdown 下载
-- 站点设置：站点信息/文案、邮件（SMTP 或 HTTP API）、AI 配置、评论审核词
+- 站点设置：站点信息/界面语言（zh-CN/en）/文案变量、邮件（SMTP 或 HTTP API）、AI 配置、评论审核词
 
 ## 技术栈
 
@@ -60,7 +60,7 @@ admin/                    Vue 3 管理端 SPA（/admin/ 基路径）
   src/lib/                drafts（草稿自动保存）、editor、format、import 解析
   src/store/auth.ts       登录态
 db/
-  migrations/             0001_init ~ 0032_email_http_api（D1 迁移）
+  migrations/             0001_init ~ 0033_reading_history（D1 迁移）
   seed.sql                本地演示种子数据
   reset-local.sql         本地整库重置（cf:db:local 可重入）
 scripts/
@@ -83,7 +83,7 @@ src/
   core/                   跨主题共享件：SiteHead.astro（CSP/canonical/og 封装）、utils、i18n
   themes/                 主题目录：modern（默认）/ classic（入库）；
                           用户安装的主题不入库（.gitignore 只放行这两套），
-                          每套含 layouts/templates/components/styles/i18n
+                          每套含 layouts/templates/components/styles/assets/i18n
 tests/                    node:test 单测 + e2e（按域拆分）
 worker/                   worker.ts 自定义 Worker 入口（包装 Astro 入口并承接 scheduled 事件）
 wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
@@ -370,8 +370,8 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 
 ## 数据库
 
-- **迁移**：`db/migrations/0001_init` ~ `0032_email_http_api`（共 32 个）
-- **核心表**：`collections`（文集，含 `ref_summaries`/`ai_prompt_id`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本）、`pages`（独立页面）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置，含 `ai_prompt_templates`）、`users`/`comments`/`comment_likes`/`post_likes`/`email_verifications`、`email_credentials`（SMTP 或 HTTP API 凭据）、`daily_views`（阅读统计）
+- **迁移**：`db/migrations/0001_init` ~ `0033_reading_history`（共 33 个）
+- **核心表**：`collections`（文集，含 `ref_summaries`/`ai_prompt_id`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本）、`pages`（独立页面）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置，含 `ai_prompt_templates`）、`users`/`comments`/`comment_likes`/`post_likes`/`reading_history`（登录用户阅读进度）/`email_verifications`、`email_credentials`（SMTP 或 HTTP API 凭据）、`daily_views`（阅读统计）
 - **文章 slug**：文集内唯一；未分类由部分唯一索引保证全局唯一。删除文集时 slug 冲突自动加后缀
 
 ## AI 摘要

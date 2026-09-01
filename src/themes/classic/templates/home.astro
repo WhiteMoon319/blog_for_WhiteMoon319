@@ -22,6 +22,18 @@ interface PostRow {
   created_at: string;
 }
 
+interface ReadingRow {
+  postId: number;
+  scrollPct: number;
+  updatedAt: string;
+  title: string;
+  slug: string;
+  summary: string;
+  coverUrl: string;
+  collectionId: number | null;
+  collectionSlug: string | null;
+}
+
 interface Props {
   ctx: SiteContext;
   /** 站名/口号/题记：取原始 env 文案（不经 settings 覆盖链），保持卷首文案与历史版本一致 */
@@ -31,9 +43,12 @@ interface Props {
   collections: CollectionRow[];
   pinnedPosts: PostRow[];
   latestPosts: PostRow[];
+  /** 登录用户的历史记录（未登录为空数组，不渲染该区块） */
+  recentReadings?: ReadingRow[];
 }
 
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
+const recentReadings = Astro.props.recentReadings ?? [];
 const heroSeal = Array.from(siteName)[0] ?? '书';
 ---
 
@@ -138,6 +153,32 @@ const heroSeal = Array.from(siteName)[0] ?? '书';
       )
     }
   </section>
+
+  {
+    recentReadings.length > 0 && (
+      <section class="section" id="history">
+        <div class="section-head reveal">
+          <span class="kicker">历 史</span>
+          <h2 class="section-title">历史记录</h2>
+          <p class="section-lead">自上次搁笔处，接续来读。</p>
+        </div>
+
+        <div class="posts-grid">
+          {recentReadings.map((r, i) => (
+            <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(r.slug, r.collectionSlug)}>
+              {r.coverUrl && <img class="post-cover" src={r.coverUrl} alt="" loading="lazy" decoding="async" />}
+              <h3 class="post-title">{r.title}</h3>
+              {r.summary && <p class="post-summary">{r.summary}</p>}
+              <div class="post-meta">
+                {r.collectionSlug && <span class="post-tag">续读</span>}
+                <span>{fmtDate(r.updatedAt)}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   <section class="epigraph" id="epigraph">
     <div class="reveal">

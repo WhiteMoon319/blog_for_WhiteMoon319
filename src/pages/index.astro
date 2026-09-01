@@ -2,7 +2,8 @@
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import HomeTemplate from '@theme/templates/home.astro';
-import { envOf, listCollections, listPublishedPosts } from '../lib/db';
+import { envOf, listCollections, listPublishedPosts, listRecentReadings } from '../lib/db';
+import { resolveUser } from '../lib/auth';
 
 const env = await envOf();
 const collections = await listCollections(env.DB);
@@ -10,6 +11,9 @@ const pinnedPosts = await listPublishedPosts(env.DB, { pinned: true, limit: 5 })
 const latestPosts = await listPublishedPosts(env.DB, { limit: 6 });
 import { getSiteContext } from "../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
+// 登录用户：读取历史记录（未登录传空，模板不渲染该区块）
+const authUser = await resolveUser(Astro);
+const recentReadings = authUser ? await listRecentReadings(env.DB, authUser.user.id, 6) : [];
 ---
 
 <HomeTemplate
@@ -20,4 +24,5 @@ const siteCtx = await getSiteContext(Astro);
   collections={collections}
   pinnedPosts={pinnedPosts}
   latestPosts={latestPosts}
+  recentReadings={recentReadings}
 />

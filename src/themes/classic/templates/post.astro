@@ -73,6 +73,10 @@ interface Props {
   previewBadgeText?: string;
   /** 「查看正式页面 →」链接目标（仅预览态且已刊发且属文集时由页面壳传入） */
   publishedHref?: string | null;
+
+  // —— 阅读历史 ——
+  /** 登录用户的上次阅读位置（0-100）；未登录/无记录不传 */
+  initialScrollPct?: number;
 }
 
 const {
@@ -103,6 +107,7 @@ const {
   isPreview = false,
   previewBadgeText = '',
   publishedHref,
+  initialScrollPct,
 } = Astro.props;
 const t = classicT(ctx.locale);
 ---
@@ -217,6 +222,56 @@ const t = classicT(ctx.locale);
     color: var(--paper-warm);
   }
 </style>
+
+<script define:vars={{ initialPct: initialScrollPct, loggedIn: ctx.user.loggedIn, postIdNum: postId }}>
+  // 阅读历史：进入恢复上次位置；离开静默上报当前位置（登录用户）
+  const hasArticle = !!document.querySelector('.article-body');
+  let readingPosted = false;
+
+  function calcScrollPct() {
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - window.innerHeight;
+    if (max <= 0) return 0;
+    return Math.round((window.scrollY / max) * 100);
+  }
+
+  function restoreScroll() {
+    if (typeof initialPct !== 'number' || !(initialPct > 0 && initialPct <= 100)) return;
+    const target = () => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - window.innerHeight;
+      if (max > 0) window.scrollTo(0, (max * initialPct) / 100);
+    };
+    // 等待正文/图表渲染完成后再恢复，避免高度未定导致位置偏移
+    window.addEventListener('load', () => setTimeout(target, 120));
+    setTimeout(target, 800);
+  }
+
+  function reportReading() {
+    if (readingPosted || !loggedIn || !hasArticle || !postIdNum) return;
+    const pct = calcScrollPct();
+    // 仅在确实滚动阅读过时上报（避免仅打开页面即产生历史）
+    if (pct <= 1) return;
+    readingPosted = true;
+    fetch('/api/reading', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify({ postId: postIdNum, scrollPct: pct }),
+    }).catch(() => {
+      /* 静默失败：不影响阅读 */
+    });
+  }
+
+  // 离开页面（切后台/关闭/跳转）时静默记录
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') reportReading();
+  });
+  window.addEventListener('pagehide', reportReading);
+
+  restoreScroll();
+</script>
 
 <script>
   // 阅读字号：A− / A / A+（作用于 .article-body 的 --font-scale，仅正文缩放）

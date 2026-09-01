@@ -1,7 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags } from '../../../lib/db';
+import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getReadingProgress } from '../../../lib/db';
 import { renderMarkdown } from '../../../lib/markdown';
 import { resolveUser } from '../../../lib/auth';
 import PostTemplate from '@theme/templates/post.astro';
@@ -26,6 +26,8 @@ const user = await resolveUser(Astro);
 const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
 const siteCtx = await getSiteContext(Astro);
+// 阅读历史：当前用户对本文的上次阅读位置（用于进入后恢复滚动）
+const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, post.id) : null;
 ---
 
 <PostTemplate
@@ -49,4 +51,5 @@ const siteCtx = await getSiteContext(Astro);
   backLabel={`← ${collection.title}`}
   kicker={collection.title}
   ogImage={post.cover_url ? post.cover_url : undefined}
+  initialScrollPct={readingProgress?.scrollPct}
 />

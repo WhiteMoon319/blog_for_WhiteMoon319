@@ -32,6 +32,8 @@ interface Props {
   collections: CollectionRow[];
   pinnedPosts: PostRow[];
   latestPosts: PostRow[];
+  /** 登录用户阅读历史（核心壳传入；本主题暂不渲染，接受即可） */
+  recentReadings?: unknown[];
 }
 
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;

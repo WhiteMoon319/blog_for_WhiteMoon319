@@ -28,6 +28,9 @@ const zhCN: Record<string, string> = {
   'post.font_default': '重置字号',
   'post.font_larger': '增大字号',
   'post.read_progress': '已读',
+  'home.history_kicker': '历 史',
+  'home.history_title': '历史记录',
+  'home.history_lead': '自上次搁笔处，接续来读。',
 };
 
 const en: Record<string, string> = {
@@ -48,7 +51,10 @@ const en: Record<string, string> = {
   'post.font_smaller': 'Decrease font size',
   'post.font_default': 'Reset font size',
   'post.font_larger': 'Increase font size',
-  'post.read_progress': 'Read',
+  'post.read_progress': 'Read ',
+  'home.history_kicker': 'History',
+  'home.history_title': 'Reading History',
+  'home.history_lead': 'Continue where you left off.',
 };
 
 export const CLASSIC_DICTS: Record<Locale, Record<string, string>> = { 'zh-CN': zhCN, en };

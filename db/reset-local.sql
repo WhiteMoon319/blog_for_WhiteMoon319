@@ -5,8 +5,10 @@
 -- 注意：删除顺序必须按外键约束从依赖到被依赖
 DROP TABLE IF EXISTS d1_migrations;
 DROP TABLE IF EXISTS email_verifications;
+DROP TABLE IF EXISTS email_credentials;
 DROP TABLE IF EXISTS comment_likes;
 DROP TABLE IF EXISTS post_likes;
+DROP TABLE IF EXISTS reading_history;
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS posts_fts;

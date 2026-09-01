@@ -68,6 +68,9 @@ interface Props {
   isPreview?: boolean;
   previewBadgeText?: string;
   publishedHref?: string | null;
+
+  // —— 阅读历史（核心壳传入；本主题暂不实现恢复/上报，接受即可） ——
+  initialScrollPct?: number;
 }
 
 const {

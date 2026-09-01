@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS reading_history (
   post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  scroll_pct INTEGER NOT NULL DEFAULT 0,      -- 上次阅读位置（0-100，-1 表示仅记录已读未滚动）
+  scroll_pct INTEGER NOT NULL DEFAULT 0 CHECK (scroll_pct BETWEEN -1 AND 100),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (post_id, user_id)
 );

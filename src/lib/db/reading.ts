@@ -17,7 +17,7 @@ export interface ReadingRecord {
   title: string;
   slug: string;
   summary: string;
-  coverUrl: string;
+  coverUrl: string | null;
   collectionId: number | null;
   collectionSlug: string | null;
 }

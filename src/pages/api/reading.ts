@@ -30,10 +30,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const postId = Number(body.postId);
   if (!Number.isInteger(postId) || postId <= 0) return json({ error: 'invalid postId' }, 400);
 
-  // scrollPct 允许 -1（仅记录已读）；正常范围 0-100
-  let scrollPct = Number(body.scrollPct ?? -1);
-  if (!Number.isFinite(scrollPct)) scrollPct = -1;
-  scrollPct = Math.max(-1, Math.min(100, Math.round(scrollPct)));
+  // scrollPct：必须是数字；允许 -1（仅记录已读）；正常范围 0-100
+  const rawPct = body.scrollPct;
+  if (typeof rawPct !== 'number' || !Number.isFinite(rawPct)) {
+    return json({ error: 'invalid scrollPct' }, 400);
+  }
+  const scrollPct = Math.max(-1, Math.min(100, Math.round(rawPct)));
 
   // 仅记录已发布文章
   const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(postId).first<{ id: number; status: string; deleted_at: string | null }>();

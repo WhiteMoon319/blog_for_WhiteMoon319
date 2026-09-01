@@ -26,9 +26,10 @@ run('pnpm run build', '构建（cf-config + admin + astro + 合并）');
 console.log(`\n${SEP}\n远程 D1 迁移\n${SEP}`);
 try {
   execSync('pnpm exec wrangler d1 migrations apply blog-db --remote', { stdio: 'inherit', cwd: process.cwd() });
-} catch {
-  // 迁移失败不阻塞部署（可能已是最新）
-  console.log('迁移可能有误，继续部署…');
+} catch (e) {
+  // 迁移失败必须终止：新表（如 reading_history）缺失时部署后页面会 500
+  console.error('❌ 远程迁移失败，中止部署（请先排查 D1 迁移）：', e.message || e);
+  process.exit(1);
 }
 
 // 3. 部署 Worker

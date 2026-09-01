@@ -48,6 +48,7 @@ test('e2e：全部写接口无 Origin 均被 CSRF 拒绝（403）', async () => 
     ['PUT', '/api/pages/1', { title: 'X' }],
     ['DELETE', '/api/pages/1', undefined],
     ['DELETE', '/api/media?key=uploads/x.png', undefined],
+    ['POST', '/api/reading', { postId: 1, scrollPct: 42 }],
   ];
 
   for (const [method, path, body] of cases) {

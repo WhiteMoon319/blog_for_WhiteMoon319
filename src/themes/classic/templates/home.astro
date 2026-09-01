@@ -3,6 +3,7 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import type { SiteContext } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
+import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
 
 interface CollectionRow {
@@ -50,6 +51,7 @@ interface Props {
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
 const recentReadings = Astro.props.recentReadings ?? [];
 const heroSeal = Array.from(siteName)[0] ?? '书';
+const t = classicT(ctx.locale);
 ---
 
 <BaseLayout ctx={ctx} title="卷首" description={slogan}>
@@ -158,23 +160,26 @@ const heroSeal = Array.from(siteName)[0] ?? '书';
     recentReadings.length > 0 && (
       <section class="section" id="history">
         <div class="section-head reveal">
-          <span class="kicker">历 史</span>
-          <h2 class="section-title">历史记录</h2>
-          <p class="section-lead">自上次搁笔处，接续来读。</p>
+          <span class="kicker">{t('home.history_kicker')}</span>
+          <h2 class="section-title">{t('home.history_title')}</h2>
+          <p class="section-lead">{t('home.history_lead')}</p>
         </div>
 
         <div class="posts-grid">
-          {recentReadings.map((r, i) => (
-            <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(r.slug, r.collectionSlug)}>
-              {r.coverUrl && <img class="post-cover" src={r.coverUrl} alt="" loading="lazy" decoding="async" />}
-              <h3 class="post-title">{r.title}</h3>
-              {r.summary && <p class="post-summary">{r.summary}</p>}
-              <div class="post-meta">
-                {r.collectionSlug && <span class="post-tag">续读</span>}
-                <span>{fmtDate(r.updatedAt)}</span>
-              </div>
-            </a>
-          ))}
+          {recentReadings.map((r, i) => {
+            const col = collections.find((c) => c.id === r.collectionId);
+            return (
+              <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(r.slug, r.collectionSlug)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+                {r.coverUrl && <img class="post-cover" src={r.coverUrl} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">{r.title}</h3>
+                {r.summary && <p class="post-summary">{r.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <span>{fmtDate(r.updatedAt)}</span>
+                </div>
+              </a>
+            );
+          })}
         </div>
       </section>
     )

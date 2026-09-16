@@ -30,7 +30,8 @@ interface ReadingRow {
   title: string;
   slug: string;
   summary: string;
-  coverUrl: string;
+  // 与 lib/db/reading.ts 的 ReadingRecord 对齐：无封面时为 null（渲染处已做 falsy 守卫）
+  coverUrl: string | null;
   collectionId: number | null;
   collectionSlug: string | null;
 }

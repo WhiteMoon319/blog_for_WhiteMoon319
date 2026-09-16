@@ -10,7 +10,7 @@ import type { APIContext } from 'astro';
 import { json, checkCsrf, passwordStrength } from '../../../lib/auth';
 import { envOf, createUser, getUserByUsername, getUserByEmail } from '../../../lib/db';
 import { hashPassword } from '../../../lib/db/credentials.ts';
-import { hashVerificationCode, generateVerificationCode, sendEmail } from '../../../lib/email';
+import { hashVerificationCode, generateVerificationCode, sendEmail, verificationEmail } from '../../../lib/email';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
 export const prerender = false;
@@ -65,9 +65,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
        VALUES (?, ?, datetime('now', '+5 minutes'))`,
     ).bind(user.id, codeHash).run();
 
-    await sendEmail(email, '验证您的邮箱 - 月下独酌',
-      `感谢注册「月下独酌」博客！\n\n您的验证码是：${code}\n\n5 分钟内有效，请勿泄露给他人。`,
-    );
+    const mail = verificationEmail(code, '感谢注册「月下独酌」博客！');
+    await sendEmail(email, mail.subject, mail.text);
   } catch (e) {
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
     return json({ error: '注册失败，请稍后重试' }, 500);

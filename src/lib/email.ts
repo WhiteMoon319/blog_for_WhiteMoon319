@@ -85,6 +85,15 @@ export async function generateVerificationCode(): Promise<string> {
   return String(100000 + (arr[0] % 900000));
 }
 
+// 统一构造邮箱验证码邮件。验证码用【】包裹并单独成行，
+// 避免纯文本客户端折叠换行时与"5 分钟内有效"的数字连成长串（如 3252145）而误导用户。
+export function verificationEmail(code: string, greeting?: string): { subject: string; text: string } {
+  const lines: string[] = [];
+  if (greeting) lines.push(greeting, '');
+  lines.push(`您的验证码是：【${code}】`, '', '该验证码 5 分钟内有效，请勿泄露给他人。');
+  return { subject: '验证您的邮箱 - 月下独酌', text: lines.join('\n') };
+}
+
 export async function hashVerificationCode(code: string): Promise<string> {
   const data = new TextEncoder().encode(code);
   const hash = await crypto.subtle.digest('SHA-256', data);

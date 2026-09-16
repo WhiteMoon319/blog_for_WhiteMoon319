@@ -9,7 +9,7 @@
 import type { APIContext } from 'astro';
 import { envOf, updateProfile, updateEmail } from '../../../lib/db';
 import { requireAnyUser, json, checkCsrf } from '../../../lib/auth';
-import { hashVerificationCode, generateVerificationCode, sendEmail } from '../../../lib/email';
+import { hashVerificationCode, generateVerificationCode, sendEmail, verificationEmail } from '../../../lib/email';
 
 export const prerender = false;
 
@@ -78,7 +78,8 @@ export async function PUT(ctx: APIContext): Promise<Response> {
       const code = await generateVerificationCode();
       const codeHash = await hashVerificationCode(code);
       await env.DB.prepare(`INSERT INTO email_verifications (user_id, code_hash, expires_at) VALUES (?, ?, datetime('now', '+5 minutes'))`).bind(auth.user.id, codeHash).run();
-      await sendEmail(newEmail, '验证您的邮箱 - 月下独酌', `您的验证码是：${code}\n\n5 分钟内有效。`);
+      const mail = verificationEmail(code);
+      await sendEmail(newEmail, mail.subject, mail.text);
     } catch { /* 邮件发送失败静默 */ }
   }
 

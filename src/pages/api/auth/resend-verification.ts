@@ -9,7 +9,7 @@
 import type { APIContext } from 'astro';
 import { json, checkCsrf } from '../../../lib/auth';
 import { envOf } from '../../../lib/db';
-import { hashVerificationCode, generateVerificationCode, sendEmail } from '../../../lib/email';
+import { hashVerificationCode, generateVerificationCode, sendEmail, verificationEmail } from '../../../lib/email';
 import { clientIp, consumeLoginAttempt } from '../../../lib/ratelimit';
 
 export const prerender = false;
@@ -42,9 +42,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   ).bind(user.id, codeHash).run();
 
   try {
-    await sendEmail(email, '验证您的邮箱 - 月下独酌',
-      `您的验证码是：${code}\n\n5 分钟内有效。`,
-    );
+    const mail = verificationEmail(code);
+    await sendEmail(email, mail.subject, mail.text);
   } catch {
     return json({ error: '邮件发送失败，请稍后重试' }, 500);
   }

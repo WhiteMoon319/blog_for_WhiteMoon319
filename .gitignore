@@ -12,6 +12,11 @@ admin/dist/
 
 # 本地生成的 Wrangler 配置（由 wrangler.jsonc.template + .env 经 scripts/cf-config.mjs 生成）
 wrangler.jsonc
+
+# 发布包自带的便携运行环境（由 CI 生成，不入库）
+/runtime/
+# 部署向导的断点续跑标记
+.setup-progress
 #计划文档
 PLAN.md
 #agent目录

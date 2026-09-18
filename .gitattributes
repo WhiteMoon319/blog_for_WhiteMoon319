@@ -1,0 +1,6 @@
+# 发布包由 CI 在 Linux 上用 `git archive` 生成，必须固定脚本换行，
+# 否则 Windows 的 .bat 会变成 LF（cmd 无法直接运行）、macOS/Linux 的 .sh 会变成 CRLF（bash 报错）。
+# 这些属性同时保证本地 core.autocrlf 设置不再影响产物。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf

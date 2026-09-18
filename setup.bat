@@ -3,15 +3,30 @@ chcp 65001 >nul
 title 月下独酌 · 一键部署向导
 rem ============================================================
 rem  一键部署向导（Windows）
-rem  作用：检查/安装 Node.js 与 pnpm，然后启动部署向导脚本。
+rem  作用：优先使用发布包内自带的便携运行环境（runtime\），
+rem        没有时再检查/安装 Node.js 与 pnpm，最后启动部署向导脚本。
 rem  用法：双击 setup.bat
 rem ============================================================
+
+setlocal
+cd /d "%~dp0"
 
 echo.
 echo  ============================================================
 echo    月下独酌 · 一键部署向导（Windows）
 echo  ============================================================
 echo.
+
+rem ---- 优先使用发布包自带的便携运行环境 ----
+if exist "%~dp0runtime\node\node.exe" (
+  echo  [OK] 检测到自带的便携运行环境（node / pnpm / git），无需另行安装
+  set "PATH=%~dp0runtime\bin;%~dp0runtime\node;%~dp0runtime\git\cmd;%~dp0runtime\git\mingw64\bin;%PATH%"
+  echo.
+  echo  [下一步] 启动部署向导…
+  echo.
+  "%~dp0runtime\node\node.exe" "scripts\setup-deploy.mjs"
+  goto :finish
+)
 
 rem ---- 第一步：检查/安装 Node.js ----
 where node >nul 2>nul
@@ -64,10 +79,8 @@ if %errorlevel%==0 (
 echo.
 echo  [下一步] 启动部署向导…
 echo.
-setlocal
-cd /d %~dp0
 node scripts/setup-deploy.mjs
-endlocal
 
+:finish
 echo.
 pause

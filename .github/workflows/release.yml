@@ -1,0 +1,184 @@
+name: Release
+
+# 打 v* tag 时构建并发布；workflow_dispatch 只构建、不发布（发布 job 限定 tag）
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 构建 dist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "11.18.0"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        env:
+          # CI 没有真实 D1 资源 ID；给一个合法占位 UUID，避免 wrangler.jsonc 残留 ${...} 占位符
+          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+        run: pnpm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+  pack:
+    name: 打包 ${{ matrix.platform }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [win-x64, linux-x64, macos-arm64, macos-x64, plain]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Resolve version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev" >> "$GITHUB_ENV"
+          fi
+
+      - name: Assemble portable runtime
+        if: matrix.platform != 'plain'
+        run: node scripts/pack-release.mjs runtime ${{ matrix.platform }}
+
+      - name: Pack
+        run: |
+          if [[ "${{ matrix.platform }}" == "plain" ]]; then
+            OUT="blog-${VERSION}-without-env.zip"
+          else
+            OUT="blog-${VERSION}-with-env-${{ matrix.platform }}.zip"
+          fi
+          node scripts/pack-release.mjs pack ${{ matrix.platform }} "$VERSION" "$OUT"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.platform }}
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+
+  release:
+    name: 发布 Release
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Install git-cliff
+        # setup-git-cliff 已停止维护（仍停在 Node 20），改用 PyPI 官方包
+        run: pipx install git-cliff
+
+      - name: Generate changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git-cliff --current --strip header --github-repo WhiteMoon319/blog_for_WhiteMoon319 -o RELEASE_NOTES.md || true
+          # git-cliff 没产出内容时退回 git log（首个 tag 没有可比对的上一版本）
+          if [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "## 更新内容" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            PREV_TAG=$(git tag --sort=-creatordate | grep -A1 "^${GITHUB_REF_NAME}$" | tail -1)
+            if [[ -z "$PREV_TAG" ]]; then
+              git log --pretty=format:"- %s" --reverse >> RELEASE_NOTES.md
+            else
+              git log "${PREV_TAG}..${GITHUB_REF_NAME}" --pretty=format:"- %s" --reverse >> RELEASE_NOTES.md
+            fi
+            echo "" >> RELEASE_NOTES.md
+          fi
+
+      - name: Append download guide
+        run: |
+          cat >> RELEASE_NOTES.md << EOF
+
+          ---
+
+          ### 下载哪个包
+
+          | 包 | 适用 |
+          |---|---|
+          | \`blog-${VERSION}-with-env-win-x64.zip\` | **Windows**：解压后双击 \`setup.bat\`，无需自行装 Node/pnpm/git |
+          | \`blog-${VERSION}-with-env-linux-x64.zip\` | **Linux x64**：解压后 \`./setup.sh\`，内置 Node 与 pnpm（git 用系统自带的） |
+          | \`blog-${VERSION}-with-env-macos-arm64.zip\` | **macOS（Apple Silicon）**：解压后 \`./setup.sh\` |
+          | \`blog-${VERSION}-with-env-macos-x64.zip\` | **macOS（Intel）**：解压后 \`./setup.sh\` |
+          | \`blog-${VERSION}-without-env.zip\` | 只要源码与构建产物；需自备 Node ≥ 22 与 pnpm |
+
+          \`with-env\` 包自带便携运行环境，开箱即用；\`without-env\` 包需自行装好 Node 与 pnpm 后运行同一个部署向导。
+
+          两种包都含已构建好的 \`dist/\`；走部署向导时会按你自己的配置重新构建一次。
+          EOF
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          name: "v${{ env.VERSION }}"
+          tag_name: ${{ github.ref_name }}
+          files: assets/*.zip
+          body_path: RELEASE_NOTES.md

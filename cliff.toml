@@ -52,6 +52,10 @@ body = """
 trim = true
 postprocessors = [
   { pattern = '\((\w+)\)!?:', replace = "**${1}**:" },
+  # 提交信息里的 Astro 导入别名 @core / @theme 会被 GitHub 当成 @提及，
+  # 在 Release 页面列成幽灵贡献者（core / theme）；包成行内代码后 GitHub 不再扫描。
+  # 新增别名时记得在这里补上。
+  { pattern = '`?@(core|theme)`?', replace = "`@${1}`" },
 ]
 
 [git]

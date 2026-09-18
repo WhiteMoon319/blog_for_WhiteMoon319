@@ -68,6 +68,7 @@ scripts/
   copy-vendor-css.mjs     把 KaTeX/hljs 样式复制到 public/_assets
   merge-admin.mjs         把 admin/dist 合并进 dist/client/admin
   build-worker.mjs        生成 scheduled-worker.mjs 包装入口（承接 cron）
+  pack-release.mjs        发布打包：组装便携运行时 + 生成发布 zip
   deploy.mjs              一键部署：构建 → 远程迁移 → 部署
   setup-deploy.mjs        从零部署向导（断点续传）
   theme.mjs               查看/切换主题
@@ -86,6 +87,10 @@ src/
                           每套含 layouts/templates/components/styles/assets/i18n
 tests/                    node:test 单测 + e2e（按域拆分）
 worker/                   worker.ts 自定义 Worker 入口（包装 Astro 入口并承接 scheduled 事件）
+setup.bat / setup.sh      一键部署向导入口（优先用包内 runtime/，否则检查/安装 Node + pnpm）
+deploy.bat / deploy.sh    日常更新入口（构建 → 迁移 → 部署，自带环境包会自动接入 runtime/）
+cliff.toml                git-cliff 的 changelog 配置（发布流程用）
+.github/workflows/        CI：release.yml 打 tag 时构建并发布两种发布包
 wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
 .env.example              真实资源 ID 的填法示例
 ```
@@ -278,6 +283,8 @@ git clone https://github.com/WhiteMoon319/blog_for_WhiteMoon319.git
 cd blog_for_WhiteMoon319
 ```
 
+> 也可以不克隆：到 [Releases](https://github.com/WhiteMoon319/blog_for_WhiteMoon319/releases) 下载**自带环境包**，解压后直接进入下一步（包内已含 Node / pnpm，Windows 版还含 git），详见下方「两种发布包」。
+
 **然后二选一：**
 
 **Windows**：双击 `setup.bat`（自动检查/安装 Node.js 与 pnpm，随后启动部署向导）
@@ -303,6 +310,22 @@ chmod +x setup.sh
 9. ✅ 构建并部署到 Cloudflare Workers
 
 部署完成后，用浏览器访问你的域名即可看到博客。
+
+### 两种发布包
+
+不想自己折腾环境的话，到 [Releases](https://github.com/WhiteMoon319/blog_for_WhiteMoon319/releases) 下载现成包：
+
+| 包 | 适用 | 用法 |
+|---|---|---|
+| `blog-<版本>-with-env-win-x64.zip` | Windows | 解压后双击 `setup.bat`；包内已带 node / pnpm / git |
+| `blog-<版本>-with-env-linux-x64.zip` | Linux x64 | 解压后 `chmod +x setup.sh && ./setup.sh`；包内带 node / pnpm，git 用系统自带的 |
+| `blog-<版本>-with-env-macos-arm64.zip` | macOS（Apple Silicon） | 同上 |
+| `blog-<版本>-with-env-macos-x64.zip` | macOS（Intel） | 同上 |
+| `blog-<版本>-without-env.zip` | 任意 | 只要源码与构建产物，需按上方「前置要求」自备 Node ≥ 22 与 pnpm |
+
+- **自带环境包（with-env）**：解压即用，不必自行安装 Node 与 pnpm（Windows 版另含便携 git）。
+- **不带环境包（without-env）**：仓库源码 + 已构建好的 `dist/`，即上文 `git clone` 的等价内容。
+- 两种包都含构建产物 `dist/`；只要走部署向导，都会用你自己的配置重新构建一次。
 
 ### 首次部署后
 
@@ -357,6 +380,8 @@ npx wrangler deploy
 ```bash
 pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 ```
+
+打包版用户同理：Windows 双击 `deploy.bat`，macOS / Linux 运行 `./deploy.sh`——存在包内 `runtime/` 时会自动接入其中的 Node 与 pnpm。
 
 ## 性能优化
 

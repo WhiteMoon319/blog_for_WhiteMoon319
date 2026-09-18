@@ -74,7 +74,6 @@ commit_parsers = [
 protect_breaking_commits = false
 filter_commits = false
 tag_pattern = "v[0-9].*"
-skip_tags = ".*alpha.*"
 sort_commits = "newest"
 
 # 启用 GitHub remote 解析 commit → GitHub username（供 @ 引用）

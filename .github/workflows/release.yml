@@ -132,11 +132,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git-cliff --current --strip header --github-repo WhiteMoon319/blog_for_WhiteMoon319 -o RELEASE_NOTES.md || true
-          # git-cliff 没产出内容时退回 git log（首个 tag 没有可比对的上一版本）
+          # 兜底：git-cliff 没产出内容时退回 git log（例如首个 tag 之前没有可比对的上一版本）
           if [[ ! -s RELEASE_NOTES.md ]]; then
             echo "## 更新内容" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
-            PREV_TAG=$(git tag --sort=-creatordate | grep -A1 "^${GITHUB_REF_NAME}$" | tail -1)
+            # 用 <tag>^ 找上一版本；仓库只有这一个 tag 时 describe 会失败，此时退化为列全部提交
+            PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
             if [[ -z "$PREV_TAG" ]]; then
               git log --pretty=format:"- %s" --reverse >> RELEASE_NOTES.md
             else

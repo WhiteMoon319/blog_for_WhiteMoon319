@@ -68,6 +68,8 @@ export interface Post {
   updated_at: string;
   /** 署名作者，按 sort_order 升序（第一位为主作者）；列表接口一次批量取回 */
   authors?: AuthorRef[];
+  /** 全文排版预设：'' = 主题默认；白名单 wechat/magazine/warm */
+  layout?: string;
 }
 
 /** 写入接口的文章载荷：authors 传用户 id 列表（服务端按顺序落署名） */

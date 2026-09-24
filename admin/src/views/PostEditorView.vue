@@ -67,6 +67,8 @@ const form = reactive({
   inherited_tags: [] as string[],
   /** 署名作者，顺序即展示顺序，第一位为主作者 */
   author_ids: [] as number[],
+  /** 全文排版预设：'' = 主题默认，可选 wechat/magazine/warm */
+  layout: '' as string,
 });
 
 // 文集切换时跟随该文集的默认 AI 提示词。必须放在 form 声明之后：
@@ -442,6 +444,7 @@ async function load() {
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
     form.author_ids = (post.authors ?? []).map((a) => a.id);
+    form.layout = post.layout ?? '';
     contentRisk.value = checkContentRisk(post.content_md);
     if (editor.value) editor.value.commands.setContent(mdToHtml(post.content_md));
     await maybeRestoreDraft(`post:${id}`, id, version, post.content_md);
@@ -461,6 +464,7 @@ async function load() {
     form.inherited_tags = [];
     // 新篇默认署名自己，与服务端缺省一致（避免保存前后署名显示不一致）
     form.author_ids = authState.userId > 0 ? [authState.userId] : [];
+    form.layout = '';
     const cid = parseId(route.query.collection);
     if (cid && collections.value.some((c) => c.id === cid) && canWriteCollection(cid)) form.collection_id = cid;
     contentRisk.value = '';
@@ -529,6 +533,7 @@ summary: form.summary,
     status: form.status,
     tags: [...form.tags],
     author_ids: [...form.author_ids],
+    layout: form.layout,
     content_md: currentMarkdown(),
     base_version: baseVersion.value,
     saved_at: new Date().toISOString(),
@@ -600,6 +605,7 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     snapshot.meta_keywords !== form.meta_keywords || snapshot.is_pinned !== form.is_pinned ||
     snapshot.scheduled_at !== scheduledIso() ||
     (snapshot.author_ids ?? []).join(',') !== form.author_ids.join(',') ||
+    (snapshot.layout ?? '') !== form.layout ||
     snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
   if (!localDiffers) {
     await clearDraft(key);
@@ -637,6 +643,7 @@ function applySnapshot(s: DraftSnapshot): void {
   form.status = s.status;
   form.tags = [...s.tags];
   form.author_ids = [...(s.author_ids ?? [])];
+  form.layout = s.layout ?? '';
   contentRisk.value = checkContentRisk(s.content_md);
   if (editor.value) editor.value.commands.setContent(mdToHtml(s.content_md));
 }
@@ -746,6 +753,7 @@ async function save() {
       version_message: form.version_message.trim(),
       tags: form.tags,
       authors: form.author_ids,
+      layout: form.layout,
       base_version: baseVersion.value,
     };
     if (loadedId.value !== null) {
@@ -919,6 +927,17 @@ async function generateAiSummary() {
             <option value="published">刊发（立即示人）</option>
           </select>
         </div>
+      </div>
+
+      <div class="field">
+        <label>全文样式</label>
+        <select v-model="form.layout" class="select">
+          <option value="">跟随主题（默认）</option>
+          <option value="wechat">公众号风（16px / 行高 1.75 / 两端缩进）</option>
+          <option value="magazine">杂志风（17px / 行高 1.8 / 疏朗）</option>
+          <option value="warm">温润风（16px / 行高 1.9 / 首行缩进）</option>
+        </select>
+        <div class="hint" style="margin-top:6px;color:var(--muted);">只改正文排版节奏，不改块样式；块内观感仍由「✦ 排版」决定。</div>
       </div>
 
       <div class="field">

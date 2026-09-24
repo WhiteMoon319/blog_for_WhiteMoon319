@@ -24,6 +24,7 @@ export interface DraftSnapshot {
   status: 'draft' | 'published';
   tags: string[];
   author_ids: number[];
+  layout: string;
   content_md: string;
   base_version: number;
   saved_at: string;

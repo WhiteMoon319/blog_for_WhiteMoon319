@@ -15,25 +15,33 @@
 - 文章页字号调节（A−/A/A+，localStorage 记忆）与左下角悬浮阅读进度指示器
 - RSS（`/feed.xml`）、站点地图（`/sitemap.xml`）动态生成
 - KaTeX 数学公式、Mermaid 流程图、MarkMap 脑图、代码高亮（highlight.js），均按需加载（正文含对应内容才拉取资源）
-- 用户系统：注册（邮箱验证码）、登录（用户名或邮箱）、个人中心（昵称、头像、改密码、改邮箱、邮件提醒开关）
+- 用户系统：注册（邮箱验证码）、登录（用户名或邮箱）、个人中心（昵称、头像、作者简介、改密码、改邮箱、邮件提醒开关）
+- 多作者：文章支持多人共同署名（有序，第一位为主作者），文章页与列表卡展示署名并链接作者页；作者页 `/authors/{username}/` 展示简介与名下文章；搜索页同关键词命中作者时分区展示
+- 文集归属作者：文集有归属人（即集主署名），可设为「公用」（任何作者可投稿）或「私有」（仅归属人与协作者）；协作者由归属人拉入或作者申请、归属人同意后加入
 - 评论系统：嵌套回复、楼层号、文字 + 图片附件（R2）、点赞、敏感词人工审核
 - 文章/评论点赞
 - 边缘缓存：匿名公开页面 60s 边缘缓存 + 后台刷新；登录用户 no-store
 - 主题系统：仓库内置 `modern`（默认，简约现代）与 `classic`（古风水墨）两套，深色模式，支持本地切换与从官方主题仓库安装更多（如 `starter` 起步模板、`wildfire` 野火等）
 
-**后台（`/admin`）**
+**后台（`/admin`，管理员专属）**
 
-- 统一账号登录（与前台共用登录，按 role 判权限；非管理员访问后台 404）
+- 统一账号登录（与前台共用登录，按 role 判权限；作者走独立写作区 `/write/`，非作者非管理员访问 `/admin` 会被请回各自入口）
 - 数据看板：阅读趋势、日聚合热文 TOP、统计字数
-- 文集管理：新建/编辑/删除（名称、slug、简介、主题色、参考前文摘要开关、AI 摘要模板）
-- 文章管理：Tiptap 富文本编辑器（可视化 + 源码双模式，CodeMirror Markdown 编辑 + 实时预览），发布/草稿/定时/置顶，版本历史（diff 对比、回滚），Word（.docx）导入为 Markdown
+- 文集管理：新建/编辑/删除（名称、slug、简介、主题色、公用/私有、参考前文摘要开关、AI 摘要模板）
+- 文章管理：Tiptap 富文本编辑器（可视化 + 源码双模式，CodeMirror Markdown 编辑 + 实时预览），发布/草稿/定时/置顶，署名作者多选（可排序），版本历史（diff 对比、回滚），Word（.docx）导入为 Markdown
 - 独立页面管理：自定义页面（slug、标题、内容、发布开关）
 - AI 摘要：单篇生成（多候选可选）、批量生成（列表/导入页）、文集参考摘要、可配置 API Key（AES-256-GCM 加密存储）
 - 图片管理：拖拽直传 R2、媒体库浏览/删除、封面与正文插图
 - 评论审核：待审/已准/已拒分栏、按文章筛选、批准/驳回/删除
-- 用户管理：列表、封禁/解封（封禁即踢下线）
-- 数据导出：全量 JSON 快照、单篇 Markdown 下载
+- 用户管理：列表、封禁/解封（封禁即踢下线）、提为作者/降回读者、编辑昵称与作者简介
+- 数据导出：全量 JSON 快照（含署名与协作者）、单篇 Markdown 下载（frontmatter 带署名）
 - 站点设置：站点信息/界面语言（zh-CN/en）/文案变量、邮件（SMTP 或 HTTP API）、AI 配置、评论审核词
+
+**写作区（`/write/`，作者与管理员）**
+
+- 独立入口与独立产物（不与后台共用页面与路由表），面向作者的轻量界面
+- 我的文章（只看自己归属或署名的）、写新篇、我的文集（自建、公用开关、协作者与协作申请）、媒体库（可读可传，删除仍限管理员）
+- 编辑器与后台共用同一套组件（署名多选、私有文集不可写会标注并禁用）
 
 ## 技术栈
 
@@ -97,7 +105,14 @@ wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
 
 ## 主题系统
 
-站点外观由 `src/themes/<slug>/` 整体定义——每个页面类型一个模板组件（home/collection/post/archive/tag-index/tag-detail/search/standalone/not-found + 可选认证页），页面壳只负责查数据并把上下文传进来：
+站点外观由 `src/themes/<slug>/` 整体定义——每个页面类型一个模板组件（home/collection/post/author/archive/tag-index/tag-detail/search/standalone/not-found + 可选认证页），页面壳只负责查数据并把上下文传进来：
+
+多作者署名由核心统一组装为「作者徽标」（`AuthorBadge`，含 `href`；封禁或身份不符时为 `null` 即降级为纯文本），主题只排版，推荐一行接入共用组件：
+
+```astro
+import AuthorByline from '@core/AuthorByline.astro';
+<AuthorByline authors={authors} prefix={t('post.byline')} variant="post" />
+```
 
 ```
 src/pages/posts/[slug].astro   # 数据查询 + 守卫
@@ -144,8 +159,10 @@ pnpm theme <slug>                 # 安装后切换
 | `/tags/{tag}/`；`/tags/?t=` | 独立标签页；多 `t` 取交集，`q` 为标签内关键词 |
 | `/feed.xml`、`/sitemap.xml` | RSS 与站点地图（动态生成） |
 | `/login/`、`/register/`、`/verify-email/`、`/account/` | 登录、注册、邮箱验证、个人中心 |
-| `/preview/{id}/` | 草稿预览（需登录，`noindex`） |
-| `/admin/...` | 管理端 SPA |
+| `/preview/{id}/` | 草稿预览（需登录，归属人/署名作者/管理员可见，`noindex`） |
+| `/authors/{username}/` | 作者页（仅未封禁的作者/管理员，展示简介与名下文章） |
+| `/admin/...` | 管理端 SPA（管理员专属；作者访问会转到写作区） |
+| `/write/...` | 作者写作区（独立产物：我的文章、写新篇、我的文集、媒体） |
 
 ### API
 
@@ -179,6 +196,12 @@ pnpm theme <slug>                 # 安装后切换
 | GET/POST | `/api/comments`，DELETE `/api/comments/{id}`，POST `.../{id}/like` | 评论发布/审核/点赞 | 写需登录 |
 | POST | `/api/comments/upload` | 评论图片附件 → R2 | 登录 |
 | GET/POST | `/api/users`，POST `/api/users/{id}/ban` | 用户列表与封禁 | 登录 |
+| POST | `/api/users/{id}/role` | 提为作者 / 降回读者（管理员角色不可改） | 登录 |
+| PUT | `/api/users/{id}` | 管理员编辑他人昵称与作者简介 | 登录 |
+| GET | `/api/authors` | 可选署名作者名单（编辑器作者多选） | 作者/管理员 |
+| GET | `/api/collections?mine=1`｜`?view=1` | 我的文集 / 写作区文集视图（关系+可写性+申请状态） | 作者/管理员 |
+| GET/POST/DELETE | `/api/collections/{id}/members` | 协作者列表、拉人、移除、裁决申请 | 归属人/管理员 |
+| POST | `/api/collections/{id}/join` | 申请协作（私有文集） | 作者/管理员 |
 | POST | `/api/posts/{id}/like` | 文章点赞 | 公开 |
 | POST | `/api/reading` | 静默上报阅读进度（离开文章页时） | 登录 |
 | GET | `/api/export`，`/api/export/posts/{id}.md` | 数据导出 | 登录 |
@@ -395,9 +418,27 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 
 ## 数据库
 
-- **迁移**：`db/migrations/0001_init` ~ `0033_reading_history`（共 33 个）
+- **迁移**：`db/migrations/0001_init` ~ `0035_collection_owner`（共 35 个）
+- **多作者相关**：`post_authors`（署名关联，有序）、`posts.created_by`（归属人，决定编辑权）、`post_versions.authors`（署名快照）、`users.bio`（作者简介）、`collections.created_by`（文集归属人即集主）、`collections.is_public`（公用/私有）、`collection_collaborators`、`collection_invites`（协作申请）
 - **核心表**：`collections`（文集，含 `ref_summaries`/`ai_prompt_id`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本）、`pages`（独立页面）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置，含 `ai_prompt_templates`）、`users`/`comments`/`comment_likes`/`post_likes`/`reading_history`（登录用户阅读进度）/`email_verifications`、`email_credentials`（SMTP 或 HTTP API 凭据）、`daily_views`（阅读统计）
 - **文章 slug**：文集内唯一；未分类由部分唯一索引保证全局唯一。删除文集时 slug 冲突自动加后缀
+
+### 迁移 0034 / 0035 升级注意（生产 D1 不可逆）
+
+这两条迁移会给既有数据回填归属人：`posts.created_by` 与 `collections.created_by` 都指向库中**最小的管理员账号**，后者还需要 `role = 'admin'` 的用户存在（迁移 0027 已种下）。执行前请务必：
+
+```bash
+# 1. 先导出快照备份（后台「数据导出」或 wrangler d1 export）
+pnpm wrangler d1 export blog-db --remote --output=backup-before-0034.sql
+
+# 2. 本地库先跑通
+pnpm run cf:db:local
+
+# 3. 再应用到生产
+pnpm wrangler d1 migrations apply blog-db --remote
+```
+
+D1 的迁移不提供自动回滚；如需退回只能靠上面的备份快照。若库中已有大量文章/文集，回填会在一次 `UPDATE` 内完成，注意 `wrangler d1 migrations apply` 的超时设置。
 
 ## AI 摘要
 

@@ -11,6 +11,10 @@ import assert from 'node:assert/strict';
 import {
   createPostWithTags,
   createCollection,
+  createUser,
+  setPostAuthors,
+  addCollectionCollaborator,
+  requestCollectionInvite,
   trashPosts,
   purgePosts,
   exportFullSnapshot,
@@ -21,6 +25,19 @@ import { makeTestDb } from './helpers/d1.ts';
 const handle = await makeTestDb();
 after(() => handle.dispose());
 const db = handle.db;
+
+async function mkUser(username: string, role: 'reader' | 'author' | 'admin', displayName = username, bio = '') {
+  const u = await createUser(db, {
+    username,
+    email: `${username}@example.com`,
+    password_hash: 'x',
+    display_name: displayName,
+    role,
+  });
+  assert.ok(u, `创建用户 ${username} 失败`);
+  if (bio) await db.prepare('UPDATE users SET bio = ? WHERE id = ?').bind(bio, u.id).run();
+  return u;
+}
 
 test('导出：全量快照含全部表与版本信息，且快照忠实反映回收站状态', async () => {
   const col = await createCollection(db, {
@@ -49,7 +66,10 @@ test('导出：全量快照含全部表与版本信息，且快照忠实反映�
   await trashPosts(db, [post.id]);
 
   const snap = await exportFullSnapshot(db);
-  assert.equal(snap.schema_version, 2, 'schema_version 递增');
+  assert.equal(snap.schema_version, 3, 'schema_version 随快照结构递增');
+  assert.deepEqual(snap.post_authors, [], '无署名的库导出为空数组');
+  assert.deepEqual(snap.collection_collaborators, [], '无协作者的库导出为空数组');
+  assert.deepEqual(snap.collection_invites, [], '无申请的库导出为空数组');
   assert.ok(snap.generated_at, '应带生成时间');
   assert.ok(snap.migration_version.length > 0, '应带迁移版本（测试环境可能为 unknown）');
   assert.equal(snap.collections.length, 1);
@@ -93,4 +113,43 @@ test('导出：单篇 Markdown 带 frontmatter 与标签，特殊字符安全', 
   assert.ok(out.body.trimEnd().endsWith('# 标题\n\n正文。'), '正文完整保留');
 
   assert.equal(await exportPostMarkdown(db, 999999), null, '不存在的文章返回 null');
+});
+
+test('导出：署名与协作者随快照导出，单篇 frontmatter 带 authors', async () => {
+  const a = await mkUser('exp-author-a', 'author', '导出甲', '简介甲');
+  const b = await mkUser('exp-author-b', 'author', '导出乙');
+
+  const col = await createCollection(db, { title: '导出协作集', slug: 'exp-col', created_by: a.id, is_public: 0 });
+  assert.ok(col);
+  await addCollectionCollaborator(db, col!.id, b.id);
+  await requestCollectionInvite(db, col!.id, b.id, '想投稿');
+  await db.prepare('DELETE FROM collection_collaborators WHERE collection_id = ? AND user_id = ?').bind(col!.id, b.id).run();
+
+  const r = await createPostWithTags(
+    db,
+    { collection_id: col!.id, title: '署名篇', slug: 'exp-signed', summary: 's', content_md: '正文', status: 'published', created_by: a.id },
+    ['标一'],
+  );
+  assert.ok(r);
+  await setPostAuthors(db, r!.post.id, [a.id, b.id]);
+
+  const snap = await exportFullSnapshot(db);
+  assert.deepEqual(
+    snap.post_authors.map((x) => [x.post_id, x.user_id, x.sort_order]).filter((x) => x[0] === r!.post.id),
+    [
+      [r!.post.id, a.id, 0],
+      [r!.post.id, b.id, 1],
+    ],
+    '署名顺序应完整进快照',
+  );
+  assert.equal(snap.collection_invites.length, 1, '协作申请应进快照');
+  assert.equal(snap.collections.find((x) => x.id === col!.id)?.created_by, a.id, '文集归属人应进快照');
+  assert.equal(snap.collections.find((x) => x.id === col!.id)?.is_public, 0, '公用标记应进快照');
+  const exportedUsers = snap.users as Array<Record<string, unknown>>;
+  assert.equal(exportedUsers.find((u) => u.username === 'exp-author-a')?.bio, '简介甲', '用户简介应进快照');
+
+  const md = await exportPostMarkdown(db, r!.post.id);
+  assert.ok(md);
+  assert.ok(md!.body.includes('authors: ["exp-author-a", "exp-author-b"]'), '单篇 frontmatter 应带署名用户名');
+  assert.ok(md!.body.includes('author_names: ["导出甲", "导出乙"]'), '并带展示名');
 });

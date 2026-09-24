@@ -110,3 +110,51 @@ test('e2e：文集页输出 CollectionPage JSON-LD', async () => {
   assert.ok(script.includes('http://e2e.test/collections/essays/'), '应含文集 URL');
   assert.ok(script.includes('"@type":"ListItem"'), '应列举文集内文章');
 });
+
+test('e2e：订阅源输出 dc:creator 署名，署名变更即刷新缓存', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const me = await (await c.get('/api/auth/me')).json();
+  const authorId = Number(String(me.sub).replace('user:', ''));
+
+  const created = await c.post('/api/posts', {
+    title: '署名订阅篇',
+    slug: 'feed-author-probe',
+    content_md: '正文',
+    status: 'published',
+    authors: [authorId],
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const first = await (await c.get('/feed.xml')).text();
+  assert.ok(first.includes('xmlns:dc='), '应声明 dc 命名空间');
+  assert.ok(first.includes('<dc:creator>管理员</dc:creator>'), '条目应带署名展示名');
+
+  // 改署名后缓存必须失效（改的是同一个作者集合，改名走用户资料）
+  await c.sql('UPDATE users SET display_name = ? WHERE id = ?', '改名后的作者', authorId);
+  const second = await (await c.get('/feed.xml')).text();
+  assert.ok(second.includes('<dc:creator>改名后的作者</dc:creator>'), '改署名后订阅源应刷新');
+  assert.ok(!second.includes('<dc:creator>管理员</dc:creator>'), '旧署名不应残留（缓存已按署名作废）');
+
+  await c.sql('UPDATE users SET display_name = ? WHERE id = ?', '管理员', authorId);
+  await c.del(`/api/posts/${id}`);
+});
+
+test('e2e：sitemap 纳入作者页，且封禁后失效', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+
+  const created = await c.sql(
+    `INSERT INTO users (username, display_name, email, email_verified, password_hash, role, bio, session_version, created_at)
+     VALUES ('sitemap-author', '站图作者', 'sitemap-author@e2e.test', 1, 'x', 'author', '', 1, datetime('now'))`,
+  );
+  assert.ok(created);
+
+  const xml = await (await c.get('/sitemap.xml')).text();
+  assert.ok(xml.includes('<loc>http://e2e.test/authors/sitemap-author/</loc>'), '作者页应进 sitemap');
+
+  await c.sql(`UPDATE users SET status = 'banned' WHERE username = 'sitemap-author'`);
+  const afterBan = await (await c.get('/sitemap.xml')).text();
+  assert.ok(!afterBan.includes('/authors/sitemap-author/'), '封禁后作者页应从 sitemap 移除（缓存已作废）');
+});

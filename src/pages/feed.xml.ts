@@ -8,6 +8,7 @@
 
 import type { APIContext } from 'astro';
 import { envOf, listPublishedPosts, getCollectionsByIds } from '../lib/db';
+import { badgesByPostId } from '../lib/authors-view';
 import { escapeXml } from '../lib/seo';
 import { postHref } from '../lib/utils';
 import { renderMarkdown } from '../lib/markdown';
@@ -49,8 +50,19 @@ export async function GET(ctx: APIContext): Promise<Response> {
     for (const [id, c] of cols) colMap.set(id, c.slug);
   }
 
-  // 代际 key：任一文章增删改或文集 slug 变化即失效
-  const cacheKey = posts.map((p) => `${p.id}:${p.created_at}:${p.updated_at}:${p.collection_id !== null ? colMap.get(p.collection_id) ?? '' : ''}`).join('|');
+  // 署名：一次批量取回，改署名同样要让缓存失效（否则订阅源里的作者陈旧）
+  const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
+
+  // 代际 key：任一文章增删改、文集 slug 变化或署名变化即失效
+  const cacheKey =
+    posts
+      .map(
+        (p) =>
+          `${p.id}:${p.created_at}:${p.updated_at}:${p.collection_id !== null ? colMap.get(p.collection_id) ?? '' : ''}:${
+            (authorsByPost[String(p.id)] ?? []).map((a) => `${a.id}/${a.name}/${a.href ?? ''}`).join(',')
+          }`,
+      )
+      .join('|');
   if (feedCache && feedCache.key === cacheKey) {
     return new Response(feedCache.xml, {
       headers: {
@@ -65,11 +77,18 @@ export async function GET(ctx: APIContext): Promise<Response> {
     const link = `${base}${postHref(p.slug, colSlug)}`;
     const pubDate = fmtDate(p.created_at);
     const { html } = renderMarkdown(p.content_md);
+    // 多作者：RSS 规范允许多个 dc:creator，逐个输出（顺序即署名顺序，第一位为主作者）；
+    // 无署名时回退站点名，订阅源里不出现空白作者
+    const badges = authorsByPost[String(p.id)] ?? [];
+    const creators = (badges.length > 0 ? badges : [{ name: env.SITE_NAME }]).map(
+      (a) => `<dc:creator>${escapeXml(a.name)}</dc:creator>`,
+    );
     return [
       '<item>',
       `<title>${escapeXml(p.title)}</title>`,
       `<link>${escapeXml(link)}</link>`,
       `<guid isPermaLink="true">${escapeXml(link)}</guid>`,
+      ...creators,
       p.summary ? `<description><![CDATA[${p.summary.replace(/\]\]>/g, ']]&gt;')}]]></description>` : '',
       html ? `<content:encoded><![CDATA[${html.replace(/\]\]>/g, ']]&gt;')}]]></content:encoded>` : '',
       pubDate ? `<pubDate>${pubDate}</pubDate>` : '',
@@ -80,7 +99,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const lastBuild = posts.length > 0 ? `<lastBuildDate>${fmtDate(posts[0].created_at)}</lastBuildDate>` : '';
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">`,
+    `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">`,
     '<channel>',
     `<title>${escapeXml(env.SITE_NAME)}</title>`,
     `<description>${escapeXml(env.SITE_SLOGAN ?? '')}</description>`,

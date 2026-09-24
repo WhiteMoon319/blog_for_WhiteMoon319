@@ -26,8 +26,22 @@ export async function GET(ctx: APIContext): Promise<Response> {
        WHERE p.status = 'published' AND p.deleted_at IS NULL`,
     )
     .all<{ id: number; slug: string; collection_id: number | null; updated_at: string; status: string; deleted_at: string | null; collection_slug: string | null }>();
+  // 作者页同样纳入 sitemap：口径与作者页一致（未封禁的作者/管理员）
+  const authors = await env.DB
+    .prepare(
+      `SELECT id, username, display_name, status, created_at FROM users
+       WHERE role IN ('author','admin') AND status = 'active'
+       ORDER BY id`,
+    )
+    .all<{ id: number; username: string; display_name: string; status: string; created_at: string }>();
 
-  const cacheKey = collections.map((c) => `${c.id}:${c.updated_at}`).join('|') + '||' + (posts.results ?? []).map((p) => `${p.id}:${p.updated_at}`).join('|');
+  // 代际 key 必须包含作者数据：改笔名/封禁作者都会改变 sitemap 内容
+  const cacheKey =
+    collections.map((c) => `${c.id}:${c.updated_at}`).join('|') +
+    '||' +
+    (posts.results ?? []).map((p) => `${p.id}:${p.updated_at}`).join('|') +
+    '||' +
+    (authors.results ?? []).map((a) => `${a.id}:${a.username}:${a.display_name}:${a.status}`).join('|');
   if (sitemapCache && sitemapCache.key === cacheKey) {
     return new Response(sitemapCache.xml, {
       headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
@@ -43,6 +57,9 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
   for (const p of posts.results ?? []) {
     urls.push({ path: postHref(p.slug, p.collection_slug), lastmod: p.updated_at });
+  }
+  for (const a of authors.results ?? []) {
+    urls.push({ path: `/authors/${encodeURIComponent(a.username)}/`, lastmod: a.created_at });
   }
 
   const body = urls.map((u) => {

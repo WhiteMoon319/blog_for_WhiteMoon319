@@ -29,6 +29,27 @@ export interface CollectionTagRow {
   tag_id: number;
 }
 
+/** 署名关联（多作者）：备份必须带走，否则恢复后署名全丢 */
+export interface PostAuthorRow {
+  post_id: number;
+  user_id: number;
+  sort_order: number;
+}
+
+/** 文集协作者（私有文集可写入的人） */
+export interface CollectionCollaboratorRow {
+  collection_id: number;
+  user_id: number;
+}
+
+/** 文集协作申请 */
+export interface CollectionInviteExportRow {
+  collection_id: number;
+  user_id: number;
+  status: string;
+  message: string;
+}
+
 export interface ExportSnapshot {
   schema_version: number;
   generated_at: string;
@@ -39,6 +60,9 @@ export interface ExportSnapshot {
   tags: TagRow[];
   collection_tags: CollectionTagRow[];
   post_tags: PostTagRow[];
+  post_authors: PostAuthorRow[];
+  collection_collaborators: CollectionCollaboratorRow[];
+  collection_invites: CollectionInviteExportRow[];
   pages: Array<Record<string, unknown>>;
   settings: Array<Record<string, unknown>>;
   users: Array<Record<string, unknown>>;
@@ -49,13 +73,20 @@ export interface ExportSnapshot {
 // 明确不含：管理员密码/口令、会话、Cookie、BLOG_SESSION_SECRET、CSRF 凭据、R2 媒体二进制。
 // 回收站文章也一并导出并保留 deleted_at，使快照能忠实反映任意时刻的完整 CMS 状态。
 export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot> {
-  const [collections, posts, post_versions, tags, collection_tags, post_tags] = await Promise.all([
+  const [collections, posts, post_versions, tags, collection_tags, post_tags, post_authors, collaborators, invites] = await Promise.all([
     db.prepare('SELECT * FROM collections ORDER BY sort_order, id').all<CollectionRow>(),
     db.prepare('SELECT * FROM posts ORDER BY created_at, id').all<PostRow>(),
     db.prepare('SELECT * FROM post_versions ORDER BY post_id, version').all<PostVersionRow>(),
     db.prepare('SELECT * FROM tags ORDER BY name').all<TagRow>(),
     db.prepare('SELECT collection_id, tag_id FROM collection_tags ORDER BY collection_id, tag_id').all<CollectionTagRow>(),
     db.prepare('SELECT post_id, tag_id FROM post_tags ORDER BY post_id, tag_id').all<PostTagRow>(),
+    db.prepare('SELECT post_id, user_id, sort_order FROM post_authors ORDER BY post_id, sort_order').all<PostAuthorRow>(),
+    db
+      .prepare('SELECT collection_id, user_id FROM collection_collaborators ORDER BY collection_id, user_id')
+      .all<CollectionCollaboratorRow>(),
+    db
+      .prepare('SELECT collection_id, user_id, status, message FROM collection_invites ORDER BY collection_id, user_id')
+      .all<CollectionInviteExportRow>(),
   ]);
 
   let pages: Array<Record<string, unknown>> = [];
@@ -70,9 +101,9 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
     settings = rows.filter((r) => isExportableSetting(r.key)).map((r) => ({ key: r.key, value: r.value }));
   } catch { settings = []; }
   try {
-    // users：仅白名单字段，排除敏感信息
+    // users：仅白名单字段，排除敏感信息；含作者简介与头像（作者页展示用）
     users = (await db.prepare(
-      `SELECT id, username, display_name, email, role, status, created_at FROM users ORDER BY id`,
+      `SELECT id, username, display_name, email, role, status, bio, avatar_url, created_at FROM users ORDER BY id`,
     ).all<Record<string, unknown>>()).results ?? [];
   } catch { users = []; }
   try {
@@ -92,7 +123,7 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
   }
 
   return {
-    schema_version: 2,
+    schema_version: 3,
     generated_at: new Date().toISOString(),
     migration_version: migrationVersion,
     collections: collections.results ?? [],
@@ -101,6 +132,9 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
     tags: tags.results ?? [],
     collection_tags: collection_tags.results ?? [],
     post_tags: post_tags.results ?? [],
+    post_authors: post_authors.results ?? [],
+    collection_collaborators: collaborators.results ?? [],
+    collection_invites: invites.results ?? [],
     pages,
     settings,
     users,
@@ -121,6 +155,16 @@ export async function exportPostMarkdown(db: D1Database, id: number): Promise<{ 
     .all<{ name: string }>();
 
   const yaml = (v: string): string => JSON.stringify(v);
+  // 署名：随 frontmatter 一起导出，否则单篇备份会丢作者
+  const authorRows = await db
+    .prepare(
+      `SELECT u.username, u.display_name FROM post_authors pa JOIN users u ON u.id = pa.user_id
+       WHERE pa.post_id = ? ORDER BY pa.sort_order, pa.user_id`,
+    )
+    .bind(id)
+    .all<{ username: string; display_name: string }>();
+  const authors = (authorRows.results ?? []).map((a) => a.username);
+  const authorNames = (authorRows.results ?? []).map((a) => a.display_name?.trim() || a.username);
   const frontmatter = [
     '---',
     `title: ${yaml(post.title)}`,
@@ -133,6 +177,8 @@ export async function exportPostMarkdown(db: D1Database, id: number): Promise<{ 
     post.deleted_at ? `deleted_at: ${yaml(post.deleted_at)}` : null,
     post.cover_url ? `cover_url: ${yaml(post.cover_url)}` : null,
     `tags: [${tags.results?.map((t) => JSON.stringify(t.name)).join(', ') ?? ''}]`,
+    `authors: [${authors.map((u) => JSON.stringify(u)).join(', ')}]`,
+    authorNames.length > 0 ? `author_names: [${authorNames.map((n) => JSON.stringify(n)).join(', ')}]` : null,
     '---',
   ].filter((l): l is string => l !== null);
 

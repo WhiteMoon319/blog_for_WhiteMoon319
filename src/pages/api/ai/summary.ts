@@ -8,7 +8,7 @@
 
 import type { APIContext } from 'astro';
 import { envOf, getAllSettings, getAiCredential } from '../../../lib/db';
-import { json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
 import { generateSummary, collectContext, parsePromptTemplates, sanitizeError, type AiConfig } from '../../../lib/ai';
 
@@ -27,7 +27,7 @@ function loadConfig(settings: Record<string, string>, apiKey: string): AiConfig 
 }
 
 export async function POST(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);

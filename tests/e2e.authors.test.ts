@@ -325,3 +325,90 @@ test('e2e：文章署名写入、替换与清空，非法署名被拒', async ()
   });
   assert.equal(oversized.status, 400, '超过署名上限应 400');
 });
+
+test('e2e：写作区依赖接口——作者名单、列表署名、AI 摘要对作者开放', async () => {
+  if (!HAS_BUILD) return;
+  await setup();
+
+  const anon = await c.anon('/api/authors', { redirect: 'manual' });
+  assert.equal(anon.status, 401, '未登录读作者名单应 401');
+  c.setSession(reader.cookie);
+  assert.equal((await c.get('/api/authors')).status, 403, '读者读作者名单应 403');
+
+  c.setSession(authorA.cookie);
+  const list = await c.get('/api/authors');
+  assert.equal(list.status, 200, '作者应能读作者名单');
+  const ids = ((await list.json()).authors as Array<{ id: number; post_count: number }>).map((a) => a.id);
+  assert.ok(ids.includes(authorA.id) && ids.includes(authorB.id), '名单应含作者');
+  assert.ok(!ids.includes(reader.id), '名单不应含读者');
+
+  // 文章列表带署名（列表页一次取回，不需要逐篇再查）
+  const created = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '署名列表',
+    slug: 'authz-list-sign',
+    status: 'draft',
+    authors: [authorB.id, authorA.id],
+  });
+  assert.equal(created.status, 201);
+  const createdId = (await created.json()).post.id as number;
+  const rows = (await (await c.get('/api/posts?status=all')).json()).posts as Array<{
+    id: number;
+    authors: Array<{ id: number; username: string }>;
+  }>;
+  const row = rows.find((p) => p.id === createdId);
+  assert.deepEqual(row?.authors.map((a) => a.id), [authorB.id, authorA.id], '列表应带有序署名');
+  assert.ok(row?.authors[0].username, '署名应含用户名（前台链接用）');
+
+  // AI 摘要类接口：作者已过鉴权（本环境未配置 AI 密钥 → 500 配置错误，而非 403）
+  const aiSummary = await c.post('/api/ai/summary', { content_md: '正文' });
+  assert.equal(aiSummary.status, 500, '作者调 AI 摘要应过鉴权（缺密钥 → 500）');
+  assert.equal((await c.get('/api/ai/models')).status, 500, '作者调模型列表应过鉴权');
+  assert.equal((await c.del('/api/settings/ai-key')).status, 403, 'AI 密钥仍限管理员');
+
+  c.setSession(reader.cookie);
+  assert.equal((await c.post('/api/ai/summary', { content_md: '正文' })).status, 403, '读者调 AI 摘要应 403');
+  c.setSession(authorA.cookie);
+  assert.equal((await c.post('/api/ai/test', { model: 'x' })).status, 403, 'AI 连通性测试仍限管理员');
+});
+
+test('e2e：封禁作者的既有署名可保留，但不接受新署名', async () => {
+  if (!HAS_BUILD) return;
+  await setup();
+
+  c.setSession(authorA.cookie);
+  const created = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '封禁署名',
+    slug: 'authz-ban-sign',
+    status: 'draft',
+    authors: [authorB.id],
+  });
+  assert.equal(created.status, 201);
+  const postId = (await created.json()).post.id as number;
+
+  c.setSession(adminCookie);
+  assert.equal((await c.post(`/api/users/${authorB.id}/ban`, {})).status, 200, '封禁作者应成功');
+
+  // 已署名者被降级/封禁后，改正文仍能保存（署名保留），否则历史署名会反过来锁死文章
+  c.setSession(authorA.cookie);
+  const updated = await c.put(`/api/posts/${postId}`, { title: '改标题', authors: [authorB.id] });
+  assert.equal(updated.status, 200, '已署名者被封禁后仍可保留其署名');
+  assert.deepEqual(
+    ((await updated.json()).authors as Array<{ id: number }>).map((a) => a.id),
+    [authorB.id],
+    '署名应保留',
+  );
+
+  // 但不允许把封禁用户新挂到别的文章上
+  const fresh = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '新挂封禁',
+    slug: 'authz-new-ban-sign',
+    authors: [authorB.id],
+  });
+  assert.equal(fresh.status, 400, '不得新署名封禁用户');
+
+  c.setSession(adminCookie);
+  await c.post(`/api/users/${authorB.id}/ban`, {});
+});

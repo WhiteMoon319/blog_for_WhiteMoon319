@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPostWithTags, listPostAuthors, filterSignableAuthorIds, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPostWithTags, listPostAuthors, listAuthorsForPosts, filterSignableAuthorIds, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 import { parseAuthorIds } from '../../../lib/api/validate';
@@ -49,7 +49,9 @@ export async function GET(ctx: APIContext): Promise<Response> {
     trashOnly,
     authorId,
   });
-  return json({ posts });
+  // 列表页需要署名：一次 IN 查询取回全部，避免逐篇查询
+  const authorMap = await listAuthorsForPosts(env.DB, posts.map((p) => p.id));
+  return json({ posts: posts.map((p) => ({ ...p, authors: authorMap.get(p.id) ?? [] })) });
 }
 
 export async function POST(ctx: APIContext): Promise<Response> {

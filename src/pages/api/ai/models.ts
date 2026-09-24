@@ -8,14 +8,14 @@
 
 import type { APIContext } from 'astro';
 import { envOf, getAllSettings, getAiCredential } from '../../../lib/db';
-import { json, requireAuth } from '../../../lib/auth';
+import { json, requireAuthor } from '../../../lib/auth';
 import { decryptApiKey } from '../../../lib/ai-credentials';
 import { fetchModelList } from '../../../lib/ai';
 
 export const prerender = false;
 
 export async function GET(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
   if (!env.AI_SETTINGS_ENCRYPTION_KEY) return json({ error: 'encryption_key_not_configured' }, 500);

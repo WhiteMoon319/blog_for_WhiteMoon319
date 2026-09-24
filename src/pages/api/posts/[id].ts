@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, getPostAuthorIds, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
 import { resolveUser, json, checkCsrf } from '../../../lib/auth';
 import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.ts';
 import { isValidSlug } from '../../../lib/utils';
@@ -116,10 +116,18 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (!parsedAuthors.ok) return json({ error: parsedAuthors.error }, 400);
   let nextAuthorIds: number[] | undefined;
   if (parsedAuthors.ids !== undefined) {
-    nextAuthorIds = await filterSignableAuthorIds(env.DB, parsedAuthors.ids);
-    if (nextAuthorIds.length !== parsedAuthors.ids.length) {
-      return json({ error: 'authors 含不可署名的用户（需为作者或管理员且未封禁）' }, 400);
+    const signable = await filterSignableAuthorIds(env.DB, parsedAuthors.ids);
+    const unsignable = parsedAuthors.ids.filter((id) => !signable.includes(id));
+    // 已在本篇署名中的用户即使被降级/封禁也予以保留：否则改一次正文就会
+    // 因"署名里有不可署名用户"而整篇存不下去，等于历史署名反过来锁死文章。
+    if (unsignable.length > 0) {
+      const current = await getPostAuthorIds(env.DB, id);
+      const rejected = unsignable.filter((uid) => !current.includes(uid));
+      if (rejected.length > 0) {
+        return json({ error: 'authors 含不可署名的用户（需为作者或管理员且未封禁）' }, 400);
+      }
     }
+    nextAuthorIds = parsedAuthors.ids;
   }
 
   try {

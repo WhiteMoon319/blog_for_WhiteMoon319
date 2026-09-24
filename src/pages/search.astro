@@ -3,6 +3,7 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import SearchTemplate from '@theme/templates/search.astro';
 import { envOf, searchPublishedPosts, getCollectionsByIds, findTagIds } from '../lib/db';
+import { badgesByPostId, searchAuthorHits } from '../lib/authors-view';
 
 export const prerender = false;
 
@@ -56,8 +57,20 @@ for (const post of posts) {
   const collection = post.collection_id ? collections.get(post.collection_id) ?? null : null;
   results.push({ post, collection });
 }
+// 同一关键词同时搜作者：不加 @ 之类专用语法，命中即分区展示
+const authorHits = q ? await searchAuthorHits(env.DB, q, 9) : [];
+// 文章结果卡署名：一次批量取回
+const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
 import { getSiteContext } from "../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<SearchTemplate ctx={siteCtx} q={q} tagMode={tagMode} tagNotFound={tagNotFound} results={results} />
+<SearchTemplate
+  ctx={siteCtx}
+  q={q}
+  tagMode={tagMode}
+  tagNotFound={tagNotFound}
+  results={results}
+  authorHits={authorHits}
+  authorsByPost={authorsByPost}
+/>

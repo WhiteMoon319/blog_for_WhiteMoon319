@@ -4,6 +4,7 @@
 import { envOf, getPublishedPostBySlug, getPublishedPostBySlugAny, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getCollectionById, getReadingProgress } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown';
 import { resolveUser } from '../../lib/auth';
+import { listPostAuthorBadges } from '../../lib/authors-view';
 import { safeJsonLd } from '../../lib/seo';
 import PostTemplate from '@theme/templates/post.astro';
 import { getSiteContext } from "../../lib/theme-context";
@@ -37,6 +38,10 @@ const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHE
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
 const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
 const postUrl = `${siteUrl}/posts/${encodeURI(post.slug)}/`;
+// 署名：多作者有序，第一位为主作者；封禁作者的署名由作者徽标降级为纯文本
+const authors = await listPostAuthorBadges(env.DB, post.id);
+// 无署名（历史数据或未指派）时回退站点名，前台不出现空白作者
+const authorNames = authors.length > 0 ? authors.map((a) => a.name) : [env.SITE_NAME];
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
@@ -52,7 +57,7 @@ const jsonLd = {
       ? post.cover_url
       : `${siteUrl}/${post.cover_url.replace(/^\//, '')}`
     : undefined,
-  author: { '@type': 'Person', name: env.SITE_NAME },
+  author: authorNames.map((name) => ({ '@type': 'Person', name })),
   publisher: { '@type': 'Organization', name: env.SITE_NAME },
 };
 const siteCtx = await getSiteContext(Astro);
@@ -77,6 +82,7 @@ const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, po
   next={next}
   likes={likeCount?.n ?? 0}
   liked={liked}
+  authors={authors}
   accentColor="#c23a30"
   backHref="/"
   backLabel="← 回到卷首"

@@ -2,7 +2,9 @@
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // 纯展示组件：数据由页面壳经 getTagsUnion 查询后传入，此处禁止访问 DB/env。
+import type { AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
+import AuthorByline from '@core/AuthorByline.astro';
 
 interface CollectionRow {
   id: number;
@@ -11,6 +13,7 @@ interface CollectionRow {
   post_count: number;
 }
 interface PostRow {
+  id: number;
   slug: string;
   title: string;
   summary: string;
@@ -25,9 +28,12 @@ interface Props {
   posts: PostRow[];
   /** collection_id -> 该集内命中文章 */
   collectionPosts: Map<number, PostRow[]>;
+  /** 文章署名，按文章 id 索引（一次批量取回） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
 }
 
 const { names, keyword = '', collections, posts, collectionPosts } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
 const active = names.length > 0;
 ---
 
@@ -79,6 +85,7 @@ const active = names.length > 0;
             <h3 class="post-title">{p.title}</h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
+              <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
               <span>{fmtDate(p.created_at)}</span>
             </div>
           </a>

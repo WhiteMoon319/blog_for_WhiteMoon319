@@ -82,6 +82,7 @@ const FAVICON =
         {ctx.user.loggedIn ? (
           <>
             <a href="/account/" class="footer-src">@{ctx.user.name}</a>
+            {ctx.user.writeHref && <a href={ctx.user.writeHref} class="footer-src">{t('footer.write')}</a>}
             {ctx.user.isAdmin && <a href="/admin/" class="footer-src">{t('footer.admin')}</a>}
             <a href="/logout/" class="footer-src">{t('footer.logout')}</a>
           </>

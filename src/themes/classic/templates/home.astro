@@ -1,10 +1,11 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorByline from '@core/AuthorByline.astro';
 
 interface CollectionRow {
   id: number;
@@ -47,9 +48,15 @@ interface Props {
   latestPosts: PostRow[];
   /** 登录用户的历史记录（未登录为空数组，不渲染该区块） */
   recentReadings?: ReadingRow[];
+  /** 文章署名，按文章 id 索引（一次批量取回，避免逐篇查询） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
+  /** 文集集主，按文集 id 索引 */
+  collectionOwners?: Record<string, AuthorBadge>;
 }
 
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
+const collectionOwners = Astro.props.collectionOwners ?? {};
 const recentReadings = Astro.props.recentReadings ?? [];
 const heroSeal = Array.from(siteName)[0] ?? '书';
 const t = classicT(ctx.locale);
@@ -88,6 +95,9 @@ const t = classicT(ctx.locale);
               <div class="portal-seal">{Array.from(c.title)[0]}</div>
               <h3>{c.title}</h3>
               <p class="portal-sub">{c.summary}</p>
+              {collectionOwners[String(c.id)] && (
+                <AuthorByline authors={[collectionOwners[String(c.id)]]} variant="card" />
+              )}
             </a>
           ))}
         </div>
@@ -116,6 +126,7 @@ const t = classicT(ctx.locale);
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
               </a>
@@ -145,6 +156,7 @@ const t = classicT(ctx.locale);
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
               </a>
@@ -176,6 +188,7 @@ const t = classicT(ctx.locale);
                 {r.summary && <p class="post-summary">{r.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(r.postId)] ?? []} variant="card" />
                   <span>{fmtDate(r.updatedAt)}</span>
                 </div>
               </a>

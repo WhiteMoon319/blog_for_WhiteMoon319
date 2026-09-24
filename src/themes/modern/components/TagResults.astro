@@ -3,8 +3,10 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // 纯展示组件（Modern 版）：数据由页面壳查询后传入，此处禁止访问 DB/env。
 // 数据 props 签名与 classic 完全一致；文案改用本主题词典的现代语态。
+import type { AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import { DEFAULT_LOCALE, type Locale } from '@core/i18n';
+import AuthorByline from '@core/AuthorByline.astro';
 import { modernT } from '../i18n';
 
 interface CollectionRow {
@@ -14,6 +16,7 @@ interface CollectionRow {
   post_count: number;
 }
 interface PostRow {
+  id: number;
   slug: string;
   title: string;
   summary: string;
@@ -30,9 +33,12 @@ interface Props {
   collectionPosts: Map<number, PostRow[]>;
   /** 可选：调用模板有 ctx 时传入以支持 en 词表，缺省回退站点默认语言 */
   locale?: Locale;
+  /** 文章署名，按文章 id 索引（一次批量取回） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
 }
 
 const { names, keyword = '', collections, posts, collectionPosts, locale = DEFAULT_LOCALE } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
 const t = modernT(locale);
 const active = names.length > 0;
 const blockMeta = (count: number): string =>
@@ -87,6 +93,7 @@ const blockMeta = (count: number): string =>
             <h3 class="post-title">{p.title}</h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
+              <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
               <span>{fmtDate(p.created_at)}</span>
             </div>
           </a>

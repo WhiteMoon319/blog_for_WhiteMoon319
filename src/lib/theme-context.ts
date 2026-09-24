@@ -21,6 +21,27 @@ export interface SiteUser {
   name: string;
   isAdmin: boolean;
   emailVerified: boolean;
+  /** 作者身份：有作者页并可进入写作区（作者或管理员） */
+  isAuthor: boolean;
+  /** 自己的作者页路径；无作者页时为 null */
+  authorHref: string | null;
+  /** 进入写作区的入口（作者/管理员可见；读者为 null） */
+  writeHref: string | null;
+}
+
+/**
+ * 前台作者徽标：由核心把用户行整理成可直接渲染的形态，
+ * 主题只负责排版，不判断封禁与角色（主题禁止访问 DB）。
+ */
+export interface AuthorBadge {
+  id: number;
+  /** 展示名：笔名优先，无笔名回退用户名 */
+  name: string;
+  username: string;
+  avatarUrl: string;
+  bio: string;
+  /** 作者页路径；被封禁或身份不符时为 null（署名降级为纯文本） */
+  href: string | null;
 }
 
 /** 路由键是核心契约，词汇由主题按 key 自行翻译（见各主题 i18n 字典） */
@@ -75,7 +96,15 @@ export async function getSiteContext(ctx: APIContext): Promise<SiteContext> {
       siteName: 'blog', siteUrl: '', slogan: '', footerLine: '',
       tagline: COPY_DEFAULTS.site_tagline, searchPlaceholder: '', heroNote: '',
       locale: DEFAULT_LOCALE,
-      user: { loggedIn: false, name: '', isAdmin: false, emailVerified: false },
+      user: {
+        loggedIn: false,
+        name: '',
+        isAdmin: false,
+        emailVerified: false,
+        isAuthor: false,
+        authorHref: null,
+        writeHref: null,
+      },
       nav: [], r2Base: '',
     };
   }
@@ -96,14 +125,26 @@ async function buildSiteContext(ctx: APIContext): Promise<SiteContext> {
   const locale: Locale = isLocale(localeRaw) ? localeRaw : DEFAULT_LOCALE;
 
   const raw = ctx.cookies.get('blog_session')?.value ? await resolveUser(ctx) : null;
+  const isAuthorRole = raw?.user.role === 'author' || raw?.user.role === 'admin';
   const user: SiteUser = raw
     ? {
         loggedIn: true,
         name: raw.user.display_name || raw.user.username,
         isAdmin: raw.user.role === 'admin',
         emailVerified: raw.emailVerified,
+        isAuthor: isAuthorRole,
+        authorHref: isAuthorRole ? `/authors/${encodeURIComponent(raw.user.username)}/` : null,
+        writeHref: isAuthorRole ? '/write/' : null,
       }
-    : { loggedIn: false, name: '', isAdmin: false, emailVerified: false };
+    : {
+        loggedIn: false,
+        name: '',
+        isAdmin: false,
+        emailVerified: false,
+        isAuthor: false,
+        authorHref: null,
+        writeHref: null,
+      };
 
   return {
     siteName: pick('SITE_NAME', env.SITE_NAME, '我的书房'),

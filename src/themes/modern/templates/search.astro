@@ -1,12 +1,14 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorByline from '@core/AuthorByline.astro';
 import { modernT } from '../i18n';
 
 interface ResultPost {
+  id: number;
   slug: string;
   title: string;
   summary: string;
@@ -16,6 +18,9 @@ interface Result {
   post: ResultPost;
   collection: { slug: string; title: string; theme_color: string } | null;
 }
+interface AuthorHit extends AuthorBadge {
+  postCount: number;
+}
 
 interface Props {
   ctx: SiteContext;
@@ -24,9 +29,14 @@ interface Props {
   /** tagMode 下未命中的标签名（空串表示无） */
   tagNotFound: string;
   results: Result[];
+  /** 关键词命中的作者（关键词同时搜文章与作者，分区展示） */
+  authorHits?: AuthorHit[];
+  /** 文章结果卡的署名，按文章 id 索引 */
+  authorsByPost?: Record<string, AuthorBadge[]>;
 }
 
-const { ctx, q, tagMode, tagNotFound, results } = Astro.props;
+const { ctx, q, tagMode, tagNotFound, results, authorHits = [] } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
 const t = modernT(ctx.locale);
 ---
 
@@ -62,19 +72,47 @@ const t = modernT(ctx.locale);
           <p class="section-lead" style="text-align:center;">
             {t('search.tag_missing', { name: tagNotFound })} <a href="/tags/">{t('search.view_tags')}</a>
           </p>
-        ) : results.length > 0 ? (
-          <div class="posts-grid" style="margin-top:32px;">
-            {results.map(({ post, collection }) => (
-              <a class="post-card reveal" href={postHref(post.slug, collection?.slug)} style={`--cc: ${collection?.theme_color ?? '#2563eb'};`}>
-                <h3 class="post-title">{post.title}</h3>
-                {post.summary && <p class="post-summary">{post.summary}</p>}
-                <div class="post-meta">
-                  {collection && <span class="post-tag">{collection.title}</span>}
-                  <span>{fmtDate(post.created_at)}</span>
+        ) : results.length > 0 || authorHits.length > 0 ? (
+          <>
+            {authorHits.length > 0 && (
+              <div class="author-hits" style="margin-top:32px;">
+                <h2 class="author-hits-title">{t('search.authors')}</h2>
+                <div class="author-hits-grid">
+                  {authorHits.map((a) => (
+                    <a class="author-hit" href={a.href ?? '#'}>
+                      {a.avatarUrl ? (
+                        <img class="author-hit-avatar" src={a.avatarUrl} alt={a.name} loading="lazy" />
+                      ) : (
+                        <span class="author-hit-avatar is-initial" aria-hidden="true">{a.name.slice(0, 1)}</span>
+                      )}
+                      <span class="author-hit-body">
+                        <span class="author-hit-name">{a.name}</span>
+                        {a.bio && <span class="author-hit-bio">{a.bio}</span>}
+                        <span class="author-hit-count">{t('author.posts', { n: a.postCount })}</span>
+                      </span>
+                    </a>
+                  ))}
                 </div>
-              </a>
-            ))}
-          </div>
+              </div>
+            )}
+            {results.length > 0 ? (
+              <div class="posts-grid" style="margin-top:32px;">
+                {results.map(({ post, collection }) => (
+                  <a class="post-card reveal" href={postHref(post.slug, collection?.slug)} style={`--cc: ${collection?.theme_color ?? '#2563eb'};`}>
+                    <h3 class="post-title">{post.title}</h3>
+                    {post.summary && <p class="post-summary">{post.summary}</p>}
+                    <div class="post-meta">
+                      {collection && <span class="post-tag">{collection.title}</span>}
+                      <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
+                      <span>{fmtDate(post.created_at)}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p class="section-lead" style="text-align:center;">{t('search.no_results', { q })}</p>
+            )}
+          </>
         ) : (
           <p class="section-lead" style="text-align:center;">{t('search.no_results', { q })}</p>
         )
@@ -117,5 +155,62 @@ const t = modernT(ctx.locale);
     max-width: 72ch;
     margin-left: auto;
     margin-right: auto;
+  }
+  .author-hits-title {
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    color: var(--ink-deep);
+    margin-bottom: 14px;
+  }
+  .author-hits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .author-hit {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--paper-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--transition), transform var(--transition);
+  }
+  .author-hit:hover {
+    border-color: var(--cinnabar);
+    transform: translateY(-2px);
+  }
+  .author-hit-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: none;
+  }
+  .author-hit-avatar.is-initial {
+    display: grid;
+    place-items: center;
+    background: var(--cinnabar-line, #e8eefb);
+    color: var(--cinnabar);
+  }
+  .author-hit-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .author-hit-name {
+    color: var(--ink-deep);
+  }
+  .author-hit-bio,
+  .author-hit-count {
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

@@ -3,6 +3,7 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import ArchiveTemplate from '@theme/templates/archive.astro';
 import { envOf, listArchivedPosts, countArchivedPosts, getCollectionsByIds, yearOf } from '../lib/db';
+import { badgesByPostId } from '../lib/authors-view';
 
 export const prerender = false;
 
@@ -14,6 +15,8 @@ const total = await countArchivedPosts(env.DB);
 const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 const page = Math.min(safeRaw, totalPages);
 const posts = await listArchivedPosts(env.DB, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+// 列表卡署名：本页文章一次性取回
+const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
 
 const groups: {
   year: string;
@@ -34,4 +37,4 @@ import { getSiteContext } from "../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<ArchiveTemplate ctx={siteCtx} total={total} page={page} totalPages={totalPages} groups={groups} />
+<ArchiveTemplate ctx={siteCtx} total={total} page={page} totalPages={totalPages} groups={groups} authorsByPost={authorsByPost} />

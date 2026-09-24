@@ -31,6 +31,21 @@ const zhCN: Record<string, string> = {
   'home.history_kicker': '历 史',
   'home.history_title': '历史记录',
   'home.history_lead': '自上次搁笔处，接续来读。',
+  // 多作者
+  'post.byline': '作者',
+  'collection.byline': '集主',
+  'search.authors': '作者',
+  'author.posts': '{n} 篇',
+  'author.kicker': '作 者',
+  'author.joined': '入斋于',
+  'author.website': '主页',
+  'author.empty': '这位作者尚未刊行篇章。',
+  'author.back': '← 回到卷首',
+  'author.page_prev': '上一页',
+  'author.page_next': '下一页',
+  'footer.write': '写作区',
+  'account.bio': '作者简介',
+  'account.bio_hint': '展示在你的作者页；留空即不展示（最长 200 字）。',
 };
 
 const en: Record<string, string> = {
@@ -55,6 +70,21 @@ const en: Record<string, string> = {
   'home.history_kicker': 'History',
   'home.history_title': 'Reading History',
   'home.history_lead': 'Continue where you left off.',
+  // Multi-author
+  'post.byline': 'By',
+  'collection.byline': 'Curated by',
+  'search.authors': 'Authors',
+  'author.posts': '{n} posts',
+  'author.kicker': 'A U T H O R',
+  'author.joined': 'Joined',
+  'author.website': 'Website',
+  'author.empty': 'This author has not published anything yet.',
+  'author.back': '← Back to home',
+  'author.page_prev': 'Previous',
+  'author.page_next': 'Next',
+  'footer.write': 'Write',
+  'account.bio': 'Author bio',
+  'account.bio_hint': 'Shown on your author page; leave empty to hide (max 200 chars).',
 };
 
 export const CLASSIC_DICTS: Record<Locale, Record<string, string>> = { 'zh-CN': zhCN, en };

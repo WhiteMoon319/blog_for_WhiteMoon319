@@ -3,10 +3,11 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // 文章详情模板：整合三处来源（独立文章 / 文集内文章 / 草稿预览）的展示标记。
 // 纯展示组件，一切数据经 props 下传，禁止自行访问 DB/env。
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorByline from '@core/AuthorByline.astro';
 import PostLike from '../components/PostLike.astro';
 import Comments from '../components/Comments.astro';
 import ArticleEnhancer from '../components/ArticleEnhancer.astro';
@@ -77,6 +78,9 @@ interface Props {
   // —— 阅读历史 ——
   /** 登录用户的上次阅读位置（0-100）；未登录/无记录不传 */
   initialScrollPct?: number;
+
+  /** 署名作者（有序，第一位为主作者）；封禁作者由核心降级为纯文本 */
+  authors?: AuthorBadge[];
 }
 
 const {
@@ -108,6 +112,7 @@ const {
   previewBadgeText = '',
   publishedHref,
   initialScrollPct,
+  authors = [],
 } = Astro.props;
 const t = classicT(ctx.locale);
 ---
@@ -130,6 +135,11 @@ const t = classicT(ctx.locale);
       <h1>{title}</h1>
       {summary && <p class="lead">{summary}</p>}
       <div class="facts">
+        {authors.length > 0 && (
+          <span class="fact-byline">
+            <AuthorByline authors={authors} prefix={t('post.byline')} variant="post" />
+          </span>
+        )}
         <span>成于 {fmtDate(createdAt)}</span>
         {updatedAt !== createdAt && <span>改于 {fmtDate(updatedAt)}</span>}
         <span data-views={viewCount}>阅 {viewCount}</span>

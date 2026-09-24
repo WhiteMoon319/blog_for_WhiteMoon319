@@ -18,7 +18,10 @@ if (!page) {
 import { getSiteContext } from "../../../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 import { getTagsUnion } from '../../../lib/db';
+import { badgesByPostId } from '../../../lib/authors-view';
 const union = await getTagsUnion(env.DB, [name], keyword);
+// 列表卡署名：标签详情结果一次性取回
+const authorsByPost = await badgesByPostId(env.DB, union.posts.map((p) => p.id));
 ---
 
 <TagDetailTemplate
@@ -30,4 +33,5 @@ const union = await getTagsUnion(env.DB, [name], keyword);
   collections={union.collections}
   posts={union.posts}
   collectionPosts={union.collectionPosts}
+  authorsByPost={authorsByPost}
 />

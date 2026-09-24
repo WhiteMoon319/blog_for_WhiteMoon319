@@ -4,11 +4,15 @@
 import HomeTemplate from '@theme/templates/home.astro';
 import { envOf, listCollections, listPublishedPosts, listRecentReadings } from '../lib/db';
 import { resolveUser } from '../lib/auth';
+import { badgesByPostId, collectionOwnerBadges } from '../lib/authors-view';
 
 const env = await envOf();
 const collections = await listCollections(env.DB);
 const pinnedPosts = await listPublishedPosts(env.DB, { pinned: true, limit: 5 });
 const latestPosts = await listPublishedPosts(env.DB, { limit: 6 });
+// 列表卡署名与文集署名：批量一次取回（避免逐篇/逐集查询）
+const authorsByPost = await badgesByPostId(env.DB, [...pinnedPosts, ...latestPosts].map((p) => p.id));
+const collectionOwners = await collectionOwnerBadges(env.DB, collections.map((c) => c.id));
 import { getSiteContext } from "../lib/theme-context";
 const siteCtx = await getSiteContext(Astro);
 // 登录用户：读取历史记录（未登录传空，模板不渲染该区块）
@@ -22,7 +26,9 @@ const recentReadings = authUser ? await listRecentReadings(env.DB, authUser.user
   slogan={env.SITE_SLOGAN}
   poem={env.SITE_POEM}
   collections={collections}
+  collectionOwners={collectionOwners}
   pinnedPosts={pinnedPosts}
   latestPosts={latestPosts}
+  authorsByPost={authorsByPost}
   recentReadings={recentReadings}
 />

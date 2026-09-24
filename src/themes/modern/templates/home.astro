@@ -1,9 +1,10 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorByline from '@core/AuthorByline.astro';
 import { modernT } from '../i18n';
 
 interface CollectionRow {
@@ -34,9 +35,15 @@ interface Props {
   latestPosts: PostRow[];
   /** 登录用户阅读历史（核心壳传入；本主题暂不渲染，接受即可） */
   recentReadings?: unknown[];
+  /** 文章署名，按文章 id 索引（一次批量取回） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
+  /** 文集集主，按文集 id 索引 */
+  collectionOwners?: Record<string, AuthorBadge>;
 }
 
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
+const collectionOwners = Astro.props.collectionOwners ?? {};
 const t = modernT(ctx.locale);
 ---
 
@@ -66,6 +73,9 @@ const t = modernT(ctx.locale);
             <a class="portal-card reveal" href={`/collections/${encodeURI(c.slug)}/`} style={`--pc: ${c.theme_color};`}>
               <h3>{c.title}</h3>
               <p class="portal-sub">{c.summary}</p>
+              {collectionOwners[String(c.id)] && (
+                <AuthorByline authors={[collectionOwners[String(c.id)]]} variant="card" />
+              )}
             </a>
           ))}
         </div>
@@ -94,6 +104,7 @@ const t = modernT(ctx.locale);
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
               </a>
@@ -123,6 +134,7 @@ const t = modernT(ctx.locale);
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
               </a>

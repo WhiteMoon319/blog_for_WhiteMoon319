@@ -1,0 +1,74 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// 作者页：/authors/{username}。
+// 口径：仅未封禁的作者与管理员有作者页；读者与不存在的用户一律 404（与"可被搜到的作者"一致）。
+import AuthorTemplate from '@theme/templates/author.astro';
+import { envOf, countPublishedPostsByAuthor, listPublishedPostsByAuthor, getCollectionsByIds } from '../../lib/db';
+import { getAuthorProfile } from '../../lib/authors-view';
+import { safeJsonLd } from '../../lib/seo';
+
+export const prerender = false;
+
+const PAGE_SIZE = 12;
+const env = await envOf();
+const username = Astro.params.username ?? '';
+const profile = username ? await getAuthorProfile(env.DB, username) : null;
+
+if (!profile) {
+  return Astro.redirect('/404');
+}
+
+const { badge: author, joinedAt } = profile;
+const pageRaw = Number(Astro.url.searchParams.get('page') ?? '1');
+const safeRaw = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+const total = await countPublishedPostsByAuthor(env.DB, author.id);
+const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+const page = Math.min(safeRaw, totalPages);
+const rows = await listPublishedPostsByAuthor(env.DB, author.id, {
+  limit: PAGE_SIZE,
+  offset: (page - 1) * PAGE_SIZE,
+});
+// 卡片需要文集 slug 才能拼出 /collections/{slug}/{post}/ 路径
+const collections = await getCollectionsByIds(env.DB, rows.map((p) => p.collection_id ?? 0));
+const posts = rows.map((p) => ({
+  id: p.id,
+  slug: p.slug,
+  title: p.title,
+  summary: p.summary,
+  cover_url: p.cover_url,
+  created_at: p.created_at,
+  collection_slug: p.collection_id ? collections.get(p.collection_id)?.slug ?? null : null,
+}));
+
+const siteUrl = env.SITE_URL.replace(/\/$/, '');
+const authorUrl = `${siteUrl}/authors/${encodeURIComponent(author.username)}/`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfilePage',
+  url: authorUrl,
+  mainEntity: {
+    '@type': 'Person',
+    name: author.name,
+    alternateName: author.username,
+    description: author.bio || undefined,
+    image: author.avatarUrl || undefined,
+    url: authorUrl,
+  },
+};
+
+import { getSiteContext } from '../../lib/theme-context';
+const siteCtx = await getSiteContext(Astro);
+---
+
+<AuthorTemplate
+  ctx={siteCtx}
+  author={author}
+  total={total}
+  page={page}
+  totalPages={totalPages}
+  posts={posts}
+  joinedAt={joinedAt}
+  avatarUrl={author.avatarUrl}
+  jsonLd={safeJsonLd(jsonLd)}
+/>

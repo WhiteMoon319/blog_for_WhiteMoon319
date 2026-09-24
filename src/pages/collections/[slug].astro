@@ -3,6 +3,7 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 import CollectionTemplate from '@theme/templates/collection.astro';
 import { envOf, getCollectionBySlug, listPublishedPosts, countPublishedPosts } from '../../lib/db';
+import { collectionOwnerBadge, badgesByPostId } from '../../lib/authors-view';
 import { safeJsonLd } from '../../lib/seo';
 import { postHref } from '../../lib/utils';
 
@@ -29,6 +30,10 @@ const posts = await listPublishedPosts(env.DB, {
   order: collection.post_order,
 });
 const siteUrl = env.SITE_URL.replace(/\/$/, '');
+// 文集署名：归属作者（单一），无归属时不渲染
+const owner = await collectionOwnerBadge(env.DB, collection.id);
+// 列表卡署名：一次批量取回全部，不逐篇查询
+const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
 const collectionUrl = `${siteUrl}/collections/${encodeURI(collection.slug)}/`;
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -54,7 +59,9 @@ const siteCtx = await getSiteContext(Astro);
   ctx={siteCtx}
   jsonLd={safeJsonLd(jsonLd)}
   collection={collection}
+  owner={owner}
   posts={posts}
+  authorsByPost={authorsByPost}
   total={total}
   page={page}
   totalPages={totalPages}

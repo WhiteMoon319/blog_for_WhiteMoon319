@@ -1,7 +1,7 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import TagResults from '../components/TagResults.astro';
 import { modernT } from '../i18n';
@@ -32,9 +32,12 @@ interface Props {
   posts: UnionPost[];
   /** collection_id -> 该集内命中文章 */
   collectionPosts: Map<number, UnionPost[]>;
+  /** 文章署名，按文章 id 索引（一次批量取回） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
 }
 
 const { ctx, name, keyword, collectionsCount, postsCount, collections, posts, collectionPosts } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
 const t = modernT(ctx.locale);
 ---
 
@@ -52,7 +55,7 @@ const t = modernT(ctx.locale);
 
   <section class="section" style="padding-top:48px;">
     <div style="margin-top:36px;">
-      <TagResults locale={ctx.locale} names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} />
+      <TagResults locale={ctx.locale} names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} authorsByPost={authorsByPost} />
     </div>
   </section>
 </BaseLayout>

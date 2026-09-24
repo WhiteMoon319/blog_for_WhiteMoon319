@@ -100,6 +100,16 @@ const zhCN: Record<string, string> = {
   'post.views': '阅读 {count}',
   'post.view_published': '查看正式页面 →',
   'post.preview_banner': '草稿预览 · 仅你可见',
+  // 多作者
+  'post.byline': '作者',
+  'collection.byline': '集主',
+  'search.authors': '作者',
+  'author.posts': '{n} 篇',
+  'author.kicker': '作 者',
+  'author.joined': '加入于',
+  'author.empty': '这位作者尚未刊行篇章。',
+  'author.back': '← 返回首页',
+  'footer.write': '写作区',
 };
 
 const en: Record<string, string> = {
@@ -193,6 +203,16 @@ const en: Record<string, string> = {
   'post.views': '{count} reads',
   'post.view_published': 'View published page →',
   'post.preview_banner': 'Draft preview · visible only to you',
+  // Multi-author
+  'post.byline': 'By',
+  'collection.byline': 'Curated by',
+  'search.authors': 'Authors',
+  'author.posts': '{n} posts',
+  'author.kicker': 'A U T H O R',
+  'author.joined': 'Joined',
+  'author.empty': 'This author has not published anything yet.',
+  'author.back': '← Back to home',
+  'footer.write': 'Write',
 };
 
 export const MODERN_DICTS: Record<Locale, Record<string, string>> = { 'zh-CN': zhCN, en };

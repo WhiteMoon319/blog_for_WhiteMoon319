@@ -1,0 +1,90 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later
+// 作者页模板：展示作者简介与名下已发布文章（归属或署名皆计入）。
+// 纯展示组件，数据全部经 props 下传（核心页面壳查询）。
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
+import { postHref, fmtDate } from '@core/utils';
+import { classicT } from '../i18n';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Pagination from '../components/Pagination.astro';
+
+interface AuthorPost {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string;
+  cover_url: string;
+  created_at: string;
+  collection_slug: string | null;
+}
+
+interface Props {
+  ctx: SiteContext;
+  author: AuthorBadge;
+  /** 作者名下已发布篇数 */
+  total: number;
+  page: number;
+  totalPages: number;
+  posts: AuthorPost[];
+  /** 作者加入时间（用户创建时间） */
+  joinedAt: string;
+  /** og:image 用 */
+  avatarUrl?: string;
+  /** JSON-LD 序列化产物（页面壳经 safeJsonLd 生成） */
+  jsonLd?: string;
+}
+
+const { ctx, author, total, page, totalPages, posts, joinedAt, avatarUrl, jsonLd } = Astro.props;
+const t = classicT(ctx.locale);
+---
+
+<BaseLayout
+  ctx={ctx}
+  title={author.name}
+  description={author.bio || `${author.name} 的篇章。`}
+  image={avatarUrl || undefined}
+>
+  {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
+  <div class="page-hero">
+    <a class="page-back reveal in" href="/">{t('author.back')}</a>
+    <div class="page-hero-card reveal in">
+      <p class="character-kicker">{t('author.kicker')}</p>
+      <h1>{author.name}</h1>
+      <p class="author-handle">@{author.username}</p>
+      {author.bio && <p class="lead">{author.bio}</p>}
+      <div class="facts">
+        <span>{t('author.posts').replace('{n}', String(total))}</span>
+        <span>{t('author.joined')} {fmtDate(joinedAt)}</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:56px;">
+    {posts.length > 0 ? (
+      <div class="posts-grid">
+        {posts.map((p, i) => (
+          <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, p.collection_slug)}>
+            {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+            <h3 class="post-title">{p.title}</h3>
+            {p.summary && <p class="post-summary">{p.summary}</p>}
+            <div class="post-meta">
+              <span>{fmtDate(p.created_at)}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p class="section-lead reveal in" style="text-align:center;">{t('author.empty')}</p>
+    )}
+    <Pagination current={page} totalPages={totalPages} base={`/authors/${author.username}/`} query="" />
+  </section>
+</BaseLayout>
+
+<style>
+  .author-handle {
+    font-size: 0.85rem;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
+</style>

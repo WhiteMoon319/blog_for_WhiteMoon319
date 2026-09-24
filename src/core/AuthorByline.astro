@@ -1,0 +1,66 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later
+//
+// 署名徽标（核心组件，四套主题共用）：
+// 多作者按 sort_order 顺序展示，第一位标注为主要作者；
+// 封禁或身份不符的作者（href 为 null）降级为纯文本，不产生死链。
+import type { AuthorBadge } from '../lib/theme-context.ts';
+
+interface Props {
+  authors: AuthorBadge[];
+  /** 已翻译的前缀文案（如「作者」「文 /」）；留空则不渲染前缀 */
+  prefix?: string;
+  /** 版式：post 文章页正文上方 / card 列表卡 / collection 文集页 */
+  variant?: 'post' | 'card' | 'collection';
+  /** 额外类名，供主题覆盖样式 */
+  class?: string;
+}
+
+const { authors = [], prefix = '', variant = 'post', class: extraClass = '' } = Astro.props;
+const visible = authors.filter((a) => a && (a.name || a.username));
+---
+
+{visible.length > 0 && (
+  <span class:list={['byline', `byline-${variant}`, extraClass]}>
+    {prefix && <span class="byline-prefix">{prefix}</span>}
+    {visible.map((a, i) => (
+      <>
+        {i > 0 && <span class="byline-sep" aria-hidden="true">、</span>}
+        {a.href ? (
+          <a class="byline-name" href={a.href} title={a.name} rel="author">{a.name}</a>
+        ) : (
+          <span class="byline-name is-plain" title={a.name}>{a.name}</span>
+        )}
+      </>
+    ))}
+  </span>
+)}
+
+<style>
+.byline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15em;
+  flex-wrap: wrap;
+}
+.byline-prefix {
+  opacity: 0.72;
+  margin-right: 0.15em;
+}
+.byline-sep {
+  opacity: 0.5;
+}
+.byline-name {
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.byline-name.is-plain {
+  border-bottom: none;
+  opacity: 0.85;
+}
+.byline-card {
+  font-size: 0.82em;
+  opacity: 0.85;
+}
+</style>

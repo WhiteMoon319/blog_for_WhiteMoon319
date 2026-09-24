@@ -4,6 +4,7 @@
 import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getReadingProgress } from '../../../lib/db';
 import { renderMarkdown } from '../../../lib/markdown';
 import { resolveUser } from '../../../lib/auth';
+import { listPostAuthorBadges } from '../../../lib/authors-view';
 import PostTemplate from '@theme/templates/post.astro';
 import { getSiteContext } from "../../../lib/theme-context";
 
@@ -26,6 +27,8 @@ const user = await resolveUser(Astro);
 const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
 const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
 const siteCtx = await getSiteContext(Astro);
+// 署名：与独立文章页同一契约
+const authors = await listPostAuthorBadges(env.DB, post.id);
 // 阅读历史：当前用户对本文的上次阅读位置（用于进入后恢复滚动）
 const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, post.id) : null;
 ---
@@ -46,6 +49,7 @@ const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, po
   next={next}
   likes={likeCount?.n ?? 0}
   liked={liked}
+  authors={authors}
   accentColor={collection.theme_color}
   backHref={`/collections/${encodeURI(collection.slug)}/`}
   backLabel={`← ${collection.title}`}

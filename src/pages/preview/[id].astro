@@ -6,6 +6,7 @@ import { postHref } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { resolveUser } from '../../lib/auth';
 import { canManagePost } from '../../lib/api/post-access.ts';
+import { listPostAuthorBadges } from '../../lib/authors-view';
 import PostTemplate from '@theme/templates/post.astro';
 import { getSiteContext } from "../../lib/theme-context";
 
@@ -38,6 +39,8 @@ const publishedHref =
   post.status === 'published' && collection ? postHref(post.slug, collection.slug) : undefined;
 
 const siteCtx = await getSiteContext(Astro);
+// 草稿预览同样展示署名，方便作者确认最终署名效果
+const authors = await listPostAuthorBadges(env.DB, post.id);
 ---
 
 <PostTemplate
@@ -57,6 +60,7 @@ const siteCtx = await getSiteContext(Astro);
   backHref={backHref}
   backLabel={backLabel}
   kicker={kicker}
+  authors={authors}
   ogImage={post.cover_url ? post.cover_url : undefined}
   noindex
   publishedHref={publishedHref}

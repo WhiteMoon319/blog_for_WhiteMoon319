@@ -29,7 +29,7 @@ export const HARD_LIMITS = {
   allowedExtensions: ['.astro', '.ts', '.json', '.css', '.png', '.jpg', '.svg', '.webp', '.woff', '.woff2', '.md'],
   slugPattern: /^[a-z0-9][a-z0-9-]{1,30}$/,
   reservedSlugs: ['classic', 'modern'],
-  coreTemplates: ['home', 'collection', 'post', 'standalone', 'archive', 'search', 'not-found', 'tag-index', 'tag-detail'],
+  coreTemplates: ['home', 'collection', 'post', 'standalone', 'archive', 'search', 'not-found', 'tag-index', 'tag-detail', 'author'],
 };
 
 const REQUIRED_MANIFEST_FIELDS = ['name', 'slug', 'version', 'engine_version', 'author', 'license'];

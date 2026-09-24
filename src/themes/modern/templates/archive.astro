@@ -1,13 +1,15 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import type { SiteContext } from '../../../lib/theme-context.ts';
+import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorByline from '@core/AuthorByline.astro';
 import Pagination from '@theme/components/Pagination.astro';
 import { modernT } from '../i18n';
 
 interface ArchivePost {
+  id: number;
   slug: string;
   title: string;
   summary: string;
@@ -24,9 +26,12 @@ interface Props {
   page: number;
   totalPages: number;
   groups: Group[];
+  /** 文章署名，按文章 id 索引（一次批量取回） */
+  authorsByPost?: Record<string, AuthorBadge[]>;
 }
 
 const { ctx, total, page, totalPages, groups } = Astro.props;
+const authorsByPost = Astro.props.authorsByPost ?? {};
 const t = modernT(ctx.locale);
 ---
 
@@ -51,7 +56,9 @@ const t = modernT(ctx.locale);
                 <div class="tl-item">
                   <a href={postHref(post.slug, collection?.slug)}>
                     <div class="tl-event">{post.title}<span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span></div>
-                    <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}</div>
+                    <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}
+                      <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
+                    </div>
                   </a>
                 </div>
               ))}

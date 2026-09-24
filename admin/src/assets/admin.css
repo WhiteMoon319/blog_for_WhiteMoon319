@@ -761,11 +761,12 @@ textarea {
 
 .blk-drawer {
   position: absolute;
-  top: 8px;
+  /* 落在块属性浮条下方：浮条是 sticky，抽屉压住它会导致变体按钮点不到 */
+  top: 52px;
   left: 8px;
   z-index: 20;
   width: 248px;
-  max-height: 78%;
+  max-height: 72%;
   overflow-y: auto;
   padding: 10px 12px 14px;
   background: var(--paper-card);

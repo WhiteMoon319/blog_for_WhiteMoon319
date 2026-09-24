@@ -17,10 +17,20 @@ function notify(msg: string, err = false) {
   setTimeout(() => (toast.msg = ''), 2600);
 }
 
-// 路由守卫：initAuth 未完成先挂起；后台仅供管理员，作者请走写作区（/write/）
-router.beforeEach((to) => {
+// 路由守卫：首次进入时鉴权尚未完成，必须在守卫内等待而不是直接拦下——
+// 直接 return false 会取消初始导航，且之后无人再触发，页面会停在空白。
+router.beforeEach(async (to) => {
   if (to.path === '/login') return true;
-  if (authState.checking) return false; // 等 initAuth 完成后再放行
+  if (authState.checking) await initAuth();
+  if (!authState.authed) {
+    window.location.href = '/login/?redirect=/admin/';
+    return false;
+  }
+  if (authState.role !== 'admin') {
+    // 作者有自己的写作区：不共用后台，避免靠隐藏菜单来做权限划分
+    window.location.href = authState.role === 'author' ? '/write/' : '/404';
+    return false;
+  }
   return true;
 });
 
@@ -31,20 +41,11 @@ watch(
   },
 );
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('auth:expired', () => {
     setAuthed(false, '');
     if (route.path !== '/login') window.location.href = '/login/?redirect=/admin/';
   });
-  await initAuth();
-  if (route.path !== '/login') {
-    if (!authState.authed) {
-      window.location.href = '/login/?redirect=/admin/';
-    } else if (authState.role !== 'admin') {
-      // 作者有自己的写作区：不共用后台，避免靠隐藏菜单来做权限划分
-      window.location.href = authState.role === 'author' ? '/write/' : '/404';
-    }
-  }
 });
 
 async function logout() {

@@ -15,7 +15,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, common } from 'lowlight';
 const lowlight = createLowlight(common);
-import { marked } from 'marked';
+import { mdToHtml } from '../lib/marked-blocks.ts';
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
 import { markdown as markdownLang, markdownLanguage } from '@codemirror/lang-markdown';
@@ -46,15 +46,6 @@ const generatingSummary = ref(false);
 const promptTemplates = ref<Array<{ id: string; name: string }>>([]);
 const selectedPromptId = ref('overview');
 
-watch(() => form.collection_id, async (colId) => {
-  // 文集切换时更新默认 prompt
-  if (colId != null) {
-    try {
-      const { collection } = await api.collection(colId);
-      selectedPromptId.value = (collection as any).ai_prompt_id ?? 'overview';
-    } catch { /* ignore */ }
-  }
-});
 const loadedId = ref<number | null>(null);
 const baseVersion = ref(0);
 
@@ -77,6 +68,17 @@ const form = reactive({
   /** 署名作者，顺序即展示顺序，第一位为主作者 */
   author_ids: [] as number[],
 });
+
+// 文集切换时跟随该文集的默认 AI 提示词。必须放在 form 声明之后：
+// watch 会立刻执行 getter，提前引用 form 会抛 TDZ（静默失效且控制台报错）。
+watch(() => form.collection_id, async (colId) => {
+  if (colId == null) return;
+  try {
+    const { collection } = await api.collection(colId);
+    selectedPromptId.value = (collection as any).ai_prompt_id ?? 'overview';
+  } catch { /* ignore */ }
+});
+
 // 可选作者名单：作者与管理员都可读，含各自已发布篇数
 const authorOptions = ref<AuthorOption[]>([]);
 
@@ -100,13 +102,24 @@ const activeBlk = computed<{ block: string; variant: string } | null>(() => {
 
 const activeBlkVariantOptions = computed(() => findBlock(activeBlk.value?.block ?? '')?.variants ?? []);
 
-/** 插入排版块：素材抽屉点一下就进来，光标落在块内 */
+/** 插入排版块：素材抽屉点一下就进来，并选中占位文字便于直接改写 */
+const BLK_PLACEHOLDER = '在这里写内容';
+
 function insertBlk(name: string): void {
   const def = findBlock(name);
-  if (!def || !editor.value) return;
+  const ed = editor.value;
+  if (!def || !ed) return;
   const variant = def.variants[0]?.value ?? '';
-  editor.value.chain().focus().insertPrBlock({ block: name, variant }, '').run();
-  if (!def.empty) editor.value.chain().focus().insertContent('在这里写内容').run();
+  // 一次性把块与占位段落插入（分两步会让文字落到块外）
+  ed.chain().focus().insertPrBlock({ block: name, variant }, def.empty ? '' : BLK_PLACEHOLDER).run();
+  if (!def.empty) {
+    // 选中占位文字：新手点一下就插入，直接打字即可覆盖
+    const end = ed.state.selection.from;
+    ed.chain().focus().setTextSelection({ from: end - BLK_PLACEHOLDER.length, to: end }).run();
+  }
+  // 插入后收起抽屉：避免浮层盖住属性浮条，也让新手看清刚插入的块
+  showBlockDrawer.value = false;
+  blkTick.value++;
 }
 // 作者视角的文集可写性：私有且未协作的文集在下拉里禁用，避免选完才吃 403
 const colWritable = ref<Map<number, boolean>>(new Map());
@@ -351,7 +364,7 @@ function switchToSource() {
 
 function switchToWysiwyg() {
   if (mode.value === 'wysiwyg') return;
-  if (editor.value) editor.value.commands.setContent(marked.parse(sourceMarkdown.value) as string);
+  if (editor.value) editor.value.commands.setContent(mdToHtml(sourceMarkdown.value));
   contentRisk.value = checkContentRisk(sourceMarkdown.value);
   mode.value = 'wysiwyg';
 }
@@ -430,7 +443,7 @@ async function load() {
     form.tags = tags.map((t) => t.name);
     form.author_ids = (post.authors ?? []).map((a) => a.id);
     contentRisk.value = checkContentRisk(post.content_md);
-    if (editor.value) editor.value.commands.setContent(marked.parse(post.content_md) as string);
+    if (editor.value) editor.value.commands.setContent(mdToHtml(post.content_md));
     await maybeRestoreDraft(`post:${id}`, id, version, post.content_md);
   } else {
     form.title = '';
@@ -625,7 +638,7 @@ function applySnapshot(s: DraftSnapshot): void {
   form.tags = [...s.tags];
   form.author_ids = [...(s.author_ids ?? [])];
   contentRisk.value = checkContentRisk(s.content_md);
-  if (editor.value) editor.value.commands.setContent(marked.parse(s.content_md) as string);
+  if (editor.value) editor.value.commands.setContent(mdToHtml(s.content_md));
 }
 
 // 内容变更（表单字段 + 编辑器）→ 防抖自动保存

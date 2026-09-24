@@ -28,6 +28,8 @@ import TagChips from '../components/TagChips.vue';
 import VersionPanel from '../components/VersionPanel.vue';
 import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
+import { PrBlock } from '../lib/tiptap-blocks.ts';
+import { BLOCKS, BLOCK_GROUPS, findBlock } from '../lib/blocks.ts';
 import { parseId } from '../lib/format';
 import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
 
@@ -77,6 +79,35 @@ const form = reactive({
 });
 // 可选作者名单：作者与管理员都可读，含各自已发布篇数
 const authorOptions = ref<AuthorOption[]>([]);
+
+// ---- 排版块（公众号式排版素材） ----
+const showBlockDrawer = ref(false);
+const blkTick = ref(0); // 选区变化时触发重算
+
+/** 当前光标所在的排版块（有则显示属性浮条） */
+const activeBlk = computed<{ block: string; variant: string } | null>(() => {
+  blkTick.value; // 依赖选区版本号
+  const ed = editor.value;
+  if (!ed) return null;
+  for (const name of ['prBlock']) {
+    if (ed.isActive(name)) {
+      const attrs = ed.getAttributes(name) as { block?: string; variant?: string };
+      return { block: String(attrs.block ?? 'callout'), variant: String(attrs.variant ?? '') };
+    }
+  }
+  return null;
+});
+
+const activeBlkVariantOptions = computed(() => findBlock(activeBlk.value?.block ?? '')?.variants ?? []);
+
+/** 插入排版块：素材抽屉点一下就进来，光标落在块内 */
+function insertBlk(name: string): void {
+  const def = findBlock(name);
+  if (!def || !editor.value) return;
+  const variant = def.variants[0]?.value ?? '';
+  editor.value.chain().focus().insertPrBlock({ block: name, variant }, '').run();
+  if (!def.empty) editor.value.chain().focus().insertContent('在这里写内容').run();
+}
 // 作者视角的文集可写性：私有且未协作的文集在下拉里禁用，避免选完才吃 403
 const colWritable = ref<Map<number, boolean>>(new Map());
 
@@ -170,6 +201,7 @@ const editor = useEditor({
     TableHeader,
     TableCell,
     CodeBlockLowlight.configure({ lowlight }),
+    PrBlock,
   ],
   editorProps: {
     handlePaste(view, event) {
@@ -184,6 +216,10 @@ const editor = useEditor({
       files.forEach((f) => void uploadImage(f));
       return true;
     },
+  },
+  // 选区变化时刷新「块属性浮条」（是否在排版块内、哪个变体）
+  onSelectionUpdate() {
+    blkTick.value++;
   },
 });
 
@@ -1009,6 +1045,7 @@ async function generateAiSummary() {
               <button type="button" @click="openPicker" title="从媒体库选择">库</button>
               <button type="button" @click="editor?.chain().focus().setHorizontalRule().run()">—</button>
               <span class="sep"></span>
+              <button type="button" class="blk-toggle" :class="{ 'is-active': showBlockDrawer }" title="公众号式排版素材" @click="showBlockDrawer = !showBlockDrawer">✦ 排版</button>
               <button type="button" @click="editor?.chain().focus().undo().run()">↩</button>
               <button type="button" @click="editor?.chain().focus().redo().run()">↪</button>
             </template>
@@ -1038,7 +1075,47 @@ async function generateAiSummary() {
           </div>
 
           <div v-show="mode === 'wysiwyg'" class="wysiwyg-area">
-            <EditorContent :editor="editor" />
+            <div v-if="showBlockDrawer" class="blk-drawer">
+              <div class="blk-drawer-head">
+                <strong>排版素材</strong>
+                <button type="button" class="blk-x" title="收起" @click="showBlockDrawer = false">×</button>
+              </div>
+              <p class="blk-drawer-hint">点一下插入，选中块后可切换外观。</p>
+              <div v-for="g in BLOCK_GROUPS" :key="g" class="blk-group">
+                <div class="blk-group-title">{{ g }}</div>
+                <button
+                  v-for="b in BLOCKS.filter((x) => x.group === g)"
+                  :key="b.name"
+                  type="button"
+                  class="blk-item"
+                  :title="b.hint"
+                  @click="insertBlk(b.name)"
+                >
+                  <span class="blk-item-name">{{ b.label }}</span>
+                  <span class="blk-item-hint">{{ b.hint }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="wysiwyg-body">
+              <div v-if="activeBlk" class="blk-bar">
+                <span class="blk-bar-label">{{ findBlock(activeBlk.block)?.label ?? activeBlk.block }}</span>
+                <template v-if="activeBlkVariantOptions.length > 0">
+                  <button
+                    v-for="v in activeBlkVariantOptions"
+                    :key="v.value"
+                    type="button"
+                    class="blk-chip"
+                    :class="{ 'is-active': activeBlk.variant === v.value }"
+                    @click="editor?.chain().focus().setPrBlockVariant(v.value).run()"
+                  >
+                    {{ v.label }}
+                  </button>
+                </template>
+                <span class="sep"></span>
+                <button type="button" class="blk-chip" title="拆掉外壳，保留文字" @click="editor?.chain().focus().unwrapPrBlock().run()">拆壳</button>
+              </div>
+              <EditorContent :editor="editor" />
+            </div>
           </div>
           <div v-show="mode === 'source'" class="source-area">
             <div ref="cmHost" class="cm-host" />

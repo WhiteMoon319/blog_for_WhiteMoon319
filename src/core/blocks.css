@@ -1,0 +1,164 @@
+/* 月下独酌 · blog（blog_for_WhiteMoon319）
+ * Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later
+ * 站内公众号式排版块的核心默认样式：由 SiteHead 全局引入，任何主题都至少能看。
+ * 主题可用 `.article-body .blk-*` 覆盖为自己的观感（见主题契约文档）。
+ * 仅在 {:::.blk} 语法与 `article-body` 容器内生效，不影响主题自身结构。 */
+
+:root {
+  --blk-accent: var(--cinnabar, #c23a30);
+  --blk-radius: 8px;
+  --blk-gap: 1.6em;
+  --blk-line: rgba(0, 0, 0, 0.08);
+}
+
+/* 块基础：与正文节奏一致的外边距 */
+.article-body .blk {
+  margin: var(--blk-gap) 0;
+}
+
+/* —— 提示卡 callout —— */
+.article-body .blk-callout {
+  padding: 0.9em 1.1em;
+  border-left: 4px solid var(--blk-accent);
+  border-radius: 0 var(--blk-radius) var(--blk-radius) 0;
+  background: rgba(0, 0, 0, 0.03);
+}
+.article-body .blk-callout > :first-child { margin-top: 0; }
+.article-body .blk-callout > :last-child { margin-bottom: 0; }
+.article-body .blk-callout.is-info { border-left-color: #2563eb; background: rgba(37, 99, 235, 0.07); }
+.article-body .blk-callout.is-success { border-left-color: #16a34a; background: rgba(22, 163, 74, 0.07); }
+.article-body .blk-callout.is-warning { border-left-color: #d97706; background: rgba(217, 119, 6, 0.09); }
+.article-body .blk-callout.is-danger { border-left-color: #dc2626; background: rgba(220, 38, 38, 0.07); }
+
+/* —— 强调段落 highlight —— */
+.article-body .blk-highlight {
+  padding: 0.35em 0.5em;
+  border-radius: 4px;
+  background: rgba(250, 204, 21, 0.35);
+}
+.article-body .blk-highlight.is-gradient {
+  background: linear-gradient(90deg, rgba(250, 204, 21, 0.4), rgba(244, 114, 182, 0.28));
+}
+.article-body .blk-highlight > :first-child { margin-top: 0; }
+.article-body .blk-highlight > :last-child { margin-bottom: 0; }
+
+/* —— 引用 / 金句 quote —— */
+.article-body .blk-quote {
+  padding: 0.2em 0 0.2em 1em;
+  border-left: 3px solid var(--blk-accent);
+  font-size: 1.06em;
+  line-height: 1.7;
+  opacity: 0.92;
+}
+.article-body .blk-quote > :first-child { margin-top: 0; }
+.article-body .blk-quote > :last-child { margin-bottom: 0; }
+
+/* —— 分割线 divider —— */
+.article-body .blk-divider {
+  border: 0;
+  height: 0;
+  margin: calc(var(--blk-gap) * 1.2) 0;
+}
+.article-body .blk-divider.is-line,
+.article-body .blk-divider:not([class*='is-']) {
+  border-top: 1px solid var(--blk-line);
+}
+.article-body .blk-divider.is-dots {
+  border-top: 2px dotted var(--blk-line);
+}
+.article-body .blk-divider.is-space {
+  margin: calc(var(--blk-gap) * 2.4) 0;
+}
+
+/* —— 步骤 steps —— */
+.article-body .blk-steps {
+  padding: 0.9em 1.1em 0.9em 1.4em;
+  border-radius: var(--blk-radius);
+  background: rgba(0, 0, 0, 0.03);
+  counter-reset: blk-step;
+  list-style: none;
+}
+.article-body .blk-steps > ol,
+.article-body .blk-steps > ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  counter-reset: blk-step;
+}
+.article-body .blk-steps li {
+  position: relative;
+  padding-left: 2em;
+  margin: 0.6em 0;
+  counter-increment: blk-step;
+}
+.article-body .blk-steps li::before {
+  content: counter(blk-step);
+  position: absolute;
+  left: 0;
+  top: 0.1em;
+  width: 1.5em;
+  height: 1.5em;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blk-accent);
+  color: #fff;
+  font-size: 0.78em;
+  line-height: 1;
+}
+
+/* —— 卡片 card —— */
+.article-body .blk-card {
+  padding: 1em 1.2em;
+  border: 1px solid var(--blk-line);
+  border-radius: var(--blk-radius);
+  background: rgba(0, 0, 0, 0.02);
+}
+.article-body .blk-card > :first-child { margin-top: 0; }
+.article-body .blk-card > :last-child { margin-bottom: 0; }
+
+/* —— 图注 caption —— */
+.article-body .blk-caption {
+  text-align: center;
+  font-size: 0.86em;
+  opacity: 0.7;
+  margin-top: -0.6em;
+}
+.article-body .blk-caption img { display: block; margin: 0 auto 0.4em; }
+
+/* —— 文末引导 cta —— */
+.article-body .blk-cta {
+  padding-top: 1em;
+  border-top: 1px solid var(--blk-line);
+  text-align: center;
+  font-weight: 600;
+}
+.article-body .blk-cta > :first-child { margin-top: 0; }
+.article-body .blk-cta > :last-child { margin-bottom: 0; }
+
+/* —— 全文样式预设（文章级 layout-*，控制全篇节奏） —— */
+.article-body.layout-wechat {
+  font-size: 16px;
+  line-height: 1.75;
+  letter-spacing: 0.5px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.article-body.layout-wechat .blk { margin: 1.4em 0; }
+
+.article-body.layout-magazine {
+  font-size: 17px;
+  line-height: 1.8;
+  letter-spacing: 0.3px;
+}
+.article-body.layout-magazine .blk-quote { font-size: 1.15em; }
+.article-body.layout-magazine .blk-callout { border-left-width: 6px; }
+
+.article-body.layout-warm {
+  font-size: 16px;
+  line-height: 1.9;
+  letter-spacing: 0.8px;
+}
+.article-body.layout-warm p { text-indent: 2em; }
+.article-body.layout-warm .blk p,
+.article-body.layout-warm .blk-caption { text-indent: 0; }

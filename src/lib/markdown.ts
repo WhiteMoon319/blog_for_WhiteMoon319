@@ -81,6 +81,90 @@ function restoreMath(html: string, math: Array<{ tex: string; display: boolean }
 
 const DIAGRAM_LANGS = new Set(['mermaid', 'markmap']);
 
+/**
+ * 排版块：`:::name{type=variant}` … `:::`（见 .pai/plan/ui/20260924_站内公众号式排版.md）。
+ * 存储层仍是 Markdown 文本，因此可进版本快照、可回滚、可 diff；解析后渲染为 `.blk-*` 元素，
+ * 样式归主题。未知块名或不闭合一律降级，绝不吞正文。
+ */
+const BLOCK_VARIANTS: Record<string, string[]> = {
+  callout: ['info', 'success', 'warning', 'danger'],
+  highlight: ['yellow', 'gradient'],
+  divider: ['line', 'dots', 'space'],
+  quote: [],
+  steps: [],
+  caption: [],
+  card: [],
+  cta: [],
+};
+
+/** 空块：自身不承载文字，渲染成无内容的分隔元素 */
+const EMPTY_BLOCKS = new Set(['divider']);
+
+const BLOCK_OPEN_RE = /^:::[ \t]*([a-z][a-z0-9-]*)[ \t]*(?:\{([^}\n]*)\})?[ \t]*\r?\n/;
+// 闭合标记可紧贴开块（空块，如 `:::divider` 后直接 `:::`），也可另起一行
+const BLOCK_CLOSE_RE = /(?:^|\r?\n):::[ \t]*(?=\r?\n|$)/;
+
+/** 从 `type=warning` / `style=dots` / `variant=success` 中取出合法变体；非法或缺失返回空串 */
+export function parseBlockVariant(name: string, attrs: string | undefined): string {
+  const allowed = BLOCK_VARIANTS[name] ?? [];
+  if (!attrs || allowed.length === 0) return '';
+  for (const pair of attrs.split(/[\s,]+/).filter(Boolean)) {
+    const [rawKey, rawVal] = pair.split('=');
+    const key = (rawKey ?? '').trim().toLowerCase();
+    const val = (rawVal ?? '').trim().toLowerCase();
+    if (!['type', 'style', 'variant'].includes(key)) continue;
+    if (allowed.includes(val)) return val;
+  }
+  return '';
+}
+
+interface PrBlockToken extends Tokens.Generic {
+  type: 'prBlock';
+  block: string;
+  variant: string;
+  tokens: Tokens.Generic[];
+}
+
+const prBlockExtension = {
+  name: 'prBlock',
+  level: 'block' as const,
+  start(src: string): number | undefined {
+    const idx = src.search(/^:::/m);
+    return idx === -1 ? undefined : idx;
+  },
+  tokenizer(this: { lexer: { blockTokens: (src: string, tokens: Tokens.Generic[]) => Tokens.Generic[] } }, src: string) {
+    const open = BLOCK_OPEN_RE.exec(src);
+    if (!open) return undefined;
+    const name = open[1].toLowerCase();
+    const body = src.slice(open[0].length);
+    const close = BLOCK_CLOSE_RE.exec(body);
+    // 未闭合：交回普通解析，正文照常渲染
+    if (!close) return undefined;
+    const inner = body.slice(0, close.index);
+    const raw = open[0] + body.slice(0, close.index + close[0].length);
+    const token: PrBlockToken = {
+      type: 'prBlock',
+      raw,
+      block: name,
+      variant: parseBlockVariant(name, open[2]),
+      tokens: this.lexer.blockTokens(inner, []),
+    };
+    return token;
+  },
+  renderer(this: { parser: { parse: (tokens: Tokens.Generic[]) => string } }, token: PrBlockToken): string {
+    const inner = EMPTY_BLOCKS.has(token.block) ? '' : this.parser.parse(token.tokens);
+    // 未知块名：只保留内容，不生成任意 class（避免正文注入样式锚点）
+    if (!(token.block in BLOCK_VARIANTS)) return inner;
+    const variantClass = token.variant ? ` is-${token.variant}` : '';
+    if (EMPTY_BLOCKS.has(token.block)) {
+      return `<section class="blk blk-${token.block}${variantClass}" role="separator" aria-hidden="true"></section>`;
+    }
+    return `<section class="blk blk-${token.block}${variantClass}">${inner}</section>`;
+  },
+};
+
+marked.use({ extensions: [prBlockExtension] });
+
 // 把占位符替换回原始 LaTeX，用于生成标题 id 与 TOC 文本（避免占位符泄露进 id）
 function rawTextOf(text: string, math: Array<{ tex: string; display: boolean }>): string {
   return text.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) => math[Number(idx)]?.tex ?? '');
@@ -130,11 +214,12 @@ export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
     allowedTags: [
       'a', 'address', 'article', 'aside', 'blockquote', 'br', 'code', 'del', 'details', 'div', 'em',
       'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'ins',
-      'kbd', 'li', 'mark', 'ol', 'p', 'pre', 's', 'small', 'span', 'strong', 'sub', 'sup',
+      'kbd', 'li', 'mark', 'ol', 'p', 'pre', 's', 'section', 'small', 'span', 'strong', 'sub', 'sup',
       'summary', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
     ],
     allowedAttributes: {
-      '*': ['class', 'style', 'id'],
+      // role / aria-hidden 供排版块（如分割线）表达语义；均为无脚本能力的静态属性
+      '*': ['class', 'style', 'id', 'role', 'aria-hidden'],
       a: ['href', 'title'],
       img: ['src', 'alt', 'title', 'loading', 'decoding', 'width', 'height'],
       code: ['class'],

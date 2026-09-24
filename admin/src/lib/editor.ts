@@ -7,9 +7,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import TurndownService from 'turndown';
+import { registerPrBlockTurndown } from './tiptap-blocks.ts';
 
 export function createTurndown(): TurndownService {
-  return new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
+  const service = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
+  // 排版块（:::block）必须能回写，否则保存一次就被剥掉
+  return registerPrBlockTurndown(service);
 }
 
 // 编辑器不支持的结构提示：表格与代码块已支持，仅提示无法在 WYSIWYG 中编辑的块级布局/脚本 HTML，

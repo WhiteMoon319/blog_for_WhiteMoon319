@@ -1042,3 +1042,40 @@ test('e2e：导出——未登录 401，登录后可取全量快照与单篇 Mar
 
   await c.del(`/api/posts/${id}`);
 });
+
+test('e2e：排版块（:::语法）在文章页渲染为 .blk 元素', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+  const content = [
+    '引子段落。',
+    '',
+    ':::callout{type=warning}',
+    '注意：**记得备份**。',
+    ':::',
+    '',
+    ':::divider{style=dots}',
+    ':::',
+    '',
+    ':::quote',
+    '一句金句。',
+    ':::',
+  ].join('\n');
+  const created = await c.post('/api/posts', {
+    title: '排版块试炼',
+    slug: 'blocks-probe',
+    content_md: content,
+    status: 'published',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const html = await (await c.get('/posts/blocks-probe/')).text();
+  assert.ok(html.includes('<section class="blk blk-callout is-warning"'), '提示卡渲染出块元素');
+  assert.ok(html.includes('<section class="blk blk-divider is-dots"'), '分割线渲染出块元素');
+  assert.ok(html.includes('<section class="blk blk-quote"'), '引用块渲染出块元素');
+  assert.ok(html.includes('<strong>记得备份</strong>'), '块内 Markdown 正常渲染');
+  assert.ok(html.includes('article-body'), '仍在正文容器内');
+  assert.ok(!html.includes(':::'), '语法标记不外泄到前台');
+
+  await c.del(`/api/posts/${id}`);
+});

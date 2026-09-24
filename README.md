@@ -15,6 +15,8 @@
 - 文章页字号调节（A−/A/A+，localStorage 记忆）与左下角悬浮阅读进度指示器
 - RSS（`/feed.xml`）、站点地图（`/sitemap.xml`）动态生成
 - KaTeX 数学公式、Mermaid 流程图、MarkMap 脑图、代码高亮（highlight.js），均按需加载（正文含对应内容才拉取资源）
+- 站内排版块：正文用 `:::name{type=variant}` 容器语法插入 8 类结构化块（提示卡/强调段落/引用金句/分割线/步骤/卡片/图注/文末引导），存储仍是纯文本 Markdown，可 diff、可随版本回滚、可导出；编辑器点「✦ 排版」素材抽屉插入，选中块用属性浮条切外观
+- 全文样式预设：文章级 `posts.layout` 一键套用整篇排版节奏（公众号风 / 杂志风 / 温润风，留空跟随主题），只改正文节奏、不动块样式
 - 用户系统：注册（邮箱验证码）、登录（用户名或邮箱）、个人中心（昵称、头像、作者简介、改密码、改邮箱、邮件提醒开关）
 - 多作者：文章支持多人共同署名（有序，第一位为主作者），文章页与列表卡展示署名并链接作者页；作者页 `/authors/{username}/` 展示简介与名下文章；搜索页同关键词命中作者时分区展示
 - 文集归属作者：文集有归属人（即集主署名），可设为「公用」（任何作者可投稿）或「私有」（仅归属人与协作者）；协作者由归属人拉入或作者申请、归属人同意后加入
@@ -113,6 +115,19 @@ wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
 import AuthorByline from '@core/AuthorByline.astro';
 <AuthorByline authors={authors} prefix={t('post.byline')} variant="post" />
 ```
+
+文章模板另有两个与正文展示相关的契约（都可选，不传即默认行为）：
+
+- **全文样式预设**：页面壳传 `layout={post.layout}`（`''` / `wechat` / `magazine` / `warm`）。主题用 `articleLayoutClass(layout)`（从 `@core/utils` 引用）把它并进正文容器 class：
+
+  ```astro
+  import { articleLayoutClass } from '@core/utils';
+  const bodyClass = ['article-body', 'reveal', 'in', articleLayoutClass(layout)].filter(Boolean).join(' ');
+  <div class={bodyClass} set:html={html} />
+  ```
+
+  预设样式定义在核心 `src/core/blocks.css` 的 `.article-body.layout-*` 下，任何主题默认即生效；主题可自行覆盖。
+- **排版块**：核心把 `:::` 容器渲染为固定 class 锚点 `.blk .blk-<name> .is-<variant>`（如 `.blk-callout.is-warning`），块样式同样由核心 `blocks.css` 全局注入，主题只需保证正文容器带 `article-body` 类即可承载。
 
 ```
 src/pages/posts/[slug].astro   # 数据查询 + 守卫
@@ -418,8 +433,9 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 
 ## 数据库
 
-- **迁移**：`db/migrations/0001_init` ~ `0035_collection_owner`（共 35 个）
+- **迁移**：`db/migrations/0001_init` ~ `0036_post_layout`（共 36 个）
 - **多作者相关**：`post_authors`（署名关联，有序）、`posts.created_by`（归属人，决定编辑权）、`post_versions.authors`（署名快照）、`users.bio`（作者简介）、`collections.created_by`（文集归属人即集主）、`collections.is_public`（公用/私有）、`collection_collaborators`、`collection_invites`（协作申请）
+- **排版相关**：`posts.layout`（全文样式预设，`''`/`wechat`/`magazine`/`warm`，应用层白名单校验）；排版块本身不建表，仍是正文 Markdown 的一部分
 - **核心表**：`collections`（文集，含 `ref_summaries`/`ai_prompt_id`）、`posts`（文章，含 `summary_source`/`view_count`/`is_pinned`/`scheduled_at`）、`post_versions`（增量版本）、`pages`（独立页面）、`tags`/`post_tags`/`collection_tags`、`collection_deletes`（删文集分批迁移账本）、`login_attempts`、`posts_fts`（FTS 全文检索）、`ai_credentials`（AES-256-GCM 加密 API Key）、`settings`（站点与 AI 配置，含 `ai_prompt_templates`）、`users`/`comments`/`comment_likes`/`post_likes`/`reading_history`（登录用户阅读进度）/`email_verifications`、`email_credentials`（SMTP 或 HTTP API 凭据）、`daily_views`（阅读统计）
 - **文章 slug**：文集内唯一；未分类由部分唯一索引保证全局唯一。删除文集时 slug 冲突自动加后缀
 
@@ -439,6 +455,8 @@ pnpm wrangler d1 migrations apply blog-db --remote
 ```
 
 D1 的迁移不提供自动回滚；如需退回只能靠上面的备份快照。若库中已有大量文章/文集，回填会在一次 `UPDATE` 内完成，注意 `wrangler d1 migrations apply` 的超时设置。
+
+> 后续的 `0036_post_layout` 只是给 `posts` 增一个有默认值的列（`layout TEXT NOT NULL DEFAULT ''`），无回填、无风险，正常 `migrations apply` 即可。
 
 ## AI 摘要
 

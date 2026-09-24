@@ -17,8 +17,7 @@ function notify(msg: string, err = false) {
   setTimeout(() => (toast.msg = ''), 2600);
 }
 
-// 路由守卫：initAuth 未完成或非管理员时，除登录页外一律拦截
-// （authed 但非 admin → 404；未登录 → 统一登录页）
+// 路由守卫：initAuth 未完成先挂起；后台仅供管理员，作者请走写作区（/write/）
 router.beforeEach((to) => {
   if (to.path === '/login') return true;
   if (authState.checking) return false; // 等 initAuth 完成后再放行
@@ -42,7 +41,8 @@ onMounted(async () => {
     if (!authState.authed) {
       window.location.href = '/login/?redirect=/admin/';
     } else if (authState.role !== 'admin') {
-      window.location.href = '/404';
+      // 作者有自己的写作区：不共用后台，避免靠隐藏菜单来做权限划分
+      window.location.href = authState.role === 'author' ? '/write/' : '/404';
     }
   }
 });

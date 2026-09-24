@@ -19,6 +19,8 @@ export interface UserRow {
   role: 'reader' | 'author' | 'admin';
   website_url: string;
   avatar_url: string;
+  /** 作者简介（纯文本），作者页展示 */
+  bio: string;
   status: 'active' | 'banned';
   session_version: number;
   notify_email: number;

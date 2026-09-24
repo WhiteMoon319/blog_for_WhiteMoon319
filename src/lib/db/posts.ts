@@ -14,6 +14,7 @@ import {
   listPostOwnTags,
 } from './tags.ts';
 import { getLatestPostVersion, planForNewContent, planForPostId, type VersionContentPlan } from './versions.ts';
+import { getPostAuthorIds, setPostAuthorsStmts } from './authors.ts';
 import { isValidSlug } from '../utils.ts';
 
 export async function listPublishedPosts(
@@ -92,13 +93,18 @@ export async function getPublishedPostInCollection(
 
 export async function listPosts(
   db: D1Database,
-  opts: { collectionId?: number; status?: 'draft' | 'published' | 'all'; limit?: number; offset?: number; trashOnly?: boolean } = {},
+  opts: { collectionId?: number; status?: 'draft' | 'published' | 'all'; limit?: number; offset?: number; trashOnly?: boolean; authorId?: number } = {},
 ): Promise<PostRow[]> {
   const where: string[] = [];
   const args: (number | string)[] = [];
   if (opts.collectionId !== undefined) {
     where.push('collection_id = ?');
     args.push(opts.collectionId);
+  }
+  // 作者视角：只看自己归属或署名的文章（含草稿），管理员不加此过滤
+  if (opts.authorId !== undefined) {
+    where.push('(created_by = ? OR id IN (SELECT post_id FROM post_authors WHERE user_id = ?))');
+    args.push(opts.authorId, opts.authorId);
   }
   if (opts.status && opts.status !== 'all') {
     where.push('status = ?');
@@ -133,8 +139,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -148,6 +154,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.is_pinned ?? 0,
         data.scheduled_at ?? null,
         data.summary_source ?? 'manual',
+        data.created_by ?? null,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -166,13 +173,14 @@ export async function createPostWithTags(
   db: D1Database,
   data: PostInput,
   tagNames: string[],
+  authorIds: number[] = [],
 ): Promise<{ post: PostRow; tags: TagRow[] } | null> {
   if (!isValidSlug(data.slug)) throw new Error(`invalid slug: ${data.slug}`);
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -186,6 +194,7 @@ export async function createPostWithTags(
         data.is_pinned ?? 0,
         data.scheduled_at ?? null,
         data.summary_source ?? 'manual',
+        data.created_by ?? null,
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -212,6 +221,19 @@ export async function createPostWithTags(
     }
     stmts.push(purgeOrphanTagsStmt(db));
   }
+  // 初始署名：放在版本 INSERT 之后，故 v1 的 authors 记为空数组；
+  // 按"空数组不覆盖当前署名"的口径，回滚到 v1 不会清空署名。
+  const authors = [...new Set(authorIds.filter((n) => Number.isInteger(n) && n > 0))];
+  authors.forEach((userId, idx) => {
+    stmts.push(
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO post_authors (post_id, user_id, sort_order)
+           SELECT p.id, ?, ? FROM posts p WHERE p.collection_id IS ? AND p.slug = ?`,
+        )
+        .bind(userId, idx, data.collection_id ?? null, data.slug),
+    );
+  });
   const results = await db.batch(stmts);
   const post = results[1].results?.[0] as PostRow | undefined ?? null;
   if (!post) return null;
@@ -269,9 +291,10 @@ export async function updatePost(
       .bind(...values, id, ...versionArgs),
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?,
+                COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -279,6 +302,7 @@ export async function updatePost(
         ...(baseVersion !== undefined
           ? [baseVersion + 1, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']
           : [id, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']),
+        id,
         id,
         ...versionArgs,
       ),
@@ -297,12 +321,24 @@ export async function updatePostWithTags(
   tagNames: string[] | null,
   versionMessage?: string,
   baseVersion?: number,
+  authorIds?: number[] | null,
 ): Promise<{ post: PostRow; tags: TagRow[] } | 'conflict' | null> {
   const current = await getPostById(db, id);
   if (!current) return null;
   // 手动刊发：scheduled_at 仅在草稿时有意义，强制清空定时值
   if (patch.status === 'published' && !('scheduled_at' in patch)) {
     patch.scheduled_at = null;
+  }
+  // 署名变更与正文变更同等对待：都要产生版本记录，否则回滚会把署名退回旧状态。
+  // authorIds 为 undefined / null 表示本次不动署名。
+  const nextAuthorIds =
+    authorIds === undefined || authorIds === null
+      ? null
+      : [...new Set(authorIds.filter((n) => Number.isInteger(n) && n > 0))];
+  let authorsChanged = false;
+  if (nextAuthorIds !== null) {
+    const curIds = await getPostAuthorIds(db, id);
+    authorsChanged = curIds.length !== nextAuthorIds.length || curIds.some((v, i) => v !== nextAuthorIds[i]);
   }
   const keys = Object.keys(patch).filter((k) =>
     ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at'].includes(k),
@@ -317,7 +353,7 @@ export async function updatePostWithTags(
     changed.push('summary_source');
     (patch as Record<string, unknown>).summary_source = 'manual';
   }
-  const tagsOnly = changed.length === 0;
+  const tagsOnly = changed.length === 0 && !authorsChanged;
   if (tagsOnly) {
     // 无实质变更仍需校验乐观锁基线；仅换标签不产生版本记录（版本史记录的是内容）
     if (baseVersion !== undefined && (await getLatestPostVersion(db, id)) !== baseVersion) return 'conflict';
@@ -334,15 +370,25 @@ export async function updatePostWithTags(
       ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
       : '';
   const versionArgs = baseVersion !== undefined ? [id, baseVersion] : [];
+  // 顺序约定：UPDATE 在首位以便取回变更后的行；署名语句紧随其后，
+  // 保证版本 INSERT 的署名子查询读到的是本次最新署名。
   const stmts: D1PreparedStatement[] = [
-    db
-      .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? ${versionMatch} RETURNING *`)
-      .bind(...values, id, ...versionArgs),
+    changed.length > 0
+      ? db
+          .prepare(`UPDATE posts SET ${sets}, updated_at = datetime('now') WHERE id = ? ${versionMatch} RETURNING *`)
+          .bind(...values, id, ...versionArgs)
+      : db
+          .prepare(`UPDATE posts SET updated_at = datetime('now') WHERE id = ? ${versionMatch} RETURNING *`)
+          .bind(id, ...versionArgs),
+  ];
+  if (authorsChanged && nextAuthorIds !== null) stmts.push(...setPostAuthorsStmts(db, id, nextAuthorIds));
+  stmts.push(
     db
       .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
          SELECT ?, ${baseVersion !== undefined ? '?' : `COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1`},
-                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
+                title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?,
+                COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
          FROM posts WHERE id = ? ${versionMatch}`,
       )
       .bind(
@@ -351,9 +397,10 @@ export async function updatePostWithTags(
           ? [baseVersion + 1, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']
           : [id, plan.content_md, plan.content_md_patch, plan.base_version, versionMessage ?? '自动保存']),
         id,
+        id,
         ...versionArgs,
       ),
-  ];
+  );
   if (tagNames !== null) stmts.push(...setPostOwnTagsStmts(db, id, tagNames));
   const results = await db.batch(stmts);
   const row = results[0].results?.[0] as PostRow | undefined;
@@ -370,9 +417,10 @@ export async function deletePost(db: D1Database, id: number): Promise<boolean> {
 
 // ---- 回收站（软删除）：trash/restore 每篇 2 语句（版本 + 更新），50 篇 = 100 恰好落在 D1 batch 上限内 ----
 
-const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+const TRASH_VERSION_SQL = `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
 SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-       title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?
+       title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, ?,
+       COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
 FROM posts WHERE id = ?`;
 
 function trashVersionStmt(
@@ -384,7 +432,7 @@ function trashVersionStmt(
 ): D1PreparedStatement {
   // 版本 INSERT 先于 UPDATE：guard（deleted_at 旧状态）读到的是变更前状态；
   // 并发重复执行时 guard 落空，不会重复留档。
-  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, message, id);
+  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, message, id, id);
 }
 
 // trash（fromTrashed=false）/restore（fromTrashed=true）共用：预检计数 + 每篇 [版本留档, 状态更新]。

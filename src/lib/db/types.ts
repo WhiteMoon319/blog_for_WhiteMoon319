@@ -37,9 +37,26 @@ export interface PostRow {
   created_at: string;
   updated_at: string;
   summary_source: 'local' | 'manual' | 'ai';
+  /** 归属人（决定编辑权），与对外署名解耦 */
+  created_by: number | null;
 }
 
 export type PostWithCollection = PostRow & { collection_slug: string | null };
+
+/** 作者引用（前台署名、作者页与编辑器选择器共用） */
+export interface AuthorRef {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+  bio: string;
+}
+
+/** 作者引用 + 已发布篇数（作者页与搜索结果用） */
+export type AuthorSummary = AuthorRef & { post_count: number };
+
+/** 带署名的文章：authors 由批量查询装配，避免逐篇查询 */
+export type PostWithAuthors = PostRow & { authors: AuthorRef[] };
 
 export interface PostInput {
   title: string;
@@ -53,6 +70,7 @@ export interface PostInput {
   is_pinned?: number;
   scheduled_at?: string | null;
   summary_source?: 'local' | 'manual' | 'ai';
+  created_by?: number | null;
 }
 
 const POST_FIELDS = [
@@ -89,6 +107,8 @@ export interface PostVersionRow {
   base_version: number | null;
   content_md_patch: string;
   summary_source: string;
+  /** 署名快照（JSON 数组字符串）；'[]' 视为不覆盖当前署名 */
+  authors: string;
 }
 
 export interface TagRow {

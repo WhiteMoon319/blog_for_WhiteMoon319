@@ -13,7 +13,7 @@ function escapeFtsPhrase(query: string): string {
 }
 
 // LIKE 通配符转义：% 与 _ 作为字面字符匹配，配合 ESCAPE '\'
-function escapeLike(query: string): string {
+export function escapeLike(query: string): string {
   return query.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 

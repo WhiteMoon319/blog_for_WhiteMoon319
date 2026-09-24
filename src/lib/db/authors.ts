@@ -89,6 +89,21 @@ export async function setPostAuthors(db: D1Database, postId: number, userIds: nu
   await db.batch(setPostAuthorsStmts(db, postId, userIds));
 }
 
+/**
+ * 过滤出可署名的用户 id（作者/管理员且未封禁），保持调用方给出的顺序。
+ * 写库前必须过这一层：直接写 post_authors 会撞 users 外键或把读者挂成作者。
+ */
+export async function filterSignableAuthorIds(db: D1Database, userIds: number[]): Promise<number[]> {
+  const unique = [...new Set(userIds.filter((n) => Number.isInteger(n) && n > 0))];
+  if (unique.length === 0) return [];
+  const rows = await db
+    .prepare(`SELECT u.id FROM users u WHERE ${AUTHOR_SCOPE} AND u.id IN (${unique.map(() => '?').join(',')})`)
+    .bind(...unique)
+    .all<{ id: number }>();
+  const allowed = new Set((rows.results ?? []).map((r) => r.id));
+  return unique.filter((id) => allowed.has(id));
+}
+
 /** 按用户名取作者（作者页用）：非作者身份或已封禁一律 null */
 export async function getAuthorByUsername(db: D1Database, username: string): Promise<AuthorRef | null> {
   return db

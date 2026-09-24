@@ -18,6 +18,7 @@ import {
   setPostsPinned,
   isSlugConflict,
   planForPostId,
+  setPostAuthors,
   type PostRow,
 } from '../../../lib/db';
 import { slugBase, slugWithSuffix } from '../../../lib/utils';
@@ -110,6 +111,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
           break;
         }
       }
+      if (created) await setPostAuthors(env.DB, created.id, [auth.user.id]);
       results.push(created ? { ok: true, post: created } : { ok: false, error: lastError });
     }
     return json({ ok: true, results });

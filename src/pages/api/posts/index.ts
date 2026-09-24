@@ -7,9 +7,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPostWithTags, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPostWithTags, listPostAuthors, filterSignableAuthorIds, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
+import { parseAuthorIds } from '../../../lib/api/validate';
 
 export const prerender = false;
 
@@ -85,6 +86,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const parsedTags = parseTagsStrict(body.tags);
   if (!parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
+  const parsedAuthors = parseAuthorIds(body.authors);
+  if (!parsedAuthors.ok) return json({ error: parsedAuthors.error }, 400);
+
   // SEO 关键词：纯文本、长度受限，超出截断会静默丢数据，因此直接 400
   const metaKeywords =
     typeof body.meta_keywords === 'string'
@@ -116,6 +120,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
     if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
       return json({ error: 'collection not found' }, 404);
     }
+    // 署名缺省为创建者本人：保证新文一定有主作者，前台不出现空白署名；
+    // 显式传空数组则允许无署名（例如仅作为草稿的转载占位）。
+    const requested = parsedAuthors.ids ?? [auth.user.id];
+    const authorIds = await filterSignableAuthorIds(env.DB, requested);
+    if (authorIds.length !== new Set(requested).size) {
+      return json({ error: 'authors 含不可署名的用户（需为作者或管理员且未封禁）' }, 400);
+    }
     const created = await createPostWithTags(env.DB, {
       title: body.title.trim(),
       slug: ensureSlug(slug, body.title, 'post'),
@@ -128,9 +139,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
       scheduled_at: scheduledAt,
       status,
       created_by: auth.user.id,
-    }, parsedTags.tags);
+    }, parsedTags.tags, authorIds);
     if (!created) return json({ error: 'post create failed' }, 500);
-    return json({ post: created.post, tags: created.tags, version: 1 }, 201);
+    return json({ post: created.post, tags: created.tags, version: 1, authors: await listPostAuthors(env.DB, created.post.id) }, 201);
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

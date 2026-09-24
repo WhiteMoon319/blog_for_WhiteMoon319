@@ -18,7 +18,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   // 白名单字段：绝不返回 password_hash / session_version
   const rows = await env.DB.prepare(
-    `SELECT id, username, display_name, email, role, status, created_at FROM users ORDER BY created_at DESC`,
+    `SELECT id, username, display_name, email, role, status, bio, avatar_url, created_at FROM users ORDER BY created_at DESC`,
   ).all();
   return json({ users: rows.results ?? [] });
 }

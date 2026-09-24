@@ -101,14 +101,28 @@ export async function banUser(db: D1Database, userId: number): Promise<boolean> 
   return !!row;
 }
 
-export async function updateProfile(db: D1Database, userId: number, data: { display_name?: string; avatar_url?: string; notify_email?: number }): Promise<boolean> {
+export async function updateProfile(db: D1Database, userId: number, data: { display_name?: string; avatar_url?: string; notify_email?: number; bio?: string }): Promise<boolean> {
   const sets: string[] = [];
   const vals: (string | number)[] = [];
   if (data.display_name !== undefined) { sets.push('display_name = ?'); vals.push(data.display_name.trim()); }
   if (data.avatar_url !== undefined) { sets.push('avatar_url = ?'); vals.push(data.avatar_url); }
   if (data.notify_email !== undefined) { sets.push('notify_email = ?'); vals.push(data.notify_email); }
+  if (data.bio !== undefined) { sets.push('bio = ?'); vals.push(data.bio); }
   if (sets.length === 0) return false;
   const row = await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? RETURNING id`).bind(...vals, userId).first<{ id: number }>();
+  return !!row;
+}
+
+/**
+ * 角色调整：仅允许 reader ↔ author 之间互换。
+ * 管理员角色不接受改动（既不能提为 admin，也不能把 admin 降级），
+ * 于是"最后一名管理员被降级"这种自锁场景从规则上就不可能出现。
+ */
+export async function setUserRole(db: D1Database, userId: number, role: 'reader' | 'author'): Promise<boolean> {
+  const row = await db
+    .prepare(`UPDATE users SET role = ? WHERE id = ? AND role IN ('reader','author') RETURNING id`)
+    .bind(role, userId)
+    .first<{ id: number }>();
   return !!row;
 }
 

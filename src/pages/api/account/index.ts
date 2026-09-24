@@ -26,6 +26,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
     avatar_url: auth.user.avatar_url,
     role: auth.user.role,
     notify_email: auth.user.notify_email === 1,
+    bio: auth.user.bio,
     created_at: auth.user.created_at,
   });
 }
@@ -37,13 +38,19 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);
 
-  let body: { display_name?: unknown; avatar_url?: unknown; notify_email?: unknown; email?: unknown };
+  let body: { display_name?: unknown; avatar_url?: unknown; notify_email?: unknown; email?: unknown; bio?: unknown };
   try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
 
-  const profile: { display_name?: string; avatar_url?: string; notify_email?: number } = {};
+  const profile: { display_name?: string; avatar_url?: string; notify_email?: number; bio?: string } = {};
   if (typeof body.display_name === 'string' && body.display_name.trim()) {
     if (body.display_name.trim().length > 30) return json({ error: '昵称最长 30 字' }, 400);
     profile.display_name = body.display_name.trim();
+  }
+  // 作者简介为自助字段：读者也能写，只是不展示在作者页
+  if (typeof body.bio === 'string') {
+    const bio = body.bio.trim();
+    if (bio.length > 200) return json({ error: '简介最长 200 字' }, 400);
+    profile.bio = bio;
   }
   if (typeof body.avatar_url === 'string') {
     // 头像仅允许本站 R2 路径（avatar/ 前缀）或空（清除）

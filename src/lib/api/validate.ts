@@ -18,6 +18,29 @@ export function parseId(raw: string | undefined): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+// 一篇文章的署名作者上限：超过这个量级的联合署名已不是"共同作者"，而是作者表
+export const MAX_POST_AUTHORS = 10;
+
+/**
+ * 署名作者列表解析：
+ * - 字段缺失 / null → ids 为 undefined，表示本次不动署名；
+ * - 数组（含空数组）→ 按数组整体替换署名，空数组即清空；
+ * - 非法值一律 400，绝不静默丢弃，否则会出现"以为改了署名其实没改"。
+ */
+export function parseAuthorIds(raw: unknown): { ok: true; ids: number[] | undefined } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) return { ok: true, ids: undefined };
+  if (!Array.isArray(raw)) return { ok: false, error: 'authors 需为数组' };
+  if (raw.length > MAX_POST_AUTHORS) return { ok: false, error: `署名作者最多 ${MAX_POST_AUTHORS} 位` };
+  const ids: number[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'number' || !Number.isInteger(v) || v <= 0) {
+      return { ok: false, error: 'authors 含非法用户 id' };
+    }
+    ids.push(v);
+  }
+  return { ok: true, ids: [...new Set(ids)] };
+}
+
 export function parseIds(raw: unknown): number[] | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > BATCH_MAX_IDS) return null;
   const ids: number[] = [];

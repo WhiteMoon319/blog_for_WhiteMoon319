@@ -11,6 +11,9 @@ import assert from 'node:assert/strict';
 import {
   createUser,
   banUser,
+  getUserById,
+  setUserRole,
+  filterSignableAuthorIds,
   createPost,
   createPostWithTags,
   updatePostWithTags,
@@ -27,6 +30,7 @@ import {
   getPostVersion,
 } from '../src/lib/db/index.ts';
 import { makeTestDb } from './helpers/d1.ts';
+import { parseAuthorIds, MAX_POST_AUTHORS } from '../src/lib/api/validate.ts';
 
 const handle = await makeTestDb();
 after(() => handle.dispose());
@@ -235,4 +239,51 @@ test('版本快照：改署名与改正文一样产生版本，版本内 authors
   // 不传 authorIds 时不触碰署名
   await updatePostWithTags(db, postId, { content_md: '三' }, null, '只改正文');
   assert.deepEqual(await getPostAuthorIds(db, postId), [b.id], '未携带署名时保持原样');
+});
+
+test('角色调整：仅 reader ↔ author，管理员角色免疫', async () => {
+  const r = await mkUser('role-reader', 'reader');
+  const a = await mkUser('role-author', 'author');
+  const boss = await mkUser('role-admin', 'admin');
+
+  assert.equal(await setUserRole(db, r.id, 'author'), true, '读者应可提为作者');
+  assert.equal((await getUserById(db, r.id))?.role, 'author');
+  assert.equal(await setUserRole(db, r.id, 'reader'), true, '作者应可降回读者');
+  assert.equal((await getUserById(db, r.id))?.role, 'reader');
+  assert.equal(await setUserRole(db, a.id, 'reader'), true);
+
+  // 管理员角色不接受改动：既保住"最后一名管理员"，也不会被本接口提权
+  assert.equal(await setUserRole(db, boss.id, 'reader'), false, '管理员不应被降级');
+  assert.equal((await getUserById(db, boss.id))?.role, 'admin');
+  assert.equal(await setUserRole(db, 999999, 'author'), false, '不存在的用户返回 false');
+});
+
+test('可署名过滤：只留作者/管理员且未封禁，保序去重', async () => {
+  const a = await mkUser('sign-author', 'author');
+  const r = await mkUser('sign-reader', 'reader');
+  const banned = await mkUser('sign-banned', 'author');
+  const boss = await mkUser('sign-admin', 'admin');
+  await banUser(db, banned.id);
+
+  assert.deepEqual(
+    await filterSignableAuthorIds(db, [banned.id, a.id, r.id, a.id, boss.id]),
+    [a.id, boss.id],
+    '应剔除读者与封禁用户并去重保序',
+  );
+  assert.deepEqual(await filterSignableAuthorIds(db, []), []);
+  assert.deepEqual(await filterSignableAuthorIds(db, [999999]), [], '不存在的用户被过滤');
+});
+
+test('署名参数解析：缺省不动、数组整体替换、非法值报错', () => {
+  assert.deepEqual(parseAuthorIds(undefined), { ok: true, ids: undefined }, '未携带字段 = 不改署名');
+  assert.deepEqual(parseAuthorIds(null), { ok: true, ids: undefined });
+  assert.deepEqual(parseAuthorIds([]), { ok: true, ids: [] }, '空数组 = 清空署名');
+  assert.deepEqual(parseAuthorIds([3, 1, 3]), { ok: true, ids: [3, 1] }, '去重保序（第一位即主作者）');
+
+  assert.equal(parseAuthorIds('a').ok, false, '非数组应报错');
+  assert.equal(parseAuthorIds([0]).ok, false, '非正整数应报错');
+  assert.equal(parseAuthorIds([1.5]).ok, false, '小数应报错');
+  assert.equal(parseAuthorIds(['1']).ok, false, '字符串 id 应报错');
+  const tooMany = Array.from({ length: MAX_POST_AUTHORS + 1 }, (_, i) => i + 1);
+  assert.equal(parseAuthorIds(tooMany).ok, false, '超过署名上限应报错');
 });

@@ -7,11 +7,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
 import { resolveUser, json, checkCsrf } from '../../../lib/auth';
 import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.ts';
 import { isValidSlug } from '../../../lib/utils';
-import { parseId } from '../../../lib/api/validate';
+import { parseId, parseAuthorIds } from '../../../lib/api/validate';
 
 export const prerender = false;
 
@@ -30,7 +30,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
   const tags = await listPostOwnTags(env.DB, id);
   const version = await getLatestPostVersion(env.DB, id);
-  return json({ post, tags, version });
+  return json({ post, tags, version, authors: await listPostAuthors(env.DB, id) });
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
@@ -111,6 +111,17 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);
   if (parsedTags !== null && !parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
+  // 署名：未携带则不动；携带则整体替换（空数组 = 清空署名）
+  const parsedAuthors = parseAuthorIds(body.authors);
+  if (!parsedAuthors.ok) return json({ error: parsedAuthors.error }, 400);
+  let nextAuthorIds: number[] | undefined;
+  if (parsedAuthors.ids !== undefined) {
+    nextAuthorIds = await filterSignableAuthorIds(env.DB, parsedAuthors.ids);
+    if (nextAuthorIds.length !== parsedAuthors.ids.length) {
+      return json({ error: 'authors 含不可署名的用户（需为作者或管理员且未封禁）' }, 400);
+    }
+  }
+
   try {
     if ('collection_id' in patch && patch.collection_id !== null && !(await getCollectionById(env.DB, Number(patch.collection_id)))) {
       return json({ error: 'collection not found' }, 404);
@@ -122,12 +133,18 @@ export async function PUT(ctx: APIContext): Promise<Response> {
       parsedTags === null ? null : parsedTags.tags,
       versionMessage,
       baseVersion,
+      nextAuthorIds,
     );
     if (updated === 'conflict') {
       return json({ error: '版本冲突：该文章已在别处被修改，请刷新后重试' }, 409);
     }
     if (!updated) return json({ error: 'not found' }, 404);
-    return json({ post: updated.post, tags: updated.tags, version: await getLatestPostVersion(env.DB, id) });
+    return json({
+      post: updated.post,
+      tags: updated.tags,
+      version: await getLatestPostVersion(env.DB, id),
+      authors: await listPostAuthors(env.DB, id),
+    });
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

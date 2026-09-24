@@ -18,6 +18,8 @@ let authorA: SeededUser;
 let authorB: SeededUser;
 let reader: SeededUser;
 let ready = false;
+// 登录接口有频率限制（e2e 窗口内 10 次），管理员会话只在 setup 里换一次，其余用此缓存复用
+let adminCookie = '';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 1, 2, 3, 4]);
 
@@ -32,7 +34,7 @@ after(async () => {
 
 async function setup(): Promise<void> {
   if (ready) return;
-  await loginAsAdmin(c);
+  adminCookie = await loginAsAdmin(c);
   const col = await c.post('/api/collections', { title: '鉴权集', slug: 'e2e-authz' });
   assert.equal(col.status, 201);
   colId = (await col.json()).collection.id as number;
@@ -133,7 +135,7 @@ test('e2e：作者不能读写他人文章、他人版本与批量操作', async
   if (!HAS_BUILD) return;
   await setup();
 
-  await loginAsAdmin(c);
+  c.setSession(adminCookie);
   const adminPost = await createPost(await c.session(), 'authz-admin-post', 'draft');
   c.setSession(authorA.cookie);
 
@@ -188,7 +190,7 @@ test('e2e：管理员全通，作者列表只看得到自己', async () => {
   await setup();
 
   const aPost = await createPost(authorA.cookie, 'authz-scope-a', 'draft');
-  await loginAsAdmin(c);
+  c.setSession(adminCookie);
   const adminPost = await createPost(await c.session(), 'authz-scope-admin', 'draft');
 
   c.setSession(authorA.cookie);
@@ -202,15 +204,124 @@ test('e2e：管理员全通，作者列表只看得到自己', async () => {
   assert.ok(!trashIds.includes(adminPost), '作者回收站不含他人文章');
 
   const adminAll = await (async () => {
-    await loginAsAdmin(c);
+    c.setSession(adminCookie);
     return (await (await c.get('/api/posts?status=all')).json()).posts as Array<{ id: number }>;
   })();
   assert.ok(adminAll.some((p) => p.id === adminPost), '管理员列表可见他人文章');
 
   // 管理员可改、可删作者的文章
-  await loginAsAdmin(c);
+  c.setSession(adminCookie);
   assert.equal((await c.put(`/api/posts/${aPost}`, { title: '管理员改的' })).status, 200, '管理员应能改作者文章');
   assert.equal((await c.del(`/api/posts/${aPost}`)).status, 200, '管理员应能删作者文章');
   assert.equal((await c.get('/api/settings')).status, 200, '管理员应能读设置');
   assert.equal((await c.get('/api/users')).status, 200, '管理员应能读用户列表');
+});
+
+test('e2e：角色调整接口——管理员专属，reader↔author，管理员角色不可改', async () => {
+  if (!HAS_BUILD) return;
+  await setup();
+
+  const adminRows = await c.sql(`SELECT id FROM users WHERE username = 'admin'`);
+  const adminId = Number(adminRows.results[0]?.id);
+
+  c.setSession(authorA.cookie);
+  assert.equal((await c.post(`/api/users/${reader.id}/role`, { role: 'author' })).status, 403, '作者无权提权');
+  const anon = await c.anon(`/api/users/${reader.id}/role`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS },
+    body: JSON.stringify({ role: 'author' }),
+  });
+  assert.equal(anon.status, 401, '未登录应 401');
+
+  c.setSession(adminCookie);
+  assert.equal((await c.post(`/api/users/${reader.id}/role`, { role: 'admin' })).status, 400, '不得提为管理员');
+  assert.equal((await c.post(`/api/users/${adminId}/role`, { role: 'reader' })).status, 403, '管理员角色不可改');
+  assert.equal((await c.post('/api/users/999999/role', { role: 'author' })).status, 404, '用户不存在应 404');
+
+  const promote = await c.post(`/api/users/${reader.id}/role`, { role: 'author' });
+  assert.equal(promote.status, 200, '读者应可提为作者');
+  const roleRows = await c.sql('SELECT role FROM users WHERE id = ?', reader.id);
+  assert.equal(String(roleRows.results[0]?.role), 'author', '角色应落库');
+  assert.equal((await c.post(`/api/users/${reader.id}/role`, { role: 'author' })).status, 200, '重复设置应幂等');
+
+  // 提权后立刻生效（角色即时读取，无需重新登录）
+  c.setSession(reader.cookie);
+  assert.equal((await c.get('/api/posts?status=draft')).status, 200, '新作者会话立即可用');
+
+  c.setSession(adminCookie);
+  assert.equal((await c.post(`/api/users/${reader.id}/role`, { role: 'reader' })).status, 200, '作者应可降回读者');
+  c.setSession(reader.cookie);
+  assert.equal((await c.get('/api/posts?status=draft')).status, 403, '降级后立即失去内容管理权限');
+});
+
+test('e2e：简介编辑——作者自助走 account，管理员可改他人', async () => {
+  if (!HAS_BUILD) return;
+  await setup();
+
+  c.setSession(authorA.cookie);
+  assert.equal((await c.put('/api/account', { bio: '写代码的人' })).status, 200, '作者应能改自己的简介');
+  assert.equal((await (await c.get('/api/account')).json()).bio, '写代码的人', 'account 应回带简介');
+  assert.equal((await (await c.get('/api/auth/me')).json()).bio, '写代码的人', 'me 应回带简介');
+  assert.equal((await c.put('/api/account', { bio: 'x'.repeat(201) })).status, 400, '超长简介应 400');
+  assert.equal((await c.put(`/api/users/${authorA.id}`, { bio: '越权' })).status, 403, '作者不能改他人资料');
+
+  c.setSession(adminCookie);
+  assert.equal((await c.put(`/api/users/${authorA.id}`, { bio: '由管理员写入' })).status, 200, '管理员应能改作者简介');
+  const listed = ((await (await c.get('/api/users')).json()).users as Array<{ id: number; bio: string }>).find(
+    (u) => u.id === authorA.id,
+  );
+  assert.equal(listed?.bio, '由管理员写入', '用户列表应带最新简介');
+  assert.equal((await c.put(`/api/users/${authorA.id}`, {})).status, 400, '空更新应 400');
+});
+
+test('e2e：文章署名写入、替换与清空，非法署名被拒', async () => {
+  if (!HAS_BUILD) return;
+  await setup();
+
+  c.setSession(authorA.cookie);
+  // 缺省署名 = 创建者本人
+  const plain = await c.post('/api/posts', { collection_id: colId, title: '默认署名', slug: 'authz-default-sign', status: 'draft' });
+  assert.equal(plain.status, 201);
+  const plainBody = await plain.json();
+  assert.deepEqual((plainBody.authors as Array<{ id: number }>).map((a) => a.id), [authorA.id], '新文默认署名创建者');
+
+  // 显式多人署名：第一位为主作者
+  const multi = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '联合署名',
+    slug: 'authz-multi-sign',
+    status: 'draft',
+    authors: [authorB.id, authorA.id],
+  });
+  assert.equal(multi.status, 201);
+  const multiId = (await multi.json()).post.id as number;
+  const detail = await (await c.get(`/api/posts/${multiId}`)).json();
+  assert.deepEqual((detail.authors as Array<{ id: number }>).map((a) => a.id), [authorB.id, authorA.id], '署名应保序');
+
+  const replaced = await c.put(`/api/posts/${multiId}`, { authors: [authorA.id] });
+  assert.equal(replaced.status, 200);
+  assert.deepEqual(
+    ((await replaced.json()).authors as Array<{ id: number }>).map((a) => a.id),
+    [authorA.id],
+    '署名应整体替换',
+  );
+
+  // 仅换署名也要留版本，否则回滚会把署名退回旧状态
+  const verAfterSign = ((await (await c.get(`/api/posts/${multiId}`)).json()).version as number) ?? 0;
+  await c.put(`/api/posts/${multiId}`, { authors: [] });
+  const cleared = await (await c.get(`/api/posts/${multiId}`)).json();
+  assert.deepEqual(cleared.authors, [], '空数组应清空署名');
+  assert.ok((cleared.version as number) > verAfterSign, '署名变更应产生新版本');
+
+  // 非法署名：读者、不存在的用户、超限一律 400
+  assert.equal((await c.put(`/api/posts/${multiId}`, { authors: [reader.id] })).status, 400, '读者不可署名');
+  assert.equal((await c.put(`/api/posts/${multiId}`, { authors: [999999] })).status, 400, '不存在的用户不可署名');
+  assert.equal((await c.put(`/api/posts/${multiId}`, { authors: [authorA.id, 'x'] })).status, 400, '非法类型应 400');
+  const oversized = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '超限署名',
+    slug: 'authz-over-sign',
+    authors: Array.from({ length: 11 }, () => authorA.id),
+  });
+  assert.equal(oversized.status, 400, '超过署名上限应 400');
 });

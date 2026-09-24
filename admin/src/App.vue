@@ -20,8 +20,9 @@ function notify(msg: string, err = false) {
 // 路由守卫：首次进入时鉴权尚未完成，必须在守卫内等待而不是直接拦下——
 // 直接 return false 会取消初始导航，且之后无人再触发，页面会停在空白。
 router.beforeEach(async (to) => {
-  if (to.path === '/login') return true;
+  // 鉴权必须在守卫内完成（含登录页）：checking 未落定时整个 App 只会渲染加载态
   if (authState.checking) await initAuth();
+  if (to.path === '/login') return true;
   if (!authState.authed) {
     window.location.href = '/login/?redirect=/admin/';
     return false;

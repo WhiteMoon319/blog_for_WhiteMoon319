@@ -4,7 +4,7 @@
 // 文章详情模板（Modern）：整合三处来源（独立文章 / 文集内文章 / 草稿预览）的展示标记。
 // 纯展示组件，一切数据经 props 下传，禁止自行访问 DB/env。
 import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
-import { postHref, fmtDate } from '@core/utils';
+import { postHref, fmtDate, articleLayoutClass } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { modernT } from '../i18n';
 import AuthorByline from '@core/AuthorByline.astro';
@@ -75,6 +75,9 @@ interface Props {
 
   /** 署名作者（有序，第一位为主作者）；封禁作者由核心降级为纯文本 */
   authors?: AuthorBadge[];
+
+  /** 全文排版预设（'' = 主题默认），控制全篇节奏 */
+  layout?: string | null;
 }
 
 const {
@@ -106,7 +109,9 @@ const {
   previewBadgeText = '',
   publishedHref,
   authors = [],
+  layout = '',
 } = Astro.props;
+const bodyClass = ['article-body', 'reveal', 'in', articleLayoutClass(layout)].filter(Boolean).join(' ');
 const t = modernT(ctx.locale);
 ---
 
@@ -149,7 +154,7 @@ const t = modernT(ctx.locale);
 
   <article class="article">
     {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
-    <div class="article-body reveal in" set:html={html} />
+    <div class={bodyClass} set:html={html} />
 
     {toc.length > 1 && (
       <nav class="article-toc" aria-label={t('post.toc')}>

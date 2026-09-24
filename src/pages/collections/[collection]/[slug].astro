@@ -50,6 +50,7 @@ const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, po
   likes={likeCount?.n ?? 0}
   liked={liked}
   authors={authors}
+  layout={post.layout}
   accentColor={collection.theme_color}
   backHref={`/collections/${encodeURI(collection.slug)}/`}
   backLabel={`← ${collection.title}`}

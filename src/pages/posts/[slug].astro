@@ -83,6 +83,7 @@ const readingProgress = user ? await getReadingProgress(env.DB, user.user.id, po
   likes={likeCount?.n ?? 0}
   liked={liked}
   authors={authors}
+  layout={post.layout}
   accentColor="#c23a30"
   backHref="/"
   backLabel="← 回到卷首"

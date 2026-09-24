@@ -12,6 +12,7 @@ import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 import { parseAuthorIds } from '../../../lib/api/validate';
+import { POST_LAYOUTS } from '../../../lib/db/types.ts';
 
 export const prerender = false;
 
@@ -92,6 +93,12 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const parsedAuthors = parseAuthorIds(body.authors);
   if (!parsedAuthors.ok) return json({ error: parsedAuthors.error }, 400);
 
+  // 全文排版预设：白名单校验，非法值 400（避免写进库里变成无声的无效 class）
+  const layout = typeof body.layout === 'string' ? body.layout.trim() : '';
+  if (!POST_LAYOUTS.includes(layout as (typeof POST_LAYOUTS)[number])) {
+    return json({ error: `invalid layout: 仅允许 ${POST_LAYOUTS.filter(Boolean).join(' / ')} 或留空` }, 400);
+  }
+
   // SEO 关键词：纯文本、长度受限，超出截断会静默丢数据，因此直接 400
   const metaKeywords =
     typeof body.meta_keywords === 'string'
@@ -144,6 +151,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       scheduled_at: scheduledAt,
       status,
       created_by: auth.user.id,
+      layout,
     }, parsedTags.tags, authorIds);
     if (!created) return json({ error: 'post create failed' }, 500);
     return json({ post: created.post, tags: created.tags, version: 1, authors: await listPostAuthors(env.DB, created.post.id) }, 201);

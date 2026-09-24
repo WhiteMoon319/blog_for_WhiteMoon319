@@ -10,3 +10,12 @@
 
 export { postHref } from '../lib/utils.ts';
 export { fmtDate, yearOf } from '../lib/db/utils.ts';
+
+/**
+ * 全文排版预设 → 正文容器 class（空串表示沿用主题默认）。
+ * 白名单与核心解析保持一致：非法值一律视为默认，避免未知 class 落到页面上。
+ * 样式定义在 @core/blocks.css 的 .article-body.layout-* 下。
+ */
+export function articleLayoutClass(layout: string | null | undefined): string {
+  return layout === 'wechat' || layout === 'magazine' || layout === 'warm' ? `layout-${layout}` : '';
+}

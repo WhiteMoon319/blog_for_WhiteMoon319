@@ -13,6 +13,7 @@ import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.t
 import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId, parseAuthorIds } from '../../../lib/api/validate';
+import { POST_LAYOUTS } from '../../../lib/db/types.ts';
 
 export const prerender = false;
 
@@ -99,6 +100,14 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     } else {
       return json({ error: 'invalid scheduled_at' }, 400);
     }
+  }
+  // 全文排版预设：白名单校验（空串 = 恢复主题默认）
+  if ('layout' in body) {
+    const layout = typeof body.layout === 'string' ? body.layout.trim() : '';
+    if (!POST_LAYOUTS.includes(layout as (typeof POST_LAYOUTS)[number])) {
+      return json({ error: `invalid layout: 仅允许 ${POST_LAYOUTS.filter(Boolean).join(' / ')} 或留空` }, 400);
+    }
+    patch.layout = layout;
   }
   if (typeof body.version_message === 'string' && body.version_message.trim()) {
     versionMessage = body.version_message.trim();

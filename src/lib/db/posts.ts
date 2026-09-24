@@ -139,8 +139,8 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by, layout)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -155,6 +155,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.scheduled_at ?? null,
         data.summary_source ?? 'manual',
         data.created_by ?? null,
+        data.layout ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -179,8 +180,8 @@ export async function createPostWithTags(
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO posts (collection_id, title, slug, summary, content_md, cover_url, status, meta_keywords, is_pinned, scheduled_at, summary_source, created_by, layout)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.collection_id ?? null,
@@ -195,6 +196,7 @@ export async function createPostWithTags(
         data.scheduled_at ?? null,
         data.summary_source ?? 'manual',
         data.created_by ?? null,
+        data.layout ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
     db
@@ -254,7 +256,7 @@ export async function updatePost(
     patch.scheduled_at = null;
   }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at', 'layout'].includes(k),
   );
   if (keys.length === 0) return current;
   const changed = keys.filter((k) => {
@@ -341,7 +343,7 @@ export async function updatePostWithTags(
     authorsChanged = curIds.length !== nextAuthorIds.length || curIds.some((v, i) => v !== nextAuthorIds[i]);
   }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at'].includes(k),
+    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at', 'layout'].includes(k),
   );
   const changed = keys.filter((k) => {
     const pv = patch[k as keyof PostPatch];

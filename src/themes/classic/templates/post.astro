@@ -4,7 +4,7 @@
 // 文章详情模板：整合三处来源（独立文章 / 文集内文章 / 草稿预览）的展示标记。
 // 纯展示组件，一切数据经 props 下传，禁止自行访问 DB/env。
 import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
-import { postHref, fmtDate } from '@core/utils';
+import { postHref, fmtDate, articleLayoutClass } from '@core/utils';
 import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthorByline from '@core/AuthorByline.astro';
@@ -81,6 +81,9 @@ interface Props {
 
   /** 署名作者（有序，第一位为主作者）；封禁作者由核心降级为纯文本 */
   authors?: AuthorBadge[];
+
+  /** 全文排版预设（'' = 主题默认），控制全篇节奏 */
+  layout?: string | null;
 }
 
 const {
@@ -113,7 +116,10 @@ const {
   publishedHref,
   initialScrollPct,
   authors = [],
+  layout = '',
 } = Astro.props;
+// 全文排版预设：非法值由核心白名单挡掉，主题不判断
+const bodyClass = ['article-body', 'reveal', 'in', articleLayoutClass(layout)].filter(Boolean).join(' ');
 const t = classicT(ctx.locale);
 ---
 
@@ -163,7 +169,7 @@ const t = classicT(ctx.locale);
     </div>
     <div class="reading-progress-pill" id="readingProgressPill" role="progressbar" aria-label={t('post.read_progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-prefix={t('post.read_progress')}>0%</div>
     {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
-    <div class="article-body reveal in" set:html={html} />
+    <div class={bodyClass} set:html={html} />
 
     {toc.length > 1 && (
       <nav class="article-toc" aria-label="目录">

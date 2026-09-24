@@ -43,6 +43,8 @@ export interface PostRow {
   summary_source: 'local' | 'manual' | 'ai';
   /** 归属人（决定编辑权），与对外署名解耦 */
   created_by: number | null;
+  /** 全文排版预设（'' = 主题默认），见 POST_LAYOUTS */
+  layout: string;
 }
 
 export type PostWithCollection = PostRow & { collection_slug: string | null };
@@ -75,7 +77,13 @@ export interface PostInput {
   scheduled_at?: string | null;
   summary_source?: 'local' | 'manual' | 'ai';
   created_by?: number | null;
+  /** 全文排版预设（'' = 主题默认）；白名单见 POST_LAYOUTS */
+  layout?: string;
 }
+
+/** 文章级排版预设白名单：空串表示沿用主题默认 */
+export const POST_LAYOUTS = ['', 'wechat', 'magazine', 'warm'] as const;
+export type PostLayout = (typeof POST_LAYOUTS)[number];
 
 const POST_FIELDS = [
   'title',
@@ -88,6 +96,7 @@ const POST_FIELDS = [
   'meta_keywords',
   'is_pinned',
   'scheduled_at',
+  'layout',
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 

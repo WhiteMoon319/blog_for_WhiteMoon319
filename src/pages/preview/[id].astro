@@ -61,6 +61,7 @@ const authors = await listPostAuthorBadges(env.DB, post.id);
   backLabel={backLabel}
   kicker={kicker}
   authors={authors}
+  layout={post.layout}
   ogImage={post.cover_url ? post.cover_url : undefined}
   noindex
   publishedHref={publishedHref}

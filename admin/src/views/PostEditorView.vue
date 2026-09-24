@@ -1150,6 +1150,9 @@ async function generateAiSummary() {
             </div>
           </div>
           <div v-show="mode === 'source'" class="source-area">
+            <div class="source-blk-hint">
+              排版块语法：<code>:::name{type=variant}</code> … <code>:::</code>（块名如 callout / quote / steps / divider）。记不住就在可视化模式点「✦ 排版」插入。
+            </div>
             <div ref="cmHost" class="cm-host" />
             <div ref="previewHost" class="source-preview" :class="{ refreshing: previewing }">
               <p v-if="previewing" class="preview-hint">渲染中…</p>
@@ -1221,6 +1224,23 @@ async function generateAiSummary() {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   min-height: 420px;
+}
+
+.source-blk-hint {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--paper-2, #f6f1e7);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.source-blk-hint code {
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+  padding: 0 4px;
 }
 
 .cm-host {

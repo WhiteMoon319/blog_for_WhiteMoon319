@@ -5,6 +5,7 @@ import { envOf, getPostById, getCollectionById } from '../../lib/db';
 import { postHref } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { resolveUser } from '../../lib/auth';
+import { canManagePost } from '../../lib/api/post-access.ts';
 import PostTemplate from '@theme/templates/post.astro';
 import { getSiteContext } from "../../lib/theme-context";
 
@@ -12,13 +13,17 @@ export const prerender = false;
 
 const env = await envOf();
 const user = await resolveUser(Astro);
-if (!user || user.user.role !== 'admin') {
+if (!user) {
   return Astro.redirect('/admin/login');
 }
 
 const id = Number(Astro.params.id);
 const post = Number.isInteger(id) && id > 0 ? await getPostById(env.DB, id) : null;
 if (!post) {
+  return Astro.redirect('/404');
+}
+// 草稿预览与编辑同权：归属人 / 署名作者 / 管理员，其余按不存在处理
+if (!(await canManagePost(env.DB, user.user, post))) {
   return Astro.redirect('/404');
 }
 

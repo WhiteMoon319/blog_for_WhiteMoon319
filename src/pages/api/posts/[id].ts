@@ -8,7 +8,8 @@
 
 import type { APIContext } from 'astro';
 import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
-import { resolveUser, json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { resolveUser, json, checkCsrf } from '../../../lib/auth';
+import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.ts';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
@@ -23,7 +24,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   if (!post) return json({ error: 'not found' }, 404);
 
   const user = await resolveUser(ctx);
-  if (post.status === 'draft' && (!user || user.user.role !== 'admin')) {
+  // 草稿只对可管理它的人可见（归属人 / 署名作者 / 管理员），其余按不存在处理
+  if (post.status === 'draft' && (!user || !(await canManagePost(env.DB, user.user, post)))) {
     return json({ error: 'not found' }, 404);
   }
   const tags = await listPostOwnTags(env.DB, id);
@@ -32,13 +34,12 @@ export async function GET(ctx: APIContext): Promise<Response> {
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
-  if (!auth.ok) return auth.response;
-  const env = await envOf();
-  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
-
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
+  const access = await requirePostAccess(ctx, env.DB, id);
+  if (!access.ok) return access.response;
 
   let body: Record<string, unknown>;
   try {
@@ -134,13 +135,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
 }
 
 export async function DELETE(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
-  if (!auth.ok) return auth.response;
-  const env = await envOf();
-  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
-
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
+  const access = await requirePostAccess(ctx, env.DB, id);
+  if (!access.ok) return access.response;
 
   // 单篇删除 = 移入回收站（软删除），可经回收站恢复；彻底删除走批量 API 的 purge
   const count = await trashPosts(env.DB, [id]);

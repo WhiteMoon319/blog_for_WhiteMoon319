@@ -8,15 +8,13 @@
 
 import type { APIContext } from 'astro';
 import { envOf, listPosts, createPostWithTags, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
-import { resolveUser, json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
 export const prerender = false;
 
 export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
-  const user = await resolveUser(ctx);
-  const authed = user !== null;
   const url = new URL(ctx.request.url);
 
   const status = url.searchParams.get('status');
@@ -25,17 +23,22 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const offset = Number(url.searchParams.get('offset'));
   // 回收站是显式管理视图：仅登录后可按 status=all&trash=1 查看，普通 status 查询不携带已删内容
   const trashOnly = url.searchParams.get('trash') === '1';
+  // 非公开状态（草稿/全部/回收站）走作者基线权限；公开列表任何人可读
+  const wantsPrivate = status === 'all' || status === 'draft' || trashOnly;
 
-  let statusFilter: 'draft' | 'published' | 'all' | undefined;
-  if (status === 'all' || trashOnly) {
-    if (!authed) return json({ error: 'unauthorized' }, 401);
-    statusFilter = 'all';
-  } else if (status === 'draft') {
-    if (!authed) return json({ error: 'unauthorized' }, 401);
-    statusFilter = 'draft';
-  } else {
-    statusFilter = 'published';
+  let authorId: number | undefined;
+  if (wantsPrivate) {
+    const auth = await requireAuthor(ctx);
+    if (!auth.ok) return auth.response;
+    // 作者只看自己归属或署名的文章；管理员不加过滤
+    if (auth.user.role !== 'admin') authorId = auth.user.id;
   }
+
+  const statusFilter: 'draft' | 'published' | 'all' = wantsPrivate
+    ? status === 'draft'
+      ? 'draft'
+      : 'all'
+    : 'published';
 
   const posts = await listPosts(env.DB, {
     collectionId: Number.isInteger(collectionId) && collectionId > 0 ? collectionId : undefined,
@@ -43,12 +46,13 @@ export async function GET(ctx: APIContext): Promise<Response> {
     limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : undefined,
     offset: Number.isInteger(offset) && offset > 0 ? offset : undefined,
     trashOnly,
+    authorId,
   });
   return json({ posts });
 }
 
 export async function POST(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) {
@@ -123,6 +127,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       is_pinned: isPinned,
       scheduled_at: scheduledAt,
       status,
+      created_by: auth.user.id,
     }, parsedTags.tags);
     if (!created) return json({ error: 'post create failed' }, 500);
     return json({ post: created.post, tags: created.tags, version: 1 }, 201);

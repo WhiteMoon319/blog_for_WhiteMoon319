@@ -10,6 +10,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Miniflare } from 'miniflare';
 import { readStatements } from './sql.ts';
+import { hashPassword } from '../../src/lib/db/credentials.ts';
 
 const SERVER_DIR = resolve('dist/server');
 const BASE = 'http://e2e.test';
@@ -82,6 +83,7 @@ export interface E2eClient {
   anon(path: string, init?: RequestInit): Promise<E2eResponse>;
   login(): Promise<void>;
   setSession(cookieValue: string): void;
+  session(): string;
   multipart(files: UploadFile[]): { body: Uint8Array<ArrayBuffer>; contentType: string };
   triggerScheduled(): Promise<void>;
   sql(stmt: string, ...binds: (string | number | null)[]): Promise<{ results: Record<string, unknown>[] }>;
@@ -204,6 +206,9 @@ export async function makeE2e(): Promise<E2eClient> {
     setSession(cookieValue: string) {
       cookie = cookieValue;
     },
+    session() {
+      return cookie;
+    },
     async triggerScheduled() {
       // 与 wrangler dev --test-scheduled / vite 插件同机制：route-override 头把
       // /cdn-cgi/local/scheduled 路由到本 worker，触发其 scheduled 处理器
@@ -245,4 +250,60 @@ export async function makeE2e(): Promise<E2eClient> {
     },
   };
   return client;
+}
+
+// 越权用例需要多身份切换：下列辅助造出可登录的普通账号并拿到其会话 cookie。
+// 注意 client.login() 有「已有 cookie 就短路」的语义，切回管理员必须用 loginAsAdmin。
+const E2E_USER_PASSWORD = 'e2e-author-pw';
+
+export interface SeededUser {
+  id: number;
+  username: string;
+  cookie: string;
+}
+
+/** 直接造一个可登录账号（reader/author/admin）并返回其会话 cookie，不改变 client 当前会话 */
+export async function seedUserSession(
+  client: E2eClient,
+  opts: { username: string; role?: 'reader' | 'author' | 'admin'; displayName?: string; bio?: string },
+): Promise<SeededUser> {
+  const { username } = opts;
+  const hash = await hashPassword(E2E_USER_PASSWORD);
+  await client.sql(
+    `INSERT INTO users (username, display_name, email, email_verified, password_hash, role, bio, session_version, created_at)
+     VALUES (?, ?, ?, 1, ?, ?, ?, 1, datetime('now'))`,
+    username,
+    opts.displayName ?? username,
+    `${username}@e2e.test`,
+    hash,
+    opts.role ?? 'author',
+    opts.bio ?? '',
+  );
+  const rows = await client.sql('SELECT id FROM users WHERE username = ?', username);
+  const id = Number(rows.results[0]?.id);
+  if (!id) throw new Error(`seedUserSession 插入失败: ${username}`);
+
+  const res = await client.anon('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS },
+    body: JSON.stringify({ username, password: E2E_USER_PASSWORD }),
+  });
+  if (res.status !== 200) throw new Error(`seedUserSession 登录失败 ${username}: ${res.status} ${await res.text()}`);
+  const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0];
+  if (!cookie) throw new Error(`seedUserSession 未取得会话 cookie: ${username}`);
+  return { id, username, cookie };
+}
+
+/** 切回管理员会话（client 的 login() 在已有会话时不会重新登录） */
+export async function loginAsAdmin(client: E2eClient): Promise<string> {
+  const res = await client.anon('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS },
+    body: JSON.stringify({ password: 'admin123' }),
+  });
+  if (res.status !== 200) throw new Error(`管理员登录失败: ${res.status} ${await res.text()}`);
+  const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0];
+  if (!cookie) throw new Error('管理员登录未取得会话 cookie');
+  client.setSession(cookie);
+  return cookie;
 }

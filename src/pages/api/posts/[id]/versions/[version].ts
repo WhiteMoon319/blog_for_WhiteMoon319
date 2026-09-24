@@ -7,15 +7,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getPostVersion } from '../../../../../lib/db';
-import { json, requireAuth } from '../../../../../lib/auth';
+import { envOf, getPostVersion } from '../../../../../lib/db';
+import { json } from '../../../../../lib/auth';
+import { requirePostAccess } from '../../../../../lib/api/post-access.ts';
 
 export const prerender = false;
 
 export async function GET(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
-  if (!auth.ok) return auth.response;
-
   const id = Number(ctx.params.id);
   const version = Number(ctx.params.version);
   if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(version) || version <= 0) {
@@ -23,8 +21,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
 
   const env = await envOf();
-  const post = await getPostById(env.DB, id);
-  if (!post) return json({ error: 'not found' }, 404);
+  const access = await requirePostAccess(ctx, env.DB, id);
+  if (!access.ok) return access.response;
 
   const ver = await getPostVersion(env.DB, id, version);
   if (!ver) return json({ error: 'version not found' }, 404);

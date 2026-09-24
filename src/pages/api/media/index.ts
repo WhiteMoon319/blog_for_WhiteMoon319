@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { json, requireAuth, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { envOf } from '../../../lib/db';
 import { publicBase } from '../../../lib/utils';
 
@@ -21,7 +21,7 @@ function parseLimit(raw: string | null): number {
 }
 
 export async function GET(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
 
   const env = await envOf();

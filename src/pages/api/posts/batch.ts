@@ -27,14 +27,15 @@ import {
   BATCH_MAX_CREATE,
   type BatchCreateItem,
 } from '../../../lib/api/validate';
-import { json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
+import { checkBatchOwned } from '../../../lib/api/post-access.ts';
 
 export const prerender = false;
 
 type Action = 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'create' | 'pin' | 'unpin';
 
 export async function POST(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
@@ -98,7 +99,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
       for (let attempt = 0; attempt < 20; attempt++) {
         const slug = attempt === 0 ? base : slugWithSuffix(base, attempt + 1);
         try {
-          created = await createPost(env.DB, { ...item, slug });
+          created = await createPost(env.DB, { ...item, slug, created_by: auth.user.id });
           break;
         } catch (e) {
           if (isSlugConflict(e)) {
@@ -116,6 +117,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   const ids = parseIds(body.ids);
   if (!ids) return json({ error: 'invalid ids' }, 400);
+  // 作者只能批量操作自己的文章（归属或署名）；管理员不受限
+  if (!(await checkBatchOwned(env.DB, auth.user, ids))) {
+    return json({ error: 'forbidden: 含非本人文章' }, 403);
+  }
 
   if (action === 'move') {
     const target = body.collection_id === null ? null : body.collection_id;
@@ -171,12 +176,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
       stmts.push(
         env.DB
           .prepare(
-            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
              SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                    title, slug, ?, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, '自动保存'
+                    title, slug, ?, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, '自动保存',
+                    COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
              FROM posts WHERE id = ?`,
           )
-          .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id),
+          .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id, r.id),
       );
       stmts.push(
         env.DB
@@ -234,12 +240,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
     stmts.push(
       env.DB
         .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message)
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
-                  title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, ?, meta_keywords, ?
+                  title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, ?, meta_keywords, ?,
+                  COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
            FROM posts WHERE id = ? AND status <> ?`,
         )
-        .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, status),
+        .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, id, status),
     );
     stmts.push(
       env.DB

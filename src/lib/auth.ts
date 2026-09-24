@@ -108,12 +108,28 @@ export type AuthResult = { ok: true; session: Session; user: UserRow } | { ok: f
 
 export async function requireAdmin(ctx: APIContext): Promise<AuthResult> {
   const loaded = await loadSessionUser(ctx);
-  if (!loaded || loaded.user.role !== 'admin') return { ok: false, response: json({ error: 'unauthorized' }, 401) };
+  if (!loaded) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
+  // 已登录但非管理员属于越权（403），与 requireAuthor 口径一致：
+  // 401 会让后台前端把作者当成会话过期而弹回登录页，误导性更强。
+  if (loaded.user.role !== 'admin') return { ok: false, response: json({ error: 'forbidden: 需要管理员权限' }, 403) };
   return { ok: true, session: loaded.session, user: loaded.user };
 }
 
 // 保留 requireAuth 作为 requireAdmin 的别名（兼容现有调用）
 export { requireAdmin as requireAuth };
+
+/**
+ * 作者基线权限（author / admin）：内容管理入口用它。
+ * 未登录 401；已登录但既非作者也非管理员 403（读者不该看到内容管理接口的存在）。
+ */
+export async function requireAuthor(ctx: APIContext): Promise<AuthResult> {
+  const loaded = await loadSessionUser(ctx);
+  if (!loaded) return { ok: false, response: json({ error: 'unauthorized' }, 401) };
+  if (loaded.user.role !== 'author' && loaded.user.role !== 'admin') {
+    return { ok: false, response: json({ error: 'forbidden' }, 403) };
+  }
+  return { ok: true, session: loaded.session, user: loaded.user };
+}
 
 export type AnyUserResult =
   | { ok: true; session: Session; user: UserRow; emailVerified: boolean }

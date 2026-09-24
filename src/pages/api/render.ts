@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { requireAuth, json } from '../../lib/auth.ts';
+import { requireAuthor, json } from '../../lib/auth.ts';
 import { envOf } from '../../lib/db';
 import { renderMarkdown } from '../../lib/markdown.ts';
 import { checkCsrf } from '../../lib/auth.ts';
@@ -16,12 +16,12 @@ export const prerender = false;
 
 const MAX_BODY_BYTES = 1024 * 1024 * 4;
 
-// POST /api/render { md } → { html, toc } — 渲染 Markdown 供 admin 源码模式实时预览（仅管理员）。
-// 与公开站点共用 renderMarkdown，保证预览即所见。
+// POST /api/render { md } → { html, toc } — 渲染 Markdown 供 admin 源码模式实时预览。
+// 与公开站点共用 renderMarkdown，保证预览即所见；作者与管理员均可用（作者写稿依赖它）。
 export async function POST(ctx: APIContext): Promise<Response> {
   const csrfOk = await checkCsrf(ctx, (await envOf()).SITE_URL);
   if (!csrfOk) return json({ error: 'CSRF 校验失败' }, 403);
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
 
   const contentLength = Number(ctx.request.headers.get('content-length') ?? '0');

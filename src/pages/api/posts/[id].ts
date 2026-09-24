@@ -7,9 +7,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, getPostAuthorIds, trashPosts, listPostOwnTags, getCollectionById, isSlugConflict, parseTagsStrict } from '../../../lib/db';
+import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, getPostAuthorIds, trashPosts, listPostOwnTags, isSlugConflict, parseTagsStrict } from '../../../lib/db';
 import { resolveUser, json, checkCsrf } from '../../../lib/auth';
 import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.ts';
+import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId, parseAuthorIds } from '../../../lib/api/validate';
 
@@ -131,8 +132,10 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   }
 
   try {
-    if ('collection_id' in patch && patch.collection_id !== null && !(await getCollectionById(env.DB, Number(patch.collection_id)))) {
-      return json({ error: 'collection not found' }, 404);
+    // 改到别的文集时同样要过写入权校验（只校验目标文集，不校验当前所在文集）
+    if ('collection_id' in patch && patch.collection_id !== null) {
+      const denied = await collectionWriteDenied(env.DB, access.user, Number(patch.collection_id));
+      if (denied) return denied;
     }
     const updated = await updatePostWithTags(
       env.DB,

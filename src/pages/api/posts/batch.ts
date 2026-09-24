@@ -30,6 +30,7 @@ import {
 } from '../../../lib/api/validate';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { checkBatchOwned } from '../../../lib/api/post-access.ts';
+import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 
 export const prerender = false;
 
@@ -86,6 +87,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
     if (colIds.length > 0 && (await getCollectionsByIds(env.DB, colIds)).size !== colIds.length) {
       return json({ error: 'collection not found' }, 404);
     }
+    // 批量新建同样要过写入权：否则作者可用批量接口把文章塞进他人的私有文集
+    for (const colId of colIds) {
+      const denied = await collectionWriteDenied(env.DB, auth.user, colId);
+      if (denied) return denied;
+    }
 
     const results: Array<{ ok: boolean; error?: string; post?: PostRow }> = [];
     for (const item of parsed) {
@@ -129,8 +135,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     if (target !== null && (typeof target !== 'number' || !Number.isInteger(target) || target <= 0)) {
       return json({ error: 'invalid collection_id' }, 400);
     }
-    if (target !== null && !(await getCollectionById(env.DB, target))) {
-      return json({ error: 'collection not found' }, 404);
+    if (target !== null) {
+      const denied = await collectionWriteDenied(env.DB, auth.user, target);
+      if (denied) return denied;
     }
 
     const placeholders = ids.map(() => '?').join(', ');

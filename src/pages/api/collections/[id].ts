@@ -12,11 +12,13 @@ import {
   getCollectionById,
   updateCollectionWithTags,
   deleteCollection,
+  countForeignPostsInCollection,
   listCollectionTags,
   isSlugConflict,
   parseTagsStrict,
 } from '../../../lib/db';
-import { json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { json, checkCsrf } from '../../../lib/auth';
+import { requireCollectionAccess } from '../../../lib/api/collection-access.ts';
 import { isValidSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
@@ -33,13 +35,12 @@ export async function GET(ctx: APIContext): Promise<Response> {
 }
 
 export async function PUT(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
-  if (!auth.ok) return auth.response;
-  const env = await envOf();
-  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
-
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
+  const access = await requireCollectionAccess(ctx, env.DB, id);
+  if (!access.ok) return access.response;
 
   let body: Record<string, unknown>;
   try {
@@ -76,6 +77,13 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.ai_prompt_id === 'string' && body.ai_prompt_id.length > 0) {
     patch.ai_prompt_id = body.ai_prompt_id;
   }
+  // 公用/私有：归属人或管理员才走到这里（requireCollectionAccess 已判定）
+  if ('is_public' in body) {
+    if (typeof body.is_public !== 'boolean' && typeof body.is_public !== 'number') {
+      return json({ error: 'is_public 需为布尔值' }, 400);
+    }
+    patch.is_public = body.is_public === true || body.is_public === 1 ? 1 : 0;
+  }
 
   // 携带 tags 时严格校验（非法/超限 400）；未携带则不动标签
   const parsedTags = body.tags === undefined ? null : parseTagsStrict(body.tags);
@@ -92,13 +100,23 @@ export async function PUT(ctx: APIContext): Promise<Response> {
 }
 
 export async function DELETE(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
-  if (!auth.ok) return auth.response;
-  const env = await envOf();
-  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
-
   const id = parseId(ctx.params.id);
   if (!id) return json({ error: 'invalid id' }, 400);
+  const env = await envOf();
+  if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
+  const access = await requireCollectionAccess(ctx, env.DB, id);
+  if (!access.ok) return access.response;
+
+  // 作者删除自建文集前的守卫：内含他人文章时拒绝（管理员的删集会把这些文章迁到未分类）
+  if (access.user.role !== 'admin') {
+    const foreign = await countForeignPostsInCollection(env.DB, id, access.user.id);
+    if (foreign > 0) {
+      return json(
+        { error: `文集内还有 ${foreign} 篇他人文章，不能删除；请先移出或联系管理员` },
+        403,
+      );
+    }
+  }
 
   const deleted = await deleteCollection(env.DB, id);
   if (!deleted) return json({ error: 'not found' }, 404);

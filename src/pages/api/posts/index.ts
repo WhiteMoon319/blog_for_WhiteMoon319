@@ -7,8 +7,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPostWithTags, listPostAuthors, listAuthorsForPosts, filterSignableAuthorIds, getCollectionById, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import { envOf, listPosts, createPostWithTags, listPostAuthors, listAuthorsForPosts, filterSignableAuthorIds, parseTagsStrict, isSlugConflict } from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
+import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 import { parseAuthorIds } from '../../../lib/api/validate';
 
@@ -119,8 +120,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   try {
-    if (collectionId !== null && !(await getCollectionById(env.DB, collectionId))) {
-      return json({ error: 'collection not found' }, 404);
+    if (collectionId !== null) {
+      // 私有文集需要归属人或协作者身份：写入校验在这里，前端隐藏只是体验
+      const denied = await collectionWriteDenied(env.DB, auth.user, collectionId);
+      if (denied) return denied;
     }
     // 署名缺省为创建者本人：保证新文一定有主作者，前台不出现空白署名；
     // 显式传空数组则允许无署名（例如仅作为草稿的转载占位）。

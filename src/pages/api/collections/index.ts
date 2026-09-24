@@ -7,20 +7,37 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listCollections, createCollectionWithTags, parseTagsStrict, isSlugConflict } from '../../../lib/db';
-import { json, requireAuth, checkCsrf } from '../../../lib/auth';
+import { envOf, listCollections, listCollectionWriteView, createCollectionWithTags, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
 export const prerender = false;
 
-export async function GET(_ctx: APIContext): Promise<Response> {
+export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
+  // ?mine=1 是写作区的"我的文集"视图：只列自己创建的，并带上可写性与申请状态
+  if (ctx.url.searchParams.get('mine') === '1') {
+    const auth = await requireAuthor(ctx);
+    if (!auth.ok) return auth.response;
+    const mine = await listCollections(env.DB, { ownerId: auth.user.id });
+    const view = await listCollectionWriteView(env.DB, auth.user);
+    const viewMap = new Map(view.map((v) => [v.id, v]));
+    return json({
+      collections: mine.map((c) => ({ ...c, ...(viewMap.get(c.id) ?? {}) })),
+    });
+  }
+  // ?view=1 是写作区的文集选择器：全部文集 + 我对每个文集的可写性与申请状态
+  if (ctx.url.searchParams.get('view') === '1') {
+    const auth = await requireAuthor(ctx);
+    if (!auth.ok) return auth.response;
+    return json({ collections: await listCollectionWriteView(env.DB, auth.user) });
+  }
   const collections = await listCollections(env.DB);
   return json({ collections });
 }
 
 export async function POST(ctx: APIContext): Promise<Response> {
-  const auth = await requireAuth(ctx);
+  const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth.response;
   const env = await envOf();
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
@@ -54,6 +71,17 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const parsedTags = parseTagsStrict(body.tags);
   if (!parsedTags.ok) return json({ error: parsedTags.error }, 400);
 
+  // 公用与否：管理员默认公用（沿用旧行为），作者自建默认私有；
+  // 显式传值时以传值为准（作者当然可以把自己的集设为公用）
+  const isPublic =
+    body.is_public === undefined
+      ? auth.user.role === 'admin'
+        ? 1
+        : 0
+      : body.is_public === true || body.is_public === 1
+        ? 1
+        : 0;
+
   try {
     const env = await envOf();
     const created = await createCollectionWithTags(env.DB, {
@@ -65,6 +93,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
       post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
       ref_summaries: typeof body.ref_summaries === 'number' ? body.ref_summaries : 0,
       ai_prompt_id: typeof body.ai_prompt_id === 'string' ? body.ai_prompt_id : 'overview',
+      created_by: auth.user.id,
+      is_public: isPublic,
     }, parsedTags.tags);
     if (!created) return json({ error: 'collection create failed' }, 500);
     return json({ collection: created.collection, tags: created.tags }, 201);

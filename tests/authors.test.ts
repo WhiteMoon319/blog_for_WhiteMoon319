@@ -212,6 +212,31 @@ test('创建时可带归属人与初始署名', async () => {
   assert.deepEqual(await getPostAuthorIds(db, created.post.id), [u.id, co.id]);
 });
 
+test('批量署名查询：超过单查询绑定上限时分块取回（>100 篇）', async () => {
+  const a = await mkUser('chunk-author', 'author', '分块作者');
+  // 直接插 105 篇（逐篇走 createPost 太慢，且这里只关心批量读取）
+  const stmts = Array.from({ length: 105 }, (_, i) =>
+    db
+      .prepare(`INSERT INTO posts (title, slug, status, created_by) VALUES (?, ?, 'draft', ?)`)
+      .bind(`分块 ${i}`, `chunk-post-${i}`, a.id),
+  );
+  await db.batch(stmts.slice(0, 90));
+  await db.batch(stmts.slice(90));
+  await db
+    .prepare(`INSERT INTO post_authors (post_id, user_id, sort_order) SELECT id, ?, 0 FROM posts WHERE slug LIKE 'chunk-post-%'`)
+    .bind(a.id)
+    .run();
+
+  const rows = await db.prepare(`SELECT id FROM posts WHERE slug LIKE 'chunk-post-%'`).all<{ id: number }>();
+  const ids = (rows.results ?? []).map((r) => r.id);
+  assert.equal(ids.length, 105);
+
+  const map = await listAuthorsForPosts(db, ids);
+  assert.equal(map.size, ids.length, '每篇都应有署名（分块合并后不丢失）');
+  assert.equal(map.get(ids[0])!.length, 1, '第一块的文章也要有署名');
+  assert.equal(map.get(ids[104])!.length, 1, '最后一块的文章也要有署名');
+});
+
 test('版本快照：改署名与改正文一样产生版本，版本内 authors 记录当时署名', async () => {
   const a = await mkUser('vera', 'author', '版甲');
   const b = await mkUser('verb', 'author', '版乙');

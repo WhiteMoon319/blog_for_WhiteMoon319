@@ -16,7 +16,19 @@ import {
 import { slugWithSuffix } from '../utils.ts';
 import { planForPostId, type VersionContentPlan } from './versions.ts';
 
-export async function listCollections(db: D1Database): Promise<CollectionRow[]> {
+export async function listCollections(db: D1Database, opts: { ownerId?: number } = {}): Promise<CollectionRow[]> {
+  // 作者视角："我的文集"只列自己创建的；未给 ownerId 时返回全量（前台与选择器要用）
+  if (opts.ownerId !== undefined) {
+    return db
+      .prepare(
+        `SELECT * FROM collections
+         WHERE created_by = ?
+         ORDER BY sort_order ASC, id ASC`,
+      )
+      .bind(opts.ownerId)
+      .all<CollectionRow>()
+      .then((r) => r.results ?? []);
+  }
   return db
     .prepare(
       `SELECT * FROM collections
@@ -32,6 +44,25 @@ export async function getCollectionBySlug(db: D1Database, slug: string): Promise
 
 export async function getCollectionById(db: D1Database, id: number): Promise<CollectionRow | null> {
   return db.prepare('SELECT * FROM collections WHERE id = ?').bind(id).first<CollectionRow>();
+}
+
+/**
+ * 文集内**他人归属**的文章数（created_by 为空的历史文章也算他人）。
+ * 作者删除自建文集前的守卫：内含他人文章时拒绝，避免把别人的文章打散成未分类。
+ */
+export async function countForeignPostsInCollection(
+  db: D1Database,
+  collectionId: number,
+  ownerUserId: number,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM posts
+        WHERE collection_id = ? AND (created_by IS NULL OR created_by != ?)`,
+    )
+    .bind(collectionId, ownerUserId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export async function getCollectionsByIds(db: D1Database, ids: number[]): Promise<Map<number, CollectionRow>> {
@@ -55,12 +86,14 @@ export async function createCollection(
     post_order?: 'asc' | 'desc';
     ref_summaries?: number;
     ai_prompt_id?: string;
+    created_by?: number | null;
+    is_public?: number;
   },
 ): Promise<CollectionRow | null> {
   const res = await db
     .prepare(
-      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id, created_by, is_public)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     )
     .bind(
       data.title,
@@ -71,6 +104,8 @@ export async function createCollection(
       data.post_order ?? 'desc',
       data.ref_summaries ?? 0,
       data.ai_prompt_id ?? 'overview',
+      data.created_by ?? null,
+      data.is_public ?? 0,
     )
     .first<CollectionRow>();
   return res ?? null;
@@ -88,14 +123,16 @@ export async function createCollectionWithTags(
     post_order?: 'asc' | 'desc';
     ref_summaries?: number;
     ai_prompt_id?: string;
+    created_by?: number | null;
+    is_public?: number;
   },
   tagNames: string[],
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        `INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order, ref_summaries, ai_prompt_id, created_by, is_public)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       )
       .bind(
         data.title,
@@ -106,6 +143,8 @@ export async function createCollectionWithTags(
         data.post_order ?? 'desc',
         data.ref_summaries ?? 0,
         data.ai_prompt_id ?? 'overview',
+        data.created_by ?? null,
+        data.is_public ?? 0,
       ),
   ];
   const unique = [...new Set(tagNames.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
@@ -132,7 +171,7 @@ export async function createCollectionWithTags(
 
 export async function updateCollection(db: D1Database, id: number, patch: CollectionPatch): Promise<CollectionRow | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'].includes(k),
   );
   if (keys.length === 0) return getCollectionById(db, id);
   const sets = keys.map((k) => `${k} = ?`).join(', ');
@@ -152,7 +191,7 @@ export async function updateCollectionWithTags(
   tagNames: string[] | null,
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id'].includes(k),
+    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'].includes(k),
   );
   const stmts: D1PreparedStatement[] = [];
   if (keys.length > 0) {

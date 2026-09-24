@@ -10,6 +10,7 @@ export { envOf, __setEnvResolver } from './env.ts';
 export type * from './types.ts';
 export { isSlugConflict, fmtDate, yearOf } from './utils.ts';
 export * from './collections.ts';
+export * from './collaborators.ts';
 export * from './posts.ts';
 export * from './authors.ts';
 export * from './search.ts';

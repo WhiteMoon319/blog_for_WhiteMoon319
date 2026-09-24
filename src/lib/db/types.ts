@@ -18,6 +18,10 @@ export interface CollectionRow {
   updated_at: string;
   ref_summaries: number;
   ai_prompt_id: string;
+  /** 文集归属人（即文集署名作者）；遗留数据在迁移 0035 中回填为管理员 */
+  created_by: number | null;
+  /** 1 = 公用（任何作者可写入）；0 = 私有（仅归属人/协作者/管理员可写入） */
+  is_public: number;
 }
 
 export interface PostRow {
@@ -87,7 +91,7 @@ const POST_FIELDS = [
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 
-const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id'] as const;
+const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'] as const;
 export type CollectionPatch = Partial<Record<(typeof COLLECTION_FIELDS)[number], string | number>>;
 
 export interface PostVersionRow {

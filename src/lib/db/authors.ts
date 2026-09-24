@@ -41,23 +41,30 @@ export async function listPostAuthors(db: D1Database, postId: number): Promise<A
   return rows.results ?? [];
 }
 
-/** 批量取多篇署名：列表页一次查完，避免逐篇查询造成 N+1 */
+/**
+ * 批量取多篇署名：列表页一次查完，避免逐篇查询造成 N+1。
+ * 按 90 个 id 分块：D1 单查询绑定参数上限 100，回收站视图可能一次返回上百篇。
+ */
 export async function listAuthorsForPosts(db: D1Database, postIds: number[]): Promise<Map<number, AuthorRef[]>> {
   const map = new Map<number, AuthorRef[]>();
   const ids = [...new Set(postIds.filter((n) => Number.isInteger(n) && n > 0))];
   if (ids.length === 0) return map;
-  const rows = await db
-    .prepare(
-      `SELECT pa.post_id, ${AUTHOR_FIELDS} FROM post_authors pa JOIN users u ON u.id = pa.user_id
-       WHERE pa.post_id IN (${ids.map(() => '?').join(',')})
-       ORDER BY pa.post_id, pa.sort_order, pa.user_id`,
-    )
-    .bind(...ids)
-    .all<AuthorRef & { post_id: number }>();
-  for (const r of rows.results ?? []) {
-    const list = map.get(r.post_id) ?? [];
-    list.push({ id: r.id, username: r.username, display_name: r.display_name, avatar_url: r.avatar_url, bio: r.bio });
-    map.set(r.post_id, list);
+  const CHUNK = 90;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunk = ids.slice(start, start + CHUNK);
+    const rows = await db
+      .prepare(
+        `SELECT pa.post_id, ${AUTHOR_FIELDS} FROM post_authors pa JOIN users u ON u.id = pa.user_id
+         WHERE pa.post_id IN (${chunk.map(() => '?').join(',')})
+         ORDER BY pa.post_id, pa.sort_order, pa.user_id`,
+      )
+      .bind(...chunk)
+      .all<AuthorRef & { post_id: number }>();
+    for (const r of rows.results ?? []) {
+      const list = map.get(r.post_id) ?? [];
+      list.push({ id: r.id, username: r.username, display_name: r.display_name, avatar_url: r.avatar_url, bio: r.bio });
+      map.set(r.post_id, list);
+    }
   }
   return map;
 }
@@ -146,8 +153,7 @@ export async function searchAuthors(db: D1Database, q: string, limit = 20): Prom
   return rows.results ?? [];
 }
 
-/** 作者名下已发布文章数（归属人或署名者皆计入） */
-export async function countPublishedPostsByAuthor(db: D1Database, userId: number): Promise<number> {
+/** 作者名下已发布文章数（归属人或署名者皆计入） */export async function countPublishedPostsByAuthor(db: D1Database, userId: number): Promise<number> {
   const row = await db
     .prepare(`SELECT COUNT(*) AS n FROM posts p WHERE ${AUTHOR_POST_SCOPE}`)
     .bind(...authorPostArgs(userId))
@@ -172,4 +178,51 @@ export async function listPublishedPostsByAuthor(
     }
   }
   return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+}
+
+/** 文集归属作者字段（含封禁状态：前台据此把封禁作者的署名降级为纯文本） */
+const OWNER_FIELDS = 'u.id, u.username, u.display_name, u.avatar_url, u.bio, u.status';
+
+export type CollectionOwner = AuthorRef & { status: string };
+
+/**
+ * 批量取文集归属作者：文集页与文集卡一次查完，避免逐条查询。
+ * 封禁作者的文集仍返回（文集内容保留），由调用方按 status 决定展示方式。
+ */
+export async function listCollectionOwners(
+  db: D1Database,
+  collectionIds: number[],
+): Promise<Map<number, CollectionOwner>> {
+  const map = new Map<number, CollectionOwner>();
+  const ids = [...new Set(collectionIds.filter((n) => Number.isInteger(n) && n > 0))];
+  if (ids.length === 0) return map;
+  // 与署名批量查询同口径分块：D1 单查询绑定参数上限 100
+  const CHUNK = 90;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunk = ids.slice(start, start + CHUNK);
+    const rows = await db
+      .prepare(
+        `SELECT c.id AS collection_id, ${OWNER_FIELDS}
+         FROM collections c JOIN users u ON u.id = c.created_by
+         WHERE c.id IN (${chunk.map(() => '?').join(',')})`,
+      )
+      .bind(...chunk)
+      .all<CollectionOwner & { collection_id: number }>();
+    for (const r of rows.results ?? []) {
+      map.set(r.collection_id, {
+        id: r.id,
+        username: r.username,
+        display_name: r.display_name,
+        avatar_url: r.avatar_url,
+        bio: r.bio,
+        status: r.status,
+      });
+    }
+  }
+  return map;
+}
+
+/** 单个文集归属作者；无归属（遗留数据）或文集不存在时返回 null */
+export async function getCollectionOwner(db: D1Database, collectionId: number): Promise<CollectionOwner | null> {
+  return (await listCollectionOwners(db, [collectionId])).get(collectionId) ?? null;
 }

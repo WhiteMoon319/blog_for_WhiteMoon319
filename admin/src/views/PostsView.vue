@@ -53,6 +53,12 @@ function colColor(id: number | null): string {
   return collections.value.find((c) => c.id === id)?.theme_color ?? '#8a6d3b';
 }
 
+/** 列表署名：主作者在前，多作者用顿号连接；无署名的历史文显示占位 */
+function authorNames(p: Post): string {
+  const names = (p.authors ?? []).map((a) => a.display_name?.trim() || a.username);
+  return names.length > 0 ? names.join('、') : '—';
+}
+
 function postUrl(p: Post): string {
   const col = collections.value.find((c) => c.id === p.collection_id);
   return col ? `/collections/${encodeURI(col.slug)}/${encodeURI(p.slug)}/` : `/posts/${encodeURI(p.slug)}/`;
@@ -285,6 +291,7 @@ async function bulkAiSummary(force: boolean) {
               />
             </th>
             <th>篇名</th>
+            <th>作者</th>
             <th>文集</th>
             <th>状态</th>
             <th>阅读</th>
@@ -321,6 +328,7 @@ async function bulkAiSummary(force: boolean) {
               <span v-else style="color:var(--ink-light);">{{ p.title }}</span>
               <span v-if="!inTrash && p.is_pinned" class="tag tag-published" style="margin-left:6px;">置顶</span>
             </td>
+            <td class="author-cell" :title="authorNames(p)">{{ authorNames(p) }}</td>
             <td>
               <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
               {{ colName(p.collection_id) }}
@@ -364,3 +372,14 @@ async function bulkAiSummary(force: boolean) {
     <div v-if="!shown.length" class="empty">{{ inTrash ? '回收站空空如也。' : '此间无文。' }}</div>
   </div>
 </template>
+
+<style scoped>
+.author-cell {
+  max-width: 160px;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

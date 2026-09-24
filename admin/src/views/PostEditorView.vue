@@ -22,7 +22,8 @@ import { markdown as markdownLang, markdownLanguage } from '@codemirror/lang-mar
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { api, download } from '../api';
-import type { Collection } from '../types';
+import { authState } from '../store/auth';
+import type { AuthorOption, Collection } from '../types';
 import TagChips from '../components/TagChips.vue';
 import VersionPanel from '../components/VersionPanel.vue';
 import MediaPickerModal from '../components/MediaPickerModal.vue';
@@ -71,7 +72,18 @@ const form = reactive({
   version_message: '',
   tags: [] as string[],
   inherited_tags: [] as string[],
+  /** 署名作者，顺序即展示顺序，第一位为主作者 */
+  author_ids: [] as number[],
 });
+// 可选作者名单：作者与管理员都可读，含各自已发布篇数
+const authorOptions = ref<AuthorOption[]>([]);
+// 作者视角的文集可写性：私有且未协作的文集在下拉里禁用，避免选完才吃 403
+const colWritable = ref<Map<number, boolean>>(new Map());
+
+function canWriteCollection(id: number | null): boolean {
+  if (id === null) return true;
+  return colWritable.value.get(id) !== false;
+}
 const coverFileInput = ref<HTMLInputElement | null>(null);
 const imageFileInput = ref<HTMLInputElement | null>(null);
 
@@ -81,6 +93,40 @@ const contentRisk = ref('');
 const turndown = createTurndown();
 
 const uploadingKeys = new Set<string>();
+
+// ---- 署名作者选择器 ----
+/** 显示名：优先笔名，兜底用户名；名单尚未载入时退回「#id」 */
+function authorLabel(id: number): string {
+  const a = authorOptions.value.find((o) => o.id === id);
+  return a ? a.display_name?.trim() || a.username : `#${id}`;
+}
+
+/** 可添加的作者：排除已在署名里的 */
+const addableAuthors = computed(() => authorOptions.value.filter((a) => !form.author_ids.includes(a.id)));
+
+function addAuthor(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const id = Number(select.value);
+  select.value = '';
+  if (!Number.isInteger(id) || id <= 0 || form.author_ids.includes(id)) return;
+  if (form.author_ids.length >= 10) {
+    emit('notify', '署名作者最多 10 位', true);
+    return;
+  }
+  form.author_ids.push(id);
+}
+
+function removeAuthor(index: number): void {
+  form.author_ids.splice(index, 1);
+}
+
+/** 上下移动：顺序即前台展示顺序，第一位是主作者 */
+function moveAuthor(index: number, delta: number): void {
+  const next = index + delta;
+  if (next < 0 || next >= form.author_ids.length) return;
+  const [id] = form.author_ids.splice(index, 1);
+  form.author_ids.splice(next, 0, id);
+}
 
 function fileKey(f: File): string {
   return `${f.name}:${f.size}:${f.lastModified}`;
@@ -303,9 +349,21 @@ function currentMarkdown(): string {
 
 async function load() {
   if (collections.value.length === 0) {
-    const cols = await api.collections();
-    collections.value = cols.collections;
+    if (authState.role === 'admin') {
+      const cols = await api.collections();
+      collections.value = cols.collections;
+    } else {
+      // 作者：取带可写性的视图，别人的私有文集在下拉里禁用并标注
+      const view = await api.collectionView();
+      collections.value = view.collections as unknown as Collection[];
+      colWritable.value = new Map(view.collections.map((c) => [c.id, c.can_write]));
+    }
   }
+  // 署名候选名单：读取失败不阻塞写作，选择器会退回 #id 占位
+  try {
+    const r = await api.authors();
+    authorOptions.value = r.authors;
+  } catch { /* 待下次保存/刷新重试 */ }
   // 载入 prompt 模板并确定默认选择
   try {
     const s = await api.settings() as unknown as Record<string, string>;
@@ -334,6 +392,7 @@ async function load() {
     form.scheduled_local = post.scheduled_at ? toLocalInputValue(post.scheduled_at) : '';
     form.status = post.status;
     form.tags = tags.map((t) => t.name);
+    form.author_ids = (post.authors ?? []).map((a) => a.id);
     contentRisk.value = checkContentRisk(post.content_md);
     if (editor.value) editor.value.commands.setContent(marked.parse(post.content_md) as string);
     await maybeRestoreDraft(`post:${id}`, id, version, post.content_md);
@@ -351,8 +410,10 @@ async function load() {
     form.version_message = '';
     form.tags = [];
     form.inherited_tags = [];
+    // 新篇默认署名自己，与服务端缺省一致（避免保存前后署名显示不一致）
+    form.author_ids = authState.userId > 0 ? [authState.userId] : [];
     const cid = parseId(route.query.collection);
-    if (cid && collections.value.some((c) => c.id === cid)) form.collection_id = cid;
+    if (cid && collections.value.some((c) => c.id === cid) && canWriteCollection(cid)) form.collection_id = cid;
     contentRisk.value = '';
     if (editor.value) editor.value.commands.setContent('');
     await maybeRestoreDraft(newDraftKey(), null, 0, '');
@@ -418,6 +479,7 @@ summary: form.summary,
     scheduled_at: scheduledIso(),
     status: form.status,
     tags: [...form.tags],
+    author_ids: [...form.author_ids],
     content_md: currentMarkdown(),
     base_version: baseVersion.value,
     saved_at: new Date().toISOString(),
@@ -488,6 +550,7 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
     snapshot.meta_keywords !== form.meta_keywords || snapshot.is_pinned !== form.is_pinned ||
     snapshot.scheduled_at !== scheduledIso() ||
+    (snapshot.author_ids ?? []).join(',') !== form.author_ids.join(',') ||
     snapshot.tags.join('\u0001') !== form.tags.join('\u0001');
   if (!localDiffers) {
     await clearDraft(key);
@@ -524,6 +587,7 @@ function applySnapshot(s: DraftSnapshot): void {
   form.scheduled_local = s.scheduled_at ? toLocalInputValue(s.scheduled_at) : '';
   form.status = s.status;
   form.tags = [...s.tags];
+  form.author_ids = [...(s.author_ids ?? [])];
   contentRisk.value = checkContentRisk(s.content_md);
   if (editor.value) editor.value.commands.setContent(marked.parse(s.content_md) as string);
 }
@@ -542,6 +606,7 @@ watch(
     scheduled_local: form.scheduled_local,
     status: form.status,
     tags: [...form.tags],
+    author_ids: [...form.author_ids],
     html: editor.value?.getHTML() ?? '',
     source: mode.value === 'source' ? sourceMarkdown.value : '',
   }),
@@ -631,6 +696,7 @@ async function save() {
       status: form.status,
       version_message: form.version_message.trim(),
       tags: form.tags,
+      authors: form.author_ids,
       base_version: baseVersion.value,
     };
     if (loadedId.value !== null) {
@@ -789,8 +855,13 @@ async function generateAiSummary() {
           <label>所属文集</label>
           <select v-model="form.collection_id" class="select">
             <option :value="null">未分类</option>
-            <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
+            <option v-for="c in collections" :key="c.id" :value="c.id" :disabled="!canWriteCollection(c.id)">
+              {{ c.title }}{{ canWriteCollection(c.id) ? '' : '（私有·需作者同意）' }}
+            </option>
           </select>
+          <div v-if="!canWriteCollection(form.collection_id)" class="hint" style="margin-top:6px;color:var(--cinnabar);">
+            该文集为私有，需文集作者同意才能投稿；可在「我的文集」页发起协作申请。
+          </div>
         </div>
         <div class="field">
           <label>状态</label>
@@ -798,6 +869,34 @@ async function generateAiSummary() {
             <option value="draft">草稿（暂不示人）</option>
             <option value="published">刊发（立即示人）</option>
           </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>署名作者（顺序即展示顺序，第一位为主作者）</label>
+        <div class="author-picker">
+          <span v-for="(id, idx) in form.author_ids" :key="id" class="author-chip-item">
+            <span v-if="idx === 0" class="author-primary">主</span>
+            {{ authorLabel(id) }}
+            <button type="button" class="chip-op" title="上移" :disabled="idx === 0" @click="moveAuthor(idx, -1)">↑</button>
+            <button
+              type="button"
+              class="chip-op"
+              title="下移"
+              :disabled="idx === form.author_ids.length - 1"
+              @click="moveAuthor(idx, 1)"
+            >↓</button>
+            <button type="button" class="chip-op" title="移除" @click="removeAuthor(idx)">×</button>
+          </span>
+          <select class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;" @change="addAuthor">
+            <option value="">添加作者…</option>
+            <option v-for="a in addableAuthors" :key="a.id" :value="a.id">
+              {{ a.display_name?.trim() || a.username }}（{{ a.post_count }} 篇）
+            </option>
+          </select>
+        </div>
+        <div class="hint" style="margin-top:6px;">
+          留空则文章无署名；前台按此顺序展示并链接到各作者页。
         </div>
       </div>
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.write.config.ts",
+    "build:write": "vite build --config vite.write.config.ts",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {

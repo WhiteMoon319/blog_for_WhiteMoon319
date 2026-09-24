@@ -6,7 +6,7 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Collection, MediaFile, Post, PostVersion, Tag } from './types';
+import type { AuthorOption, Collection, CollectionWriteView, MediaFile, Post, PostVersion, PostWritePayload, Tag } from './types';
 
 export interface CorpusStats {
   total_chars: number;
@@ -79,13 +79,13 @@ export const api = {
 
   post: (id: number) => request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`),
 
-  createPost: (data: Partial<Post>) =>
+  createPost: (data: PostWritePayload) =>
     request<{ post: Post; tags: Tag[]; version: number }>('/api/posts', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updatePost: (id: number, data: Partial<Post>) =>
+  updatePost: (id: number, data: PostWritePayload) =>
     request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
@@ -227,8 +227,48 @@ export const api = {
   emailClear: () => request<{ ok: boolean }>('/api/settings/email', { method: 'DELETE' }),
 
   // ---- 用户管理 ----
-  users: () => request<{ users: Array<{ id: number; username: string; display_name: string; email: string; role: string; status: string; created_at: string }> }>('/api/users'),
+  users: () => request<{ users: Array<{ id: number; username: string; display_name: string; email: string; role: string; status: string; bio: string; avatar_url: string; created_at: string }> }>('/api/users'),
   userBan: (id: number) => request<{ ok: boolean }>(`/api/users/${id}/ban`, { method: 'POST' }),
+  userRole: (id: number, role: 'reader' | 'author') =>
+    request<{ ok: boolean; id: number; role: string }>(`/api/users/${id}/role`, {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    }),
+  userProfile: (id: number, data: { display_name?: string; bio?: string }) =>
+    request<{ ok: boolean; id: number; display_name: string; bio: string }>(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  // ---- 作者（编辑器作者选择器） ----
+  authors: () => request<{ authors: AuthorOption[] }>('/api/authors'),
+
+  // ---- 文集协作（写作区） ----
+  /** 写作区的文集选择器：全部文集 + 我的关系与可写性 */
+  collectionView: () => request<{ collections: CollectionWriteView[] }>('/api/collections?view=1'),
+  myCollections: () => request<{ collections: CollectionWriteView[] }>('/api/collections?mine=1'),
+  collectionMembers: (id: number) =>
+    request<{
+      members: Array<{ user_id: number; username: string; display_name: string; created_at: string }>;
+      invites: Array<{ id: number; user_id: number; username: string; display_name: string; message: string; created_at: string }>;
+    }>(`/api/collections/${id}/members`),
+  collectionAddMember: (id: number, userId: number) =>
+    request<{ ok: boolean; user_id: number }>(`/api/collections/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
+  collectionRemoveMember: (id: number, userId: number) =>
+    request<{ ok: boolean }>(`/api/collections/${id}/members?user_id=${userId}`, { method: 'DELETE' }),
+  collectionDecideInvite: (id: number, inviteId: number, agree: boolean) =>
+    request<{ ok: boolean }>(`/api/collections/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify(agree ? { approve_id: inviteId } : { reject_id: inviteId }),
+    }),
+  collectionJoin: (id: number, message = '') =>
+    request<{ ok: boolean; status: string }>(`/api/collections/${id}/join`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
 
   // ---- 评论管理 ----
   adminComments: (status = 'pending', page = 1, postId?: number) => {

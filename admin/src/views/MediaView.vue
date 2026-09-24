@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import { authState } from '../store/auth';
 import { fmtDate, fmtSize } from '../lib/format';
 import type { MediaFile } from '../types';
 
@@ -108,7 +109,8 @@ onMounted(loadMore);
           <div class="actions">
             <button class="btn btn-ghost mini" @click="copy(f.url)">复制链接</button>
             <button class="btn btn-ghost mini" @click="copy(f.url, true)">复制引用</button>
-            <button class="btn btn-danger mini" @click="remove(f)">删</button>
+            <!-- 删除仅限管理员：R2 无归属信息，无法按作者删除 -->
+            <button v-if="authState.role === 'admin'" class="btn btn-danger mini" @click="remove(f)">删</button>
           </div>
         </figcaption>
       </figure>

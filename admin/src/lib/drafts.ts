@@ -23,6 +23,7 @@ export interface DraftSnapshot {
   scheduled_at: string;
   status: 'draft' | 'published';
   tags: string[];
+  author_ids: number[];
   content_md: string;
   base_version: number;
   saved_at: string;

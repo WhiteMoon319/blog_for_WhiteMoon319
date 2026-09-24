@@ -5,6 +5,7 @@ dist/
 node_modules/
 admin/node_modules/
 admin/dist/
+admin/dist-write/
 
 # 环境变量
 .dev.vars

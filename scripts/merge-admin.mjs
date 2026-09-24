@@ -6,8 +6,17 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cpSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, rmSync } from 'node:fs';
 
+// 管理员后台与作者写作区是两份独立产物、两个 base（/admin/ 与 /write/），
+// 合并时各自落位，互不覆盖。
 rmSync('dist/client/admin', { recursive: true, force: true });
 cpSync('admin/dist', 'dist/client/admin', { recursive: true });
 console.log('admin bundle merged into dist/client/admin');
+
+if (!existsSync('admin/dist-write/index.html')) {
+  throw new Error('admin/dist-write/index.html 缺失：请先运行 pnpm --filter blog-admin run build:write');
+}
+rmSync('dist/client/write', { recursive: true, force: true });
+cpSync('admin/dist-write', 'dist/client/write', { recursive: true });
+console.log('writer bundle merged into dist/client/write');

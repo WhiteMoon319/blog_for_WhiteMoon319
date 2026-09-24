@@ -47,6 +47,15 @@ export function requireBuild(): void {
       if (t > distNewest) distNewest = t;
     }
   }
+  // 作者写作区是独立产物：缺了它就是没 build，不能靠 admin 产物蒙混过关
+  const writeDir = resolve('dist/client/write');
+  if (!existsSync(resolve(writeDir, 'index.html'))) {
+    throw new Error('dist/client/write/index.html 缺失，请先运行 pnpm run build');
+  }
+  for (const f of readdirSync(writeDir)) {
+    const t = statSync(resolve(writeDir, f)).mtimeMs;
+    if (t > distNewest) distNewest = t;
+  }
   if (distNewest < srcNewest) {
     throw new Error('dist 构建产物早于源码，请先重新运行 pnpm run build');
   }

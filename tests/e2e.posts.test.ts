@@ -424,6 +424,51 @@ test('e2e：批量创建——一次导入多篇、slug 自动避让、逐条报
   }
 });
 
+test('e2e：全文排版预设 layout 落到文章容器 class，非法值 400', async () => {
+  if (!HAS_BUILD) return;
+  await c.login();
+
+  // 非法值应被白名单拒绝
+  const bad = await c.post('/api/posts', {
+    title: '预设非法试炼',
+    slug: 'layout-bad',
+    content_md: '正文。',
+    status: 'published',
+    layout: 'dark',
+  });
+  assert.equal(bad.status, 400);
+
+  // 合法值：创建 → 文章页出现对应 class
+  const created = await c.post('/api/posts', {
+    title: '预设试炼',
+    slug: 'layout-probe',
+    content_md: '正文一段。',
+    status: 'published',
+    layout: 'wechat',
+  });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).post.id as number;
+
+  const html = await (await c.get('/posts/layout-probe/')).text();
+  assert.ok(html.includes('article-body'), '文章容器应存在');
+  assert.ok(/class="[^"]*\blayout-wechat\b[^"]*"/.test(html), '文章容器应带 layout-wechat class');
+  assert.ok(!html.includes('layout-dark'), '未知 class 不应落到页面');
+
+  // PUT 改成 magazine，再读回
+  const put = await c.put(`/api/posts/${id}`, { layout: 'magazine', base_version: 1 });
+  assert.equal(put.status, 200);
+  const html2 = await (await c.get('/posts/layout-probe/')).text();
+  assert.ok(/class="[^"]*\blayout-magazine\b[^"]*"/.test(html2), '改预设后 class 应更新');
+
+  // 空串恢复主题默认
+  const put2 = await c.put(`/api/posts/${id}`, { layout: '', base_version: 2 });
+  assert.equal(put2.status, 200);
+  const html3 = await (await c.get('/posts/layout-probe/')).text();
+  assert.ok(html3.includes('article-body') && !/class="[^"]*\blayout-/.test(html3), '空串应回落到主题默认');
+
+  await c.del(`/api/posts/${id}`);
+});
+
 test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () => {
   if (!HAS_BUILD) return;
   await c.login();

@@ -43,6 +43,10 @@ const visible = authors.filter((a) => a && (a.name || a.username));
   align-items: baseline;
   gap: 0.15em;
   flex-wrap: wrap;
+  /* 卡片主链接的 ::after 覆盖层 z-index:1；署名整体浮在其上才能被点到。
+     注意 .byline-card 的 opacity 会形成独立层叠上下文，故 z-index 必须加在这里。 */
+  position: relative;
+  z-index: 2;
 }
 .byline-prefix {
   opacity: 0.72;

@@ -1,0 +1,38 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later
+//
+// 卡片主链接（核心组件，四套主题共用）：
+// 卡片容器是 <div class="...card">（position: relative），把标题文字包进本组件后，
+// 它用 ::after 铺满整张卡片承接点击，从而避免「卡内再放作者链接」造成 <a> 嵌套 <a>。
+// 卡内其它可交互链接（如署名）用 position: relative + 更高 z-index 浮在其上即可。
+interface Props {
+  href: string;
+}
+const { href } = Astro.props;
+---
+
+<a class="card-hit" href={href}><slot /></a>
+
+<style>
+.card-hit {
+  color: inherit;
+  text-decoration: none;
+}
+/* 铺满最近定位祖先（即卡片容器），承接整卡点击 */
+.card-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+/* 键盘焦点落在标题链接上时，外框画满整卡 */
+.card-hit:focus-visible {
+  outline: none;
+}
+.card-hit:focus-visible::after {
+  outline: 2px solid var(--focus-ring, currentColor);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+</style>

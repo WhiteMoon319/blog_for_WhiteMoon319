@@ -5,6 +5,7 @@
 import type { AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import AuthorByline from '@core/AuthorByline.astro';
+import CardLink from '@core/CardLink.astro';
 
 interface CollectionRow {
   id: number;
@@ -81,14 +82,14 @@ const active = names.length > 0;
       </div>
       <div class="posts-grid">
         {posts.map((p, i) => (
-          <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, p.collection_slug)}>
-            <h3 class="post-title">{p.title}</h3>
+          <div class="post-card reveal" data-delay={String((i % 3) + 1)}>
+            <h3 class="post-title"><CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink></h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
               <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
               <span>{fmtDate(p.created_at)}</span>
             </div>
-          </a>
+          </div>
         ))}
       </div>
     </>

@@ -5,6 +5,7 @@ import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthorByline from '@core/AuthorByline.astro';
+import CardLink from '@core/CardLink.astro';
 import Pagination from '../components/Pagination.astro';
 
 interface ArchivePost {
@@ -52,12 +53,10 @@ const authorsByPost = Astro.props.authorsByPost ?? {};
               <div class="tl-era">{g.year} 年 <small>共 {g.posts.length} 篇</small></div>
               {g.posts.map(({ post, collection }) => (
                 <div class="tl-item">
-                  <a href={postHref(post.slug, collection?.slug)}>
-<div class="tl-event">{collection?.title ?? '未分类'} · {post.title}</div>
+                  <div class="tl-event">{collection?.title ?? '未分类'} · <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink></div>
                 <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}
                   <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
                 </div>
-                  </a>
                 </div>
               ))}
             </>

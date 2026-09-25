@@ -5,6 +5,7 @@ import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthorByline from '@core/AuthorByline.astro';
+import CardLink from '@core/CardLink.astro';
 import { modernT } from '../i18n';
 
 interface CollectionRow {
@@ -70,13 +71,13 @@ const t = modernT(ctx.locale);
       collections.length > 0 ? (
         <div class="portal-grid">
           {collections.map((c) => (
-            <a class="portal-card reveal" href={`/collections/${encodeURI(c.slug)}/`} style={`--pc: ${c.theme_color};`}>
-              <h3>{c.title}</h3>
+            <div class="portal-card reveal" style={`--pc: ${c.theme_color};`}>
+              <h3><CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink></h3>
               <p class="portal-sub">{c.summary}</p>
               {collectionOwners[String(c.id)] && (
                 <AuthorByline authors={[collectionOwners[String(c.id)]]} variant="card" />
               )}
-            </a>
+            </div>
           ))}
         </div>
       ) : (
@@ -98,16 +99,16 @@ const t = modernT(ctx.locale);
           {pinnedPosts.map((p) => {
             const col = collections.find((c) => c.id === p.collection_id);
             return (
-              <a class="post-card reveal" href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
+              <div class="post-card reveal" style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title">{p.title}</h3>
+                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
                   <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
-              </a>
+              </div>
             );
           })}
         </div>
@@ -128,16 +129,16 @@ const t = modernT(ctx.locale);
           {latestPosts.map((p) => {
             const col = collections.find((c) => c.id === p.collection_id);
             return (
-              <a class="post-card reveal" href={postHref(p.slug, col?.slug)} style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
+              <div class="post-card reveal" style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title">{p.title}</h3>
+                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
                   <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />
                   <span>{fmtDate(p.created_at)}</span>
                 </div>
-              </a>
+              </div>
             );
           })}
         </div>

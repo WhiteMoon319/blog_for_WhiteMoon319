@@ -5,6 +5,7 @@ import type { SiteContext, AuthorBadge } from '../../../lib/theme-context.ts';
 import { postHref, fmtDate } from '@core/utils';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthorByline from '@core/AuthorByline.astro';
+import CardLink from '@core/CardLink.astro';
 import Pagination from '@theme/components/Pagination.astro';
 import { modernT } from '../i18n';
 
@@ -54,12 +55,10 @@ const t = modernT(ctx.locale);
               <div class="tl-era">{t('archive.year_posts', { year: g.year, count: g.posts.length })}</div>
               {g.posts.map(({ post, collection }) => (
                 <div class="tl-item">
-                  <a href={postHref(post.slug, collection?.slug)}>
-                    <div class="tl-event">{post.title}<span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span></div>
+                  <div class="tl-event"><CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink><span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span></div>
                     <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}
                       <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
                     </div>
-                  </a>
                 </div>
               ))}
             </>

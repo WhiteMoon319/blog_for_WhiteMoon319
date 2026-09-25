@@ -638,6 +638,7 @@ body {
 }
 
 .tl-item {
+  position: relative;
   padding: 14px 0;
   border-bottom: 1px solid var(--hairline);
 }
@@ -646,13 +647,7 @@ body {
   border-bottom: 0;
 }
 
-.tl-item a {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-
-.tl-item a:hover .tl-event {
+.tl-item:hover .tl-event {
   color: var(--cinnabar);
 }
 
@@ -1297,8 +1292,6 @@ body {
 
 .float-nav:focus-visible,
 .btn:focus-visible,
-.portal-card:focus-visible,
-.post-card:focus-visible,
 .page-back:focus-visible,
 .tag-chip:focus-visible,
 .pgn:focus-visible {

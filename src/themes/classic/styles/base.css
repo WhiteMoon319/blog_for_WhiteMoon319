@@ -1086,12 +1086,7 @@ body {
   box-shadow: 0 0 0 3px rgba(194, 58, 48, 0.08);
 }
 
-.tl-item a {
-  color: var(--ink-deep);
-  text-decoration: none;
-}
-
-.tl-item a:hover {
+.tl-item:hover .tl-event {
   color: var(--cinnabar);
 }
 
@@ -1147,7 +1142,6 @@ body {
 .float-nav:focus-visible,
 .btn:focus-visible,
 .portal-card:focus-visible,
-.post-card:focus-visible,
 .page-back:focus-visible {
   outline: 3px solid var(--cinnabar);
   outline-offset: 3px;

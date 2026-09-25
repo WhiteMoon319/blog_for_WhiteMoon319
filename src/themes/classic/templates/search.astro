@@ -6,6 +6,7 @@ import { postHref, fmtDate } from '@core/utils';
 import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthorByline from '@core/AuthorByline.astro';
+import CardLink from '@core/CardLink.astro';
 
 interface ResultPost {
   id: number;
@@ -97,15 +98,15 @@ const t = classicT(ctx.locale);
             {results.length > 0 ? (
               <div class="posts-grid" style="margin-top:32px;">
                 {results.map(({ post, collection }, i) => (
-                  <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(post.slug, collection?.slug)} style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}>
-                    <h3 class="post-title">{post.title}</h3>
+                  <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}>
+                    <h3 class="post-title"><CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink></h3>
                     {post.summary && <p class="post-summary">{post.summary}</p>}
                     <div class="post-meta">
                       {collection && <span class="post-tag">{collection.title}</span>}
                       <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
                       <span>{fmtDate(post.created_at)}</span>
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             ) : (

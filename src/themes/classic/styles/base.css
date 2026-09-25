@@ -507,7 +507,7 @@ body {
 }
 
 .portal-card:hover,
-.portal-card:focus-visible {
+.portal-card:has(.card-hit:focus-visible) {
   transform: translateY(-6px);
   box-shadow: var(--shadow-float);
   border-color: var(--pc, var(--cinnabar));
@@ -531,7 +531,7 @@ body {
 }
 
 .portal-card:hover .portal-seal,
-.portal-card:focus-visible .portal-seal {
+.portal-card:has(.card-hit:focus-visible) .portal-seal {
   transform: rotate(-6deg);
 }
 
@@ -587,14 +587,14 @@ body {
 }
 
 .post-card:hover,
-.post-card:focus-visible {
+.post-card:has(.card-hit:focus-visible) {
   transform: translateY(-4px);
   box-shadow: var(--shadow-float);
   border-color: var(--cc, var(--cinnabar));
 }
 
 .post-card:hover::after,
-.post-card:focus-visible::after {
+.post-card:has(.card-hit:focus-visible)::after {
   transform: scale(1.4);
 }
 
@@ -1141,7 +1141,6 @@ body {
 
 .float-nav:focus-visible,
 .btn:focus-visible,
-.portal-card:focus-visible,
 .page-back:focus-visible {
   outline: 3px solid var(--cinnabar);
   outline-offset: 3px;

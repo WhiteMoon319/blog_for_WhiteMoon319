@@ -392,7 +392,7 @@ body {
 }
 
 .portal-card:hover,
-.portal-card:focus-visible {
+.portal-card:has(.card-hit:focus-visible) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-float);
   border-color: color-mix(in srgb, var(--pc, var(--cinnabar)) 35%, transparent);
@@ -441,7 +441,7 @@ body {
 }
 
 .post-card:hover,
-.post-card:focus-visible {
+.post-card:has(.card-hit:focus-visible) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-float);
   border-color: color-mix(in srgb, var(--cc, var(--cinnabar)) 35%, transparent);

@@ -8,6 +8,7 @@ import { postHref, fmtDate } from '@core/utils';
 import { classicT } from '../i18n';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Pagination from '../components/Pagination.astro';
+import CardLink from '@core/CardLink.astro';
 
 interface AuthorPost {
   id: number;
@@ -64,14 +65,14 @@ const t = classicT(ctx.locale);
     {posts.length > 0 ? (
       <div class="posts-grid">
         {posts.map((p, i) => (
-          <a class="post-card reveal" data-delay={String((i % 3) + 1)} href={postHref(p.slug, p.collection_slug)}>
+          <div class="post-card reveal" data-delay={String((i % 3) + 1)}>
             {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-            <h3 class="post-title">{p.title}</h3>
+            <h3 class="post-title"><CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink></h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
               <span>{fmtDate(p.created_at)}</span>
             </div>
-          </a>
+          </div>
         ))}
       </div>
     ) : (

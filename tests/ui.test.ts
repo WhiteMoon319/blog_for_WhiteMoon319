@@ -40,11 +40,13 @@ test('列表卡：不得用 <a> 包裹整卡（卡内署名链接会造成非法
     'src/themes/classic/templates/collection.astro',
     'src/themes/classic/templates/archive.astro',
     'src/themes/classic/templates/search.astro',
+    'src/themes/classic/templates/author.astro',
     'src/themes/classic/components/TagResults.astro',
     'src/themes/modern/templates/home.astro',
     'src/themes/modern/templates/collection.astro',
     'src/themes/modern/templates/archive.astro',
     'src/themes/modern/templates/search.astro',
+    'src/themes/modern/templates/author.astro',
     'src/themes/modern/components/TagResults.astro',
   ];
   for (const f of files) {

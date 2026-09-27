@@ -109,24 +109,24 @@ onMounted(() => {
 
   <template v-else-if="stats">
     <div class="stat-grid">
-      <div class="card stat-card" style="--pc: var(--cinnabar);">
+      <div class="card stat-card pc-cinnabar">
         <div class="num">{{ stats.total_views }}</div>
         <div class="label">区间总阅读</div>
       </div>
-      <div class="card stat-card" style="--pc: var(--pine);">
+      <div class="card stat-card pc-pine">
         <div class="num">{{ avgPerDay }}</div>
         <div class="label">日均阅读</div>
       </div>
-      <div class="card stat-card" style="--pc: var(--amber);">
+      <div class="card stat-card pc-amber">
         <div class="num">{{ stats.daily.filter((d) => d.views > 0).length }}</div>
         <div class="label">有阅读天数</div>
       </div>
     </div>
 
-    <div class="card pad" style="margin-top:20px;">
+    <div class="card pad mt-20">
       <div class="card-head">
         <h2>字数统计</h2>
-        <select v-model="scope" class="select" style="margin-left:auto;max-width:260px;" @change="loadCorpus()">
+        <select v-model="scope" class="select select-end" @change="loadCorpus()">
           <option :value="undefined">全站</option>
           <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
           <option value="none">未分类</option>
@@ -148,12 +148,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="card pad" style="margin-top:20px;">
+    <div class="card pad mt-20">
       <div class="card-head">
         <h2>每日阅读</h2>
         <span class="muted">{{ stats.start_day }} → {{ stats.end_day }}</span>
       </div>
-      <div v-if="stats.total_views === 0" class="muted" style="padding:24px 0;">
+      <div v-if="stats.total_views === 0" class="muted py-24">
         暂无阅读数据。读者访问文章页后，趋势将在这里呈现。
       </div>
       <div v-else class="bar-chart">
@@ -164,17 +164,17 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="card pad" style="margin-top:20px;">
+    <div class="card pad mt-20">
       <div class="card-head">
         <h2>热文 TOP {{ stats.top_posts.length }}</h2>
       </div>
-      <div v-if="stats.top_posts.length === 0" class="muted" style="padding:12px 0;">暂无数据</div>
+      <div v-if="stats.top_posts.length === 0" class="muted py-12">暂无数据</div>
       <table v-else class="table">
         <thead>
           <tr>
-            <th style="width:48px;">#</th>
+            <th class="w-48">#</th>
             <th>标题</th>
-            <th style="width:120px;">区间阅读</th>
+            <th class="w-120">区间阅读</th>
           </tr>
         </thead>
         <tbody>
@@ -190,8 +190,8 @@ onMounted(() => {
     </div>
   </template>
 
-  <div v-else class="card pad" style="margin-top:20px;">
-    <p style="color:var(--ink-light);">数据加载失败</p>
+  <div v-else class="card pad mt-20">
+    <p class="text-muted">数据加载失败</p>
   </div>
 </template>
 

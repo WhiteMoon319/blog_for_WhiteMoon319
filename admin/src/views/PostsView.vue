@@ -295,7 +295,7 @@ async function bulkAiSummary(force: boolean) {
       <table class="table posts-table" v-if="paged.length">
         <thead>
           <tr>
-            <th style="width:32px;">
+            <th class="w-32">
               <input
                 type="checkbox"
                 :checked="paged.length > 0 && paged.every((p) => selected.has(p.id))"
@@ -308,7 +308,7 @@ async function bulkAiSummary(force: boolean) {
             <th>状态</th>
             <th>阅读</th>
             <th>日期</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>

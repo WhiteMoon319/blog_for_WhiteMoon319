@@ -90,7 +90,7 @@ async function logout() {
 
 <template>
   <div v-if="authState.checking" class="login-wrap">
-    <div class="seal" style="width:48px;height:48px;font-size:1.4rem;display:grid;place-items:center;border-radius:6px;background:var(--cinnabar);color:#fff;">签</div>
+    <div class="seal seal-lg">签</div>
   </div>
 
   <template v-else-if="authState.authed && route.path !== '/login'">

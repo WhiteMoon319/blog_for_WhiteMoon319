@@ -298,8 +298,8 @@ async function generateAiSummaries() {
     <div class="card-head">
       <h2>选择文件与设置</h2>
     </div>
-    <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
-      <div class="field" style="grid-column: 1 / -1;">
+    <div class="form-row form-row-3">
+      <div class="field field-full">
         <label>源文件（.md / .txt / .docx，可多选）</label>
         <div
           class="dropzone"
@@ -333,7 +333,7 @@ async function generateAiSummaries() {
       </div>
       <div class="field">
         <label>导入状态</label>
-        <div style="display: flex; gap: 8px;">
+        <div class="row">
           <button
             class="btn btn-ghost mini"
             :style="status === 'draft' ? 'border-color:var(--cinnabar);color:var(--cinnabar);' : ''"
@@ -352,7 +352,7 @@ async function generateAiSummaries() {
       </div>
       <div class="field">
         <label>slug 生成方式</label>
-        <div style="display: flex; gap: 8px;">
+        <div class="row">
           <button
             class="btn btn-ghost mini"
             :style="slugMode === 'auto' ? 'border-color:var(--cinnabar);color:var(--cinnabar);' : ''"
@@ -375,19 +375,19 @@ async function generateAiSummaries() {
   <div class="card" v-if="items.length">
     <div class="card-head">
       <h2>待导入清单（{{ items.length }} 篇）</h2>
-      <div style="display: flex; gap: 8px;">
+      <div class="row">
         <button class="btn btn-ghost mini" :disabled="importing" @click="clearAll">清空</button>
         <button class="btn btn-primary" :disabled="importing || collectionId === null" @click="submitAll">
           {{ importing ? '导入中…' : '全部导入' }}
         </button>
       </div>
     </div>
-    <div v-if="importedIds.length > 0" style="padding:8px 16px;border-bottom:1px solid var(--hairline);display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:0.82rem;color:var(--ink-light);">已导入 {{ importedIds.length }} 篇</span>
+    <div v-if="importedIds.length > 0" class="import-bar">
+      <span class="text-muted-sm">已导入 {{ importedIds.length }} 篇</span>
       <button class="btn btn-ghost mini" :disabled="generatingAi" @click="generateAiSummaries">
         {{ generatingAi ? '生成中…' : 'AI 生成摘要' }}
       </button>
-      <span v-if="Object.keys(aiResults).length" style="font-size:0.78rem;color:var(--ink-light);">
+      <span v-if="Object.keys(aiResults).length" class="text-muted-xs">
         {{ Object.values(aiResults).filter(s => s === 'generated').length }} 篇成功，
         {{ Object.values(aiResults).filter(s => s === 'failed').length }} 篇失败
       </span>
@@ -398,39 +398,36 @@ async function generateAiSummaries() {
         <thead>
           <tr>
             <th>来源</th>
-            <th style="min-width: 180px;">标题</th>
-            <th style="min-width: 150px;">slug</th>
+            <th class="col-min-180">标题</th>
+            <th class="col-min-150">slug</th>
             <th>摘要</th>
             <th>状态</th>
-            <th style="text-align: right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(item, i) in items" :key="item.file + i">
-            <td style="white-space: nowrap; color: var(--ink-light); font-size: 0.8rem;">{{ item.file }}</td>
+            <td class="file-cell">{{ item.file }}</td>
             <td>
-              <input v-model="item.title" class="input" style="padding: 6px 10px; font-size: 0.85rem;" />
+              <input v-model="item.title" class="input compact" />
             </td>
             <td>
               <input
                 v-if="slugMode === 'auto'"
                 :value="slugify(item.title)"
-                class="input"
+                class="input compact is-readonly-input"
                 readonly
-                style="padding: 6px 10px; font-size: 0.85rem; background: transparent;"
               />
               <input
                 v-else
                 v-model="item.slug"
-                class="input"
-                style="padding: 6px 10px; font-size: 0.85rem;"
+                class="input compact"
               />
             </td>
             <td>
               <input
                 v-model="item.summary"
-                class="input"
-                style="padding: 6px 10px; font-size: 0.85rem;"
+                class="input compact"
                 :title="item.summary"
               />
             </td>
@@ -439,7 +436,7 @@ async function generateAiSummaries() {
               <span v-else-if="item.state === 'failed'" class="tag tag-draft" :title="item.error">失败</span>
               <span v-else class="tag">待导入</span>
             </td>
-            <td style="text-align: right;">
+            <td class="ta-right">
               <button class="btn btn-danger mini" :disabled="importing" @click="removeItem(i)">移除</button>
             </td>
           </tr>
@@ -447,7 +444,7 @@ async function generateAiSummaries() {
       </table>
     </div>
 
-    <div v-if="items.some((it) => it.state === 'failed')" class="empty" style="text-align: left; color: var(--cinnabar);">
+    <div v-if="items.some((it) => it.state === 'failed')" class="empty empty-error">
       <div v-for="(item, i) in items" :key="'e' + i">
         <span v-if="item.state === 'failed'">「{{ item.file }}」失败：{{ item.error }}</span>
       </div>

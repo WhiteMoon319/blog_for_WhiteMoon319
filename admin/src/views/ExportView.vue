@@ -26,25 +26,25 @@ async function exportJson() {
   <PageHead kicker="数 据" title="数据导出" />
 
   <div class="card pad">
-    <h3 style="margin:0 0 14px;">全量数据快照（JSON）</h3>
-    <p style="color:var(--ink-mid);font-size:0.9rem;line-height:1.9;">
+    <h3 class="section-title-tight">全量数据快照（JSON）</h3>
+    <p class="prose-note">
       包含文集、文章（含回收站，保留 deleted_at）、全部版本历史与标签关联，并标注 schema 与迁移版本。
-      当前为<span style="color:var(--cinnabar);">只读导出</span>，不包含登录口令、会话、密钥与媒体文件本体；
+      当前为<span class="text-danger">只读导出</span>，不包含登录口令、会话、密钥与媒体文件本体；
       在导入功能落地前，请勿把它当作可一键恢复的备份。
     </p>
-    <div style="display:flex;gap:12px;align-items:center;">
+    <div class="row-wrap">
       <button class="btn btn-primary" :disabled="busy" @click="exportJson">
         {{ busy ? '导出中…' : '导出全量快照' }}
       </button>
-      <span style="color:var(--ink-light);font-size:0.82rem;">
+      <span class="text-muted-sm">
         单篇 Markdown 可从文章编辑器内导出
       </span>
     </div>
   </div>
 
-  <div class="card pad" style="margin-top:20px;">
-    <h3 style="margin:0 0 14px;">范围说明</h3>
-    <ul style="color:var(--ink-mid);font-size:0.88rem;line-height:2.1;margin:0;padding-left:1.2em;">
+  <div class="card pad mt-20">
+    <h3 class="section-title-tight">范围说明</h3>
+    <ul class="prose-list">
       <li>密码、口令、会话 Cookie、签名密钥一律不进入导出文件。</li>
       <li>R2 图片本体不在导出范围；媒体迁移属专项功能。</li>
       <li>每次导出都记录生成时间与迁移版本，便于日后核对快照时点。</li>

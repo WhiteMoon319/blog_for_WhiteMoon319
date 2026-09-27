@@ -97,7 +97,7 @@ function moveAuthor(index: number, delta: number): void {
           {{ c.title }}{{ canWrite(c.id) ? '' : '（私有·需作者同意）' }}
         </option>
       </select>
-      <div v-if="!canWrite(form.collection_id)" class="hint" style="margin-top:6px;color:var(--cinnabar);">
+      <div v-if="!canWrite(form.collection_id)" class="hint mt-6 text-danger">
         该文集为私有，需文集作者同意才能投稿；可在「我的文集」页发起协作申请。
       </div>
     </div>
@@ -118,7 +118,7 @@ function moveAuthor(index: number, delta: number): void {
       <option value="magazine">杂志风（17px / 行高 1.8 / 疏朗）</option>
       <option value="warm">温润风（16px / 行高 1.9 / 首行缩进）</option>
     </select>
-    <div class="hint" style="margin-top:6px;color:var(--muted);">只改正文排版节奏，不改块样式；块内观感仍由「✦ 排版」决定。</div>
+    <div class="hint mt-6 text-muted">只改正文排版节奏，不改块样式；块内观感仍由「✦ 排版」决定。</div>
   </div>
 
   <div class="field">
@@ -137,14 +137,14 @@ function moveAuthor(index: number, delta: number): void {
         >↓</button>
         <button type="button" class="chip-op" title="移除" @click="removeAuthor(idx)">×</button>
       </span>
-      <select class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;" @change="addAuthor">
+      <select class="select select-xs" @change="addAuthor">
         <option value="">添加作者…</option>
         <option v-for="a in addableAuthors" :key="a.id" :value="a.id">
           {{ a.display_name?.trim() || a.username }}（{{ a.post_count }} 篇）
         </option>
       </select>
     </div>
-    <div class="hint" style="margin-top:6px;">
+    <div class="hint mt-6">
       留空则文章无署名；前台按此顺序展示并链接到各作者页。
     </div>
   </div>
@@ -152,7 +152,7 @@ function moveAuthor(index: number, delta: number): void {
   <div class="field">
     <label>标签（自有，叠加在文集标签之上）</label>
     <TagChips v-model="form.tags" :suggestions="suggestions" placeholder="回车添加标签" />
-    <div v-if="form.inherited_tags.length" class="hint" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+    <div v-if="form.inherited_tags.length" class="hint tag-row mt-8">
       继承自文集：
       <span v-for="t in form.inherited_tags" :key="t" class="tag-chip-item is-readonly">{{ t }}</span>
     </div>
@@ -160,18 +160,17 @@ function moveAuthor(index: number, delta: number): void {
 
   <div class="field">
     <label>摘要</label>
-    <div style="display:flex;gap:8px;align-items:flex-start;">
-      <textarea v-model="form.summary" class="textarea" placeholder="列表卡上的一行小字" style="flex:1;" />
-      <div style="display:flex;flex-direction:column;gap:4px;">
+    <div class="row-top">
+      <textarea v-model="form.summary" class="textarea grow" placeholder="列表卡上的一行小字" />
+      <div class="col-stack">
         <select
-          class="select"
-          style="width:auto;font-size:0.78rem;padding:4px 8px;"
+          class="select select-xs"
           :value="selectedPromptId"
           @change="emit('update:selectedPromptId', ($event.target as HTMLSelectElement).value)"
         >
           <option v-for="t in promptTemplates" :key="t.id" :value="t.id">{{ t.name }}（{{ t.id }}）</option>
         </select>
-        <button type="button" class="btn btn-ghost" :disabled="generatingSummary" @click="emit('generate-summary')" style="white-space:nowrap;margin-top:2px;">
+        <button type="button" class="btn btn-ghost nowrap mt-2" :disabled="generatingSummary" @click="emit('generate-summary')">
           {{ generatingSummary ? '生成中…' : 'AI 生成' }}
         </button>
       </div>
@@ -183,7 +182,7 @@ function moveAuthor(index: number, delta: number): void {
     <input v-model="form.meta_keywords" class="input" maxlength="200" placeholder="文章、随笔、书房" />
   </div>
 
-  <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+  <label class="checkbox-row">
     <input
       type="checkbox"
       :checked="form.is_pinned === 1"
@@ -194,8 +193,8 @@ function moveAuthor(index: number, delta: number): void {
 
   <div class="field">
     <label>定时发布（到点自动刊发；仅草稿可设）</label>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-      <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+    <div class="row-wrap">
+      <label class="checkbox-row">
         <input
           type="checkbox"
           v-model="form.scheduled_enabled"
@@ -208,11 +207,10 @@ function moveAuthor(index: number, delta: number): void {
         v-model="form.scheduled_local"
         type="datetime-local"
         step="60"
-        class="input"
-        style="width:auto;"
+        class="input w-auto"
       />
     </div>
-    <div class="hint" style="margin-top:8px;">
+    <div class="hint mt-8">
       按本机时区展示，提交后转为 UTC 存储；cron 每 5 分钟轮询，到点可能略有延迟，不承诺秒级准点。
       手动刊发会清空定时。
     </div>
@@ -220,13 +218,13 @@ function moveAuthor(index: number, delta: number): void {
 
   <div class="field">
     <label>封面</label>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="row-wrap">
       <button class="btn btn-ghost" type="button" @click="emit('pick-cover')" :disabled="uploading">上传封面</button>
       <img
         v-if="form.cover_url"
         :src="form.cover_url"
         alt="封面"
-        style="max-height:80px;border-radius:6px;border:1px solid var(--hairline);"
+        class="cover-thumb"
       />
       <button v-if="form.cover_url" class="btn btn-danger mini" type="button" @click="form.cover_url = ''">
         去封面

@@ -115,7 +115,7 @@ async function deleteOne(id: number) {  if (!confirm('确认删除此页面？�
     </template>
   </PageHead>
 
-  <div v-if="!loaded" style="text-align:center;padding:40px 0;color:var(--ink-light);">加载中…</div>
+  <div v-if="!loaded" class="state-block">加载中…</div>
 
   <template v-else>
     <div class="card">
@@ -130,7 +130,7 @@ async function deleteOne(id: number) {  if (!confirm('确认删除此页面？�
               <th>slug</th>
               <th>状态</th>
               <th>更新时间</th>
-              <th style="text-align:right;">操作</th>
+              <th class="ta-right">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -162,11 +162,11 @@ async function deleteOne(id: number) {  if (!confirm('确认删除此页面？�
     </div>
 
     <div class="card pad" v-if="!pages.length && !showEditor">
-      <p style="color:var(--ink-light);">暂无页面</p>
+      <p class="text-muted">暂无页面</p>
     </div>
 
     <div class="card pad" v-if="showEditor">
-      <h3 style="margin:0 0 20px;">{{ editId ? '编辑页面' : '新建页面' }}</h3>
+      <h3 class="section-title">{{ editId ? '编辑页面' : '新建页面' }}</h3>
       <div class="field">
         <label>标题</label>
         <input v-model="form.title" maxlength="200" class="input" />
@@ -186,7 +186,7 @@ async function deleteOne(id: number) {  if (!confirm('确认删除此页面？�
           <option :value="1">已发布</option>
         </select>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;margin-top:20px;">
+      <div class="card-actions">
         <button class="btn btn-primary" :disabled="saving" @click="save">
           {{ saving ? '保存中…' : '保存' }}
         </button>

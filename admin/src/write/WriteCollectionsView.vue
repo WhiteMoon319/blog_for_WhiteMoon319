@@ -189,14 +189,14 @@ onMounted(load);
   <div class="page-head">
     <span class="kicker">文 集</span>
     <h1>我的文集</h1>
-    <p class="hint" style="margin-top:6px;">
+    <p class="hint mt-6">
       公用文集任何作者都能投稿；私有文集只有你与拉入的协作者能投稿。别人想投稿需你同意。
     </p>
   </div>
 
   <div class="card">
     <div class="card-head">
-      <span style="color:var(--ink-light);font-size:0.85rem;">共 {{ mine.length }} 个自建文集</span>
+      <span class="text-muted-sm">共 {{ mine.length }} 个自建文集</span>
       <button class="btn btn-primary" @click="creating = !creating">
         {{ creating ? '收起' : '新建文集' }}
       </button>
@@ -218,7 +218,7 @@ onMounted(load);
         <input v-model="draft.summary" class="input" placeholder="一句话说明这个文集" />
       </div>
       <div class="field">
-        <label style="display:flex;align-items:center;gap:8px;">
+        <label class="row">
           <input type="checkbox" v-model="draft.is_public" />
           <span>公用（任何作者都可投稿；不勾选则私有，需你同意）</span>
         </label>
@@ -233,7 +233,7 @@ onMounted(load);
             <th>文集</th>
             <th>投稿</th>
             <th>简介</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -242,19 +242,18 @@ onMounted(load);
               <td>
                 <span class="color-dot" :style="{ background: c.theme_color || '#8a6d3b' }"></span>
                 {{ c.title }}
-                <span style="color:var(--ink-light);font-size:0.78rem;">/{{ c.slug }}</span>
+                <span class="text-muted-xs">/{{ c.slug }}</span>
               </td>
               <td>
                 <button
-                  class="tag"
+                  class="tag bare-btn"
                   :class="c.is_public === 1 ? 'tag-published' : 'tag-draft'"
-                  style="border:none;cursor:pointer;"
                   @click="togglePublic(c)"
                 >
                   {{ c.is_public === 1 ? '公用' : '私有' }}
                 </button>
               </td>
-              <td style="color:var(--ink-light);font-size:0.82rem;">{{ c.summary || '—' }}</td>
+              <td class="muted-cell">{{ c.summary || '—' }}</td>
               <td>
                 <div class="actions">
                   <button class="btn btn-ghost mini" @click="openPanel(c)">协作</button>
@@ -285,8 +284,8 @@ onMounted(load);
                 </div>
                 <div class="panel-block">
                   <strong>拉入协作者</strong>
-                  <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-                    <select v-model="pickUser" class="select" style="width:auto;">
+                  <div class="row mt-6">
+                    <select v-model="pickUser" class="select w-auto">
                       <option value="">选择作者…</option>
                       <option v-for="a in addable" :key="a.id" :value="a.id">
                         {{ a.display_name?.trim() || a.username }}
@@ -306,7 +305,7 @@ onMounted(load);
 
   <div class="card" v-if="needInvite.length">
     <div class="card-head">
-      <span style="color:var(--ink-light);font-size:0.85rem;">他人的私有文集（需对方同意才能投稿）</span>
+      <span class="text-muted-sm">他人的私有文集（需对方同意才能投稿）</span>
     </div>
     <div class="table-wrap">
       <table class="table">
@@ -314,13 +313,13 @@ onMounted(load);
           <tr>
             <th>文集</th>
             <th>状态</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="c in needInvite" :key="c.id">
             <td>{{ c.title }}</td>
-            <td style="color:var(--ink-light);font-size:0.82rem;">{{ c.invite_status === 'pending' ? '申请待处理' : c.invite_status === 'rejected' ? '已被拒绝' : '—' }}</td>
+            <td class="muted-cell">{{ c.invite_status === 'pending' ? '申请待处理' : c.invite_status === 'rejected' ? '已被拒绝' : '—' }}</td>
             <td>
               <button class="btn btn-ghost mini" :disabled="c.invite_status === 'pending'" @click="join(c)">
                 {{ inviteLabel(c) }}

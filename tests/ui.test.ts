@@ -103,3 +103,38 @@ test('列表卡：不得用 <a> 包裹整卡（卡内署名链接会造成非法
   const cardLink = readFileSync(resolve('src/core/CardLink.astro'), 'utf8');
   assert.match(cardLink, /\.card-hit::after\s*\{[^}]*position:\s*absolute/s, 'CardLink 覆盖层必须绝对定位铺满卡片');
 });
+test('后台样式治理：模板里不再写内联样式（间距/排布走工具类）', () => {
+  const root = resolve('admin/src');
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = resolve(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.vue')) files.push(p);
+    }
+  };
+  walk(root);
+  assert.ok(files.length >= 20, '应扫到后台组件与视图');
+
+  const offenders: string[] = [];
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8');
+    const tpl = src.slice(src.indexOf('<template>'), src.indexOf('</template>'));
+    // 只禁静态 style 属性；:style / v-bind:style 是动态绑定，允许
+    const hits = tpl.match(/(?<![:\w-])style="/g) ?? [];
+    if (hits.length > 0) offenders.push(`${f.replace(root, 'admin/src')}（${hits.length} 处）`);
+  }
+  assert.deepEqual(offenders, [], `以下模板仍有内联样式，请改用 admin.css 的语义类/工具类：\n${offenders.join('\n')}`);
+});
+
+test('后台样式治理：工具类层存在（内联样式收敛的落点）', () => {
+  const css = readFileSync(resolve('admin/src/assets/admin.css'), 'utf8');
+  for (const cls of ['.row {', '.row-wrap {', '.card-actions {', '.section-title {', '.ta-right {', '.text-muted {', '.state-block {']) {
+    assert.ok(css.includes(cls), `admin.css 缺少工具类 ${cls}`);
+  }
+  // 深色模式下工具类也必须可跟随：除「朱砂底上的白字」外不得写死色值
+  const utilSection = css.slice(css.indexOf('===== 工具类'));
+  const hard = utilSection.match(/#[0-9a-fA-F]{3,6}\b/g) ?? [];
+  const bad = hard.filter((c) => !/^#(fff|ffffff)$/i.test(c));
+  assert.deepEqual(bad, [], `工具类区出现写死色值，应改走 CSS 变量：${bad.join(' ')}`);
+});

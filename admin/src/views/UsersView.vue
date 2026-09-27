@@ -98,7 +98,7 @@ onMounted(load);
             <th>角色</th>
             <th>状态</th>
             <th>注册时间</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>

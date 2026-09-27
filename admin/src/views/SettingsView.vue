@@ -471,7 +471,7 @@ async function deleteAiKey() {
     <div class="settings-body">
 
   <div id="site" class="card pad settings-section">
-    <h3 style="margin:0 0 20px;">站点信息</h3>
+    <h3 class="section-title">站点信息</h3>
     <div class="field">
       <label>站点名称</label>
       <input v-model="form.SITE_NAME" maxlength="200" class="input" />
@@ -519,7 +519,7 @@ async function deleteAiKey() {
   </div>
 
   <div id="ai" class="card pad settings-section" v-if="!loading">
-    <h3 style="margin:0 0 20px;">AI 摘要</h3>
+    <h3 class="section-title">AI 摘要</h3>
 
     <div class="field">
       <label>服务商</label>
@@ -534,20 +534,20 @@ async function deleteAiKey() {
     </div>
     <div class="field">
       <label>API Key</label>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input v-model="aiForm.apiKey" type="password" class="input" style="flex:1;" placeholder="留空则不修改" />
-        <span v-if="aiKeyConfigured" style="font-size:0.78rem;color:var(--ink-light);">{{ aiKeyMasked }}</span>
-        <span v-else style="font-size:0.78rem;color:var(--cinnabar);">未配置</span>
+      <div class="row">
+        <input v-model="aiForm.apiKey" type="password" class="input grow" placeholder="留空则不修改" />
+        <span v-if="aiKeyConfigured" class="text-muted-xs">{{ aiKeyMasked }}</span>
+        <span v-else class="text-xs text-danger">未配置</span>
       </div>
-      <div class="hint" style="margin-top:4px;">
+      <div class="hint mt-4">
         填写后随「测试并保存」落库，不会明文返回前端。
-        <button class="btn btn-danger mini" @click="deleteAiKey" :disabled="!aiKeyConfigured" style="margin-left:8px;">清除 Key</button>
+        <button class="btn btn-danger mini ml-8" @click="deleteAiKey" :disabled="!aiKeyConfigured">清除 Key</button>
       </div>
     </div>
     <div class="field">
       <label>模型</label>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input v-model="aiForm.model" class="input" style="flex:1;" list="model-list" placeholder="deepseek-v4-flash" />
+      <div class="row">
+        <input v-model="aiForm.model" class="input grow" list="model-list" placeholder="deepseek-v4-flash" />
         <datalist id="model-list">
           <option v-for="m in modelList" :key="m" :value="m" />
         </datalist>
@@ -562,19 +562,19 @@ async function deleteAiKey() {
       <div class="hint">部分服务商支持；留空则用服务商默认</div>
     </div>
     <div class="field">
-      <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;">
+      <label class="checkbox-row">
         <input v-model="aiForm.multiSummary" type="checkbox" />
         生成多条摘要供选择
       </label>
     </div>
     <div class="field" v-if="aiForm.multiSummary">
       <label>候选条数（2～5）</label>
-      <input v-model.number="aiForm.candidateCount" type="number" min="2" max="5" class="input" style="width:100px;" />
+      <input v-model.number="aiForm.candidateCount" type="number" min="2" max="5" class="input input-xs" />
     </div>
-    <div class="hint" style="margin:12px 0;">
+    <div class="hint my-12">
       文章内容会发送到您配置的第三方 AI 服务商。请确认服务商的数据保留、训练使用和合规策略。
     </div>
-    <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="row-wrap mt-16">
       <button class="btn btn-ghost" :disabled="testingAi" @click="testAiOnly">
         {{ testingAi ? '测试中…' : '测试连接' }}
       </button>
@@ -586,41 +586,41 @@ async function deleteAiKey() {
   </div>
 
   <div id="prompts" class="card pad settings-section" v-if="!loading">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <h3 style="margin:0;">Prompt 模板</h3>
-      <div style="display:flex;gap:8px;align-items:center;">
+    <div class="row-between">
+      <h3 class="m-0">Prompt 模板</h3>
+      <div class="row">
         <button class="btn btn-ghost mini" @click="addPromptTemplate">＋ 新增模板</button>
       </div>
     </div>
-    <div class="field" style="margin-top:10px;">
+    <div class="field mt-10">
       <label>模板说明</label>
       <div class="hint">
         每套模板定义一组 AI 提示词。文集可指定使用哪套；编辑器生成时默认跟随文集，也可临时切换。
         <code>overview</code> 为默认博客摘要，<code>teaser</code> 为章节导读（适合小说/连载，不剧透）。
       </div>
     </div>
-    <div v-for="(t, i) in promptTemplates" :key="i" class="prompt-card" style="border:1px solid var(--hairline);border-radius:8px;padding:14px;margin-top:12px;">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input v-model="t.id" class="input" style="width:130px;font-family:var(--font-mono);" placeholder="标识(如 overview)" />
-        <input v-model="t.name" class="input" style="width:160px;" placeholder="名称" />
+    <div v-for="(t, i) in promptTemplates" :key="i" class="prompt-card">
+      <div class="row-wrap-sm">
+        <input v-model="t.id" class="input input-mono" placeholder="标识(如 overview)" />
+        <input v-model="t.name" class="input input-sm" placeholder="名称" />
         <button class="btn btn-danger mini" @click="removePromptTemplate(i)">删</button>
       </div>
-      <textarea v-model="t.prompt" class="textarea" style="margin-top:8px;" rows="6" placeholder="提示词内容…" />
+      <textarea v-model="t.prompt" class="textarea mt-8" rows="6" placeholder="提示词内容…" />
     </div>
-    <div class="hint" style="margin-top:8px;">
+    <div class="hint mt-8">
       注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
     </div>
   </div>
 
   <div id="email" class="card pad settings-section" v-if="!loading">
-    <h3 style="margin:0 0 20px;">邮件（SMTP）</h3>
+    <h3 class="section-title">邮件（SMTP）</h3>
     <div class="field">
       <label>SMTP 服务器</label>
       <input v-model="emailForm.smtp_host" class="input" placeholder="smtp.qq.com" />
     </div>
     <div class="field">
       <label>端口</label>
-      <input v-model.number="emailForm.smtp_port" type="number" class="input" style="width:100px;" />
+      <input v-model.number="emailForm.smtp_port" type="number" class="input input-xs" />
     </div>
     <div class="field">
       <label>用户名</label>
@@ -629,20 +629,20 @@ async function deleteAiKey() {
     <div class="field">
       <label>授权码 / 密码</label>
       <input v-model="emailForm.smtp_password" type="password" class="input" placeholder="QQ 邮箱授权码（非 QQ 密码）" />
-      <div class="hint" style="margin-top:4px;">
-        <span v-if="emailConfigured" style="color:var(--ink-light);">已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span>
-        <span v-else style="color:var(--cinnabar);">未配置</span>
-        <button class="btn btn-danger mini" :disabled="!emailConfigured" @click="clearEmail" style="margin-left:8px;">清除配置</button>
+      <div class="hint mt-4">
+        <span v-if="emailConfigured" class="text-muted">已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span>
+        <span v-else class="text-danger">未配置</span>
+        <button class="btn btn-danger mini ml-8" :disabled="!emailConfigured" @click="clearEmail">清除配置</button>
       </div>
     </div>
     <div class="field">
       <label>发件邮箱</label>
       <input v-model="emailForm.from_email" class="input" placeholder="noreply@example.com" />
     </div>
-    <div class="hint" style="margin:8px 0;">
+    <div class="hint my-8">
       用于发送注册验证码、回复通知等邮件。测试成功后自动保存配置（授权码加密存储）。
     </div>
-    <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="row-wrap mt-12">
       <button class="btn btn-ghost" :disabled="emailTesting" @click="testEmailOnly">
         {{ emailTesting ? '测试中…' : '测试连接' }}
       </button>
@@ -652,7 +652,7 @@ async function deleteAiKey() {
   </div>
 
   <div id="comments" class="card pad settings-section" v-if="!loading">
-    <h3 style="margin:0 0 20px;">评论设置</h3>
+    <h3 class="section-title">评论设置</h3>
     <div class="field">
       <label>需人工审核的关键词</label>
       <input v-model="commentAutoApprove" class="input" placeholder="如：广告，联系方式（逗号分隔；留空则全部直接展示）" />
@@ -662,7 +662,7 @@ async function deleteAiKey() {
   </div>
 
   <div id="security" class="card pad settings-section" v-if="!loading">
-    <h3 style="margin:0 0 20px;">修改管理员密码</h3>
+    <h3 class="section-title">修改管理员密码</h3>
     <div class="field">
       <label>原密码</label>
       <input v-model="pwdState.oldPassword" type="password" class="input" autocomplete="current-password" />
@@ -675,7 +675,7 @@ async function deleteAiKey() {
       <label>确认新密码</label>
       <input v-model="pwdState.confirmPassword" type="password" class="input" autocomplete="new-password" />
     </div>
-    <div style="margin-top:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="card-actions">
       <button class="btn btn-primary" :disabled="pwdSaving" @click="changePassword">
         {{ pwdSaving ? '更新中…' : '更新密码' }}
       </button>

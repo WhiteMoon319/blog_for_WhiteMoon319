@@ -845,14 +845,13 @@ async function generateAiSummary() {
         </div>
       </div>
 
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div class="footer-actions">
         <button class="btn btn-primary" type="submit" :disabled="saving">
           {{ saving ? '落印中…' : isEdit ? '存 篇' : '成 篇' }}
         </button>
         <input
           v-model="form.version_message"
-          class="input"
-          style="width:230px;padding:8px 12px;"
+          class="input input-version"
           placeholder="本次修改说明（可选，写入版本记录）"
         />
         <a

@@ -98,7 +98,7 @@ onMounted(loadMore);
   </PageHead>
 
   <div class="card pad">
-    <div class="filter-bar" style="padding:0 0 14px;border-bottom:none;">
+    <div class="filter-bar filter-bar-tight">
       <span class="filter-count">共 {{ files.length }} 张{{ cursor ? '+' : '' }}（旧→新）</span>
     </div>
 
@@ -125,7 +125,7 @@ onMounted(loadMore);
     <div v-else-if="loaded" class="empty">相册尚空，传一张吧。</div>
     <div v-else class="empty">载入中…</div>
 
-    <div style="text-align:center;padding-top:20px;" v-if="cursor">
+    <div class="load-more" v-if="cursor">
       <button class="btn btn-ghost" :disabled="busy" @click="loadMore">
         {{ busy ? '载入中…' : '加载更多' }}
       </button>

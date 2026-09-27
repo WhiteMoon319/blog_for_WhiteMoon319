@@ -67,7 +67,7 @@ function onBlur() {
       @keydown="onKeydown"
       @blur="onBlur"
     />
-    <span v-if="atLimit" class="hint" style="flex-basis:100%;">已达 {{ MAX_TAGS }} 个标签上限，移除后可继续添加。</span>
+    <span v-if="atLimit" class="hint full-basis">已达 {{ MAX_TAGS }} 个标签上限，移除后可继续添加。</span>
     <datalist :id="listId">
       <option v-for="s in suggestions ?? []" :key="s" :value="s">{{ s }}</option>
     </datalist>

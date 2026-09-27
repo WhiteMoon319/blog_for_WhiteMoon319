@@ -34,15 +34,15 @@ onMounted(async () => {
   <p class="panel-title">内容概览</p>
 
   <div v-if="loaded" class="stat-grid">
-    <div class="card stat-card" style="--pc: var(--cinnabar);">
+    <div class="card stat-card pc-cinnabar">
       <div class="num">{{ stats.collections }}</div>
       <div class="label">文 集</div>
     </div>
-    <div class="card stat-card" style="--pc: var(--pine);">
+    <div class="card stat-card pc-pine">
       <div class="num">{{ stats.published }}</div>
       <div class="label">已 刊 篇 目</div>
     </div>
-    <div class="card stat-card" style="--pc: var(--amber);">
+    <div class="card stat-card pc-amber">
       <div class="num">{{ stats.drafts }}</div>
       <div class="label">未 竟 之 稿</div>
     </div>

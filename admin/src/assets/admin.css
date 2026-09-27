@@ -1105,3 +1105,131 @@ textarea {
 .border-preview.pv-innerH span:nth-child(-n + 2) { border-bottom: 1px solid var(--ink-mid); }
 .border-preview.pv-innerV span:nth-child(odd) { border-right: 1px solid var(--ink-mid); }
 .border-preview-label { font-size: 0.72rem; color: var(--ink-light); }
+
+/* ===== 工具类：排布 / 文本 / 间距 =====
+   只为消除模板里的 style="..."，不承载视觉调性；复杂样式仍写语义类。
+   颜色一律走变量，深色模式自动跟随。
+
+   ⚠️ 选择器一律双写类名（.row.row）。原因是组件里存在更高权重的默认规则——
+     .field label（display/font-size）、.field .hint（margin-top/font-size）、
+     .table th/td（text-align:left）等。内联样式原本天然盖过它们，
+     改成语义类后若仍是单类权重就会被压掉（勾选行会退化成上下两行、
+     表头「操作」会左对齐、表单内 hint 间距会被吃成 4px）。
+     双写把权重抬到 (0,2,0)，并在文件末尾（晚于组件规则）生效。 */
+.row.row { display: flex; align-items: center; gap: 8px; }
+.row-wrap.row-wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.row-wrap-sm.row-wrap-sm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row-between.row-between { display: flex; align-items: center; justify-content: space-between; }
+.row-top.row-top { display: flex; align-items: flex-start; gap: 8px; }
+.col-stack.col-stack { display: flex; flex-direction: column; gap: 4px; }
+.grow.grow { flex: 1 1 auto; }
+
+.text-xs.text-xs { font-size: 0.78rem; }
+.text-sm.text-sm { font-size: 0.85rem; }
+.text-muted.text-muted { color: var(--ink-light); }
+.text-danger.text-danger { color: var(--cinnabar); }
+.text-muted-xs.text-muted-xs { font-size: 0.78rem; color: var(--ink-light); }
+.text-muted-sm.text-muted-sm { font-size: 0.85rem; color: var(--ink-light); }
+
+.m-0.m-0 { margin: 0; }
+.mt-2.mt-2 { margin-top: 2px; }
+.mt-4.mt-4 { margin-top: 4px; }
+.mt-6.mt-6 { margin-top: 6px; }
+.mt-8.mt-8 { margin-top: 8px; }
+.mt-10.mt-10 { margin-top: 10px; }
+.mt-12.mt-12 { margin-top: 12px; }
+.mt-16.mt-16 { margin-top: 16px; }
+.mt-20.mt-20 { margin-top: 20px; }
+.ml-8.ml-8 { margin-left: 8px; }
+.my-8.my-8 { margin: 8px 0; }
+.my-12.my-12 { margin: 12px 0; }
+.py-12.py-12 { padding: 12px 0; }
+.py-24.py-24 { padding: 24px 0; }
+
+/* 卡片内的分区标题与底部按钮行 */
+.section-title.section-title { margin: 0 0 20px; }
+.section-title-tight.section-title-tight { margin: 0 0 14px; }
+.card-actions.card-actions { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* 编辑态卡片头（去掉卡片头自带的下边框，改由分隔线承担） */
+.card-head-divided.card-head-divided { padding: 0 0 16px; border-bottom: 1px solid var(--hairline); margin-bottom: 18px; }
+/* 提示词模板卡 */
+.prompt-card.prompt-card { border: 1px solid var(--hairline); border-radius: 8px; padding: 14px; margin-top: 12px; }
+/* 勾选行：勾选框 + 文字在一行 */
+.checkbox-row.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+/* 导入页的已导入条 / 说明条 */
+.import-bar.import-bar { padding: 8px 16px; border-bottom: 1px solid var(--hairline); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+/* 表单行变体 */
+.form-row-3.form-row-3 { grid-template-columns: repeat(3, 1fr); }
+.field-full.field-full { grid-column: 1 / -1; }
+/* 导入清单：来源文件名（长文件名不换行、弱化） */
+.file-cell.file-cell { white-space: nowrap; color: var(--ink-light); font-size: 0.8rem; }
+/* 只读输入：保留边框但底色透出，用于「自动生成」的 slug */
+.is-readonly-input.is-readonly-input { background: transparent; }
+/* 空态里的错误清单：左对齐并转为警示色 */
+.empty-error.empty-error { text-align: left; color: var(--cinnabar); }
+/* 继承标签行：标签间 6px */
+.tag-row.tag-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* 封面缩略图 */
+.cover-thumb.cover-thumb { max-height: 80px; border-radius: 6px; border: 1px solid var(--hairline); }
+/* 文案不换行（如按钮内的固定短语） */
+.nowrap.nowrap { white-space: nowrap; }
+/* 去掉按钮外观、只留可点击语义（如把 .tag 当开关用） */
+.bare-btn.bare-btn { border: none; cursor: pointer; }
+/* 各页只出现一次的档位 */
+.w-32.w-32 { width: 32px; }
+.row-10.row-10 { display: flex; gap: 10px; }
+.filter-bar-tight.filter-bar-tight { padding: 0 0 14px; border-bottom: none; }
+.load-more.load-more { text-align: center; padding-top: 20px; }
+.load-more-sm.load-more-sm { text-align: center; padding-top: 12px; }
+.media-modal-wide.media-modal-wide { width: min(1080px, 96vw); }
+.full-basis.full-basis { flex-basis: 100%; }
+.seal-lg.seal-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 1.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--cinnabar);
+  color: #fff;
+}
+.footer-actions.footer-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.input-version.input-version { width: 230px; padding: 8px 12px; }
+
+/* 控件宽度档位 */
+.input-xs.input-xs { width: 100px; }
+.input-sm.input-sm { width: 160px; }
+.input-mono.input-mono { width: 130px; font-family: var(--font-mono); }
+.select-xs.select-xs { width: auto; padding: 4px 8px; font-size: 0.78rem; }
+.w-auto.w-auto { width: auto; }
+.w-48.w-48 { width: 48px; }
+.w-120.w-120 { width: 120px; }
+.col-min-150.col-min-150 { min-width: 150px; }
+.col-min-180.col-min-180 { min-width: 180px; }
+.select-end.select-end { margin-left: auto; max-width: 260px; }
+.compact.compact { padding: 6px 10px; font-size: 0.85rem; }
+
+/* 表格单元格对齐 */
+.ta-right.ta-right { text-align: right; }
+.ta-center.ta-center { text-align: center; }
+
+/* 统计卡主题色（--pc 由 .stat-card 消费） */
+.pc-cinnabar.pc-cinnabar { --pc: var(--cinnabar); }
+.pc-pine.pc-pine { --pc: var(--pine); }
+.pc-amber.pc-amber { --pc: var(--amber); }
+
+/* 只读正文说明 */
+.prose-note.prose-note { color: var(--ink-mid); font-size: 0.9rem; line-height: 1.9; }
+.prose-list.prose-list { color: var(--ink-mid); font-size: 0.88rem; line-height: 2.1; margin: 0; padding-left: 1.2em; }
+
+/* 加载中 / 空态 */
+.state-block.state-block { text-align: center; padding: 40px 0; color: var(--ink-light); }
+.state-block-sm.state-block-sm { text-align: center; padding: 20px 0; color: var(--ink-light); }
+
+@media (max-width: 700px) {
+  .row-wrap.row-wrap { gap: 8px; }
+  .input-xs.input-xs,
+  .input-sm.input-sm,
+  .input-mono.input-mono { width: 100%; }
+}
+

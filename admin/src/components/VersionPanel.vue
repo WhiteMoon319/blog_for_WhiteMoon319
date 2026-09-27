@@ -135,7 +135,7 @@ async function restoreVersion(v: PostVersion) {
 
 <template>
   <div class="media-mask" @click.self="emit('close')">
-    <div class="media-modal" style="width:min(1080px, 96vw);">
+    <div class="media-modal media-modal-wide">
       <div class="media-modal-head">
         <span>版本史（每次保存自动留档，可对比与回滚）</span>
         <button class="btn btn-ghost mini" @click="emit('close')">关</button>
@@ -171,11 +171,11 @@ async function restoreVersion(v: PostVersion) {
         </aside>
         <section class="versions-diff">
           <div class="diff-toolbar">
-            <select v-model="selVersion" class="select" @change="refreshDiff" style="width:auto;">
+            <select v-model="selVersion" class="select w-auto" @change="refreshDiff">
               <option v-for="v in versions" :key="v.version" :value="v.version">基线 v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
             </select>
             <span class="diff-arrow">→</span>
-            <select v-model="cmpTarget" class="select" @change="refreshDiff" style="width:auto;">
+            <select v-model="cmpTarget" class="select w-auto" @change="refreshDiff">
               <option value="current">当前工作区（未保存）</option>
               <option v-for="v in versions" :key="v.version" :value="v.version">v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
             </select>

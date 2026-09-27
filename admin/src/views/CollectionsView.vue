@@ -121,7 +121,7 @@ async function remove(c: Collection) {
             <th>序</th>
             <th>文集名</th>
             <th>简介</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -148,8 +148,8 @@ async function remove(c: Collection) {
     <div v-if="!collections.length" class="empty">尚无文集。</div>
   </div>
 
-  <div v-if="creating || editing" class="card pad" style="margin-top:20px;">
-    <div class="card-head" style="padding:0 0 16px;border-bottom:1px solid var(--hairline);margin-bottom:18px;">
+  <div v-if="creating || editing" class="card pad mt-20">
+    <div class="card-head card-head-divided">
       <h2>{{ creating ? '立新集' : '改文集' }}</h2>
     </div>
     <form @submit.prevent="save">
@@ -187,7 +187,7 @@ async function remove(c: Collection) {
         </div>
       </div>
       <div class="field">
-        <label class="checkbox-row" style="display:flex;gap:8px;align-items:center;font-size:0.9rem;">
+        <label class="checkbox-row">
           <input v-model.number="form.ref_summaries" type="checkbox" :true-value="1" :false-value="0" />
           参考前文摘要（AI 生成时参考该文集最近 3 篇已刊文章的摘要风格）
         </label>
@@ -203,7 +203,7 @@ async function remove(c: Collection) {
         <label>标签（其下文章默认继承）</label>
         <TagChips v-model="form.tags" :suggestions="suggestions" placeholder="回车添加题材标签" />
       </div>
-      <div style="display:flex;gap:10px;">
+      <div class="row-10">
         <button class="btn btn-primary" type="submit">落印</button>
         <button class="btn btn-ghost" type="button" @click="creating = false; editing = null">罢笔</button>
       </div>

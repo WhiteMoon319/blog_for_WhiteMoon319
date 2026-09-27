@@ -52,7 +52,7 @@ function insert(url: string) {
           </button>
         </div>
         <div v-else class="empty">相册空空…</div>
-        <div v-if="cursor" style="text-align:center;padding-top:12px;">
+        <div v-if="cursor" class="load-more-sm">
           <button class="btn btn-ghost mini" :disabled="busy" @click="load">
             {{ busy ? '载入中…' : '加载更多' }}
           </button>

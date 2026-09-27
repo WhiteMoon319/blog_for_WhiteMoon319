@@ -111,10 +111,10 @@ onMounted(load);
           <tr>
             <th>文章</th>
             <th>用户</th>
-            <th style="min-width:180px;">内容</th>
+            <th class="col-min-180">内容</th>
             <th>图片</th>
             <th>时间</th>
-            <th style="text-align:right;">操作</th>
+            <th class="ta-right">操作</th>
           </tr>
         </thead>
         <tbody>

@@ -112,6 +112,14 @@ export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
         if (title) attrs.push(`title="${title}"`);
         return `<img ${attrs.join(' ')} />`;
       },
+      // 表格列对齐改用内联样式承载：marked 默认输出 align 属性，但主题里的
+      // `.article-body th/td { text-align: left }` 会压过该属性（样式表 > 呈现性属性），
+      // 内联样式优先级更高，四套主题一致生效。
+      tablecell({ tokens, header, align }: Tokens.TableCell): string {
+        const tag = header ? 'th' : 'td';
+        const style = align ? ` style="text-align:${align}"` : '';
+        return `<${tag}${style}>${this.parser.parseInline(tokens)}</${tag}>`;
+      },
       code({ text, lang }: Tokens.Code): string {
         const langName = (lang ?? '').trim().toLowerCase();
         if (DIAGRAM_LANGS.has(langName)) {
@@ -140,8 +148,8 @@ export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
       'summary', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
     ],
     allowedAttributes: {
-      // role / aria-hidden 供排版块（如分割线）表达语义；均为无脚本能力的静态属性
-      '*': ['class', 'style', 'id', 'role', 'aria-hidden'],
+      // role / aria-hidden 供排版块（如分割线）表达语义；align 承载手写 HTML 的居中对齐
+      '*': ['class', 'style', 'id', 'role', 'aria-hidden', 'align'],
       a: ['href', 'title'],
       img: ['src', 'alt', 'title', 'loading', 'decoding', 'width', 'height'],
       code: ['class'],

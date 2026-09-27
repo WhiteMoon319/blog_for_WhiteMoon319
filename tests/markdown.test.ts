@@ -18,6 +18,26 @@ test('markdown：GFM 表格渲染为 table', () => {
   assert.ok(html.includes('<td>2</td>'));
 });
 
+test('markdown：表格列对齐用内联样式保留（align 属性会被主题 CSS 压过）', () => {
+  const { html } = renderMarkdown('| 左 | 中 | 右 |\n| :-- | :-: | --: |\n| a | b | c |');
+  assert.ok(html.includes('<th style="text-align:left">左</th>'), '左对齐表头');
+  assert.ok(html.includes('<th style="text-align:center">中</th>'), '居中表头');
+  assert.ok(html.includes('<th style="text-align:right">右</th>'), '右对齐表头');
+  assert.ok(html.includes('<td style="text-align:center">b</td>'), '居中单元格');
+  assert.ok(!html.includes('align='), '不应残留 align 属性（主题 CSS 会覆盖它）');
+});
+
+test('markdown：段落/标题的内联对齐样式保留', () => {
+  const { html } = renderMarkdown('<p style="text-align:center">居中</p>\n\n<h2 style="text-align:right">右标题</h2>');
+  assert.ok(html.includes('<p style="text-align:center">居中</p>'), '段落居中保留');
+  assert.ok(html.includes('<h2 style="text-align:right">右标题</h2>'), '标题右对齐保留');
+});
+
+test('markdown：手写 align 属性保留（供 <p align="center"> 之类兜底）', () => {
+  const { html } = renderMarkdown('<p align="center">居中</p>');
+  assert.ok(html.includes('align="center"'), 'align 属性应进入白名单');
+});
+
 test('markdown：行内公式 $...$ 渲染为 KaTeX', () => {
   const { html } = renderMarkdown('欧拉公式 $e^{i\\pi}+1=0$ 很美');
   assert.ok(html.includes('class="katex"'), '应包含 katex 根元素');

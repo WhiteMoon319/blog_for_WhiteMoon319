@@ -162,3 +162,31 @@
 .article-body.layout-warm p { text-indent: 2em; }
 .article-body.layout-warm .blk p,
 .article-body.layout-warm .blk-caption { text-indent: 0; }
+
+/* ===== 正文对齐（核心默认，四套主题通用） =====
+   编辑器写入的是内联 style（优先级最高，无需规则）；这里兜底手写 HTML 的 align 属性。
+   提高特异性以压过主题的 `.article-body p { text-align: justify }` 与表头/格左对齐。 */
+.article-body p[align='center'],
+.article-body th[align='center'],
+.article-body td[align='center'],
+.article-body [align='center'] {
+  text-align: center;
+}
+.article-body p[align='right'],
+.article-body th[align='right'],
+.article-body td[align='right'],
+.article-body [align='right'] {
+  text-align: right;
+}
+.article-body p[align='left'],
+.article-body th[align='left'],
+.article-body td[align='left'],
+.article-body [align='left'] {
+  text-align: left;
+}
+/* 显式对齐的元素不该再吃「温润」预设的首行缩进 */
+.article-body [align='center'],
+.article-body [align='right'],
+.article-body [style*='text-align'] {
+  text-indent: 0;
+}

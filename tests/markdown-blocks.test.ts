@@ -33,8 +33,42 @@ test('排版块：八种块渲染出固定 class 锚点', () => {
   }
 });
 
-test('排版块：变体参数生效，非法变体被忽略', () => {
-  assert.ok(html(':::callout{type=warning}\n注意\n:::').includes('blk-callout is-warning'), 'type 变体生效');
+test('排版块：表格容器按 borders 输出边类，默认不加类', () => {
+  const tbl = '| 列 | 列 |\n| --- | --- |\n| 1 | 2 |';
+  // 默认：不加任何边类，沿用主题原有框线
+  const def = html(`:::table\n${tbl}\n:::`);
+  assert.ok(def.includes('<section class="blk blk-table">'), `默认不应加边类：${def}`);
+  assert.ok(def.includes('<table>'), '表格应渲染在容器内');
+  // 无框线
+  const none = html(`:::table{borders=none}\n${tbl}\n:::`);
+  assert.ok(none.includes('blk-table bd-reset"'), `无框线应只有 bd-reset：${none}`);
+  // 预设
+  const outer = html(`:::table{borders=outer}\n${tbl}\n:::`);
+  for (const c of ['bd-reset', 'bd-top', 'bd-bottom', 'bd-left', 'bd-right']) {
+    assert.ok(outer.includes(c), `outer 应含 ${c}：${outer}`);
+  }
+  assert.ok(!outer.includes('bd-innerH'), 'outer 不含内部横线');
+  // 逐边（小写边名）
+  const custom = html(`:::table{borders=top,innerh,innerv}\n${tbl}\n:::`);
+  assert.ok(custom.includes('bd-top') && custom.includes('bd-innerH') && custom.includes('bd-innerV'), `大小写不敏感：${custom}`);
+  assert.ok(!custom.includes('bd-bottom'), '未选中的边不出现');
+});
+
+test('排版块：表格 borders 非法或缺失回落默认，且不吞内容', () => {
+  const tbl = '| a |\n| --- |\n| 1 |';
+  for (const attrs of ['', '{borders=}', '{borders=oops}', '{borders=nonsense}']) {
+    const out = html(`:::table${attrs}\n${tbl}\n:::`);
+    assert.ok(out.includes('<section class="blk blk-table">'), `${attrs || '(无属性)'} 应回落默认：${out}`);
+    assert.ok(out.includes('<table>'), '内容仍渲染');
+  }
+});
+
+test('排版块：borders=all 与不写等价（默认观感不变）', () => {
+  const tbl = '| a |\n| --- |\n| 1 |';
+  assert.equal(html(`:::table{borders=all}\n${tbl}\n:::`), html(`:::table\n${tbl}\n:::`));
+});
+
+test('排版块：变体参数生效，非法变体被忽略', () => {  assert.ok(html(':::callout{type=warning}\n注意\n:::').includes('blk-callout is-warning'), 'type 变体生效');
   assert.ok(html(':::divider{style=dots}\n:::').includes('blk-divider is-dots'), 'style 变体生效');
   assert.ok(html(':::highlight{variant=gradient}\n强调\n:::').includes('is-gradient'), 'variant 等价键');
   assert.ok(!html(':::callout{type=evil}\n注意\n:::').includes('is-evil'), '非法变体不落地');

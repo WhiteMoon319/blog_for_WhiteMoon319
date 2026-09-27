@@ -23,6 +23,7 @@ const CORE_BLOCKS: Record<string, string[]> = {
   caption: [],
   card: [],
   cta: [],
+  table: [],
 };
 
 test('块清单：编辑器元数据与核心解析器完全一致（防两处漂移）', () => {

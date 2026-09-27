@@ -1128,7 +1128,7 @@ async function generateAiSummary() {
               <div v-for="g in BLOCK_GROUPS" :key="g" class="blk-group">
                 <div class="blk-group-title">{{ g }}</div>
                 <button
-                  v-for="b in BLOCKS.filter((x) => x.group === g)"
+                  v-for="b in BLOCKS.filter((x) => x.group === g && !x.hidden)"
                   :key="b.name"
                   type="button"
                   class="blk-item"

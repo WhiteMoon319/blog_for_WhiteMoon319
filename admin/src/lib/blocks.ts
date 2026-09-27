@@ -25,6 +25,8 @@ export interface BlockDef {
   group: '强调' | '结构' | '图文' | '收尾';
   /** 是否有内容区（空块无） */
   content: boolean;
+  /** 不进素材抽屉：仅用于语法/节点元数据（如表格容器，由表格工具条驱动） */
+  hidden?: boolean;
 }
 
 export const BLOCKS: BlockDef[] = [
@@ -104,6 +106,17 @@ export const BLOCKS: BlockDef[] = [
     group: '收尾',
     content: true,
     variants: [],
+  },
+  {
+    // 表格框线容器：不进素材抽屉（表格由工具条的表格/框线菜单驱动），
+    // 仅为语法与节点元数据的单一来源，保证与核心解析器一致。
+    name: 'table',
+    label: '表格',
+    hint: '表格框线容器（由表格工具条的框线菜单驱动）',
+    group: '图文',
+    content: true,
+    variants: [],
+    hidden: true,
   },
 ];
 

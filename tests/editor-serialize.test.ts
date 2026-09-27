@@ -47,6 +47,16 @@ test('turndown：对齐段落回写为内联样式，左对齐不写标签', () 
   assert.equal(td.turndown('<p style="text-align:left">左</p>'), '左');
 });
 
+test('对齐段落：斜体往返不丢（保存 → 载入仍是斜体，不露下划线）', async () => {
+  const td = createTurndown();
+  const saved = td.turndown('<p style="text-align:right"><em>简言</em>，<strong>绝笔</strong>。</p>');
+  assert.equal(saved, '<p style="text-align:right">_简言_，**绝笔**。</p>');
+  const { mdToHtml } = await import('../admin/src/lib/marked-blocks.ts');
+  const back = mdToHtml(saved);
+  assert.ok(back.includes('<em>简言</em>') && back.includes('<strong>绝笔</strong>'), `载入应还原斜体/粗体：${back}`);
+  assert.ok(!back.includes('_简言_'), '不应残留字面下划线');
+});
+
 test('turndown：框线非默认时表格包回 :::table 容器，默认保持纯 GFM', () => {
   const td = createTurndown();
   const cells = '<tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr>';

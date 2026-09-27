@@ -33,6 +33,15 @@ test('markdown：段落/标题的内联对齐样式保留', () => {
   assert.ok(html.includes('<h2 style="text-align:right">右标题</h2>'), '标题右对齐保留');
 });
 
+test('markdown：对齐块内部的行内 Markdown 照常解析（否则 `_斜体_` 会露出下划线）', () => {
+  const { html } = renderMarkdown('<p style="text-align:right">_简言_，**绝笔**。</p>');
+  assert.ok(html.includes('<em>简言</em>'), `斜体应解析：${html}`);
+  assert.ok(html.includes('<strong>绝笔</strong>'), `粗体应解析：${html}`);
+  assert.ok(!html.includes('_简言_'), '不应残留字面下划线');
+  const h = renderMarkdown('<h2 style="text-align:center">居中**标题**</h2>').html;
+  assert.ok(h.includes('居中<strong>标题</strong>'), `标题内联解析：${h}`);
+});
+
 test('markdown：手写 align 属性保留（供 <p align="center"> 之类兜底）', () => {
   const { html } = renderMarkdown('<p align="center">居中</p>');
   assert.ok(html.includes('align="center"'), 'align 属性应进入白名单');

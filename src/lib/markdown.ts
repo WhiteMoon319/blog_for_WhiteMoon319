@@ -10,7 +10,7 @@ import { marked, type Tokens } from 'marked';
 import hljs from 'highlight.js';
 import katex from 'katex';
 import sanitizeHtml from 'sanitize-html';
-import { prBlockExtension } from '../core/marked-blocks.ts';
+import { prBlockExtension, renderAlignedInline } from '../core/marked-blocks.ts';
 import { slugify } from './utils.ts';
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -138,7 +138,10 @@ export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
     },
   });
 
-  const raw = marked.parse(pre, { async: false }) as string;
+  // 对齐段落存的是原始 HTML 块，内部的 `_斜体_` / `**粗体**` 需要补一次行内解析
+  const raw = renderAlignedInline(marked.parse(pre, { async: false }) as string, (md) =>
+    marked.parseInline(md) as string,
+  );
 
   const html = sanitizeHtml(restoreMath(raw, math), {
     allowedTags: [

@@ -102,6 +102,22 @@ export function tableBorderClasses(borders: readonly TableBorder[]): string[] {
   return ['bd-reset', ...TABLE_BORDERS.filter((b) => borders.includes(b)).map((b) => `bd-${b}`)];
 }
 
+// 对齐段落的原始 HTML：`<p style="text-align:center">…</p>`（标题同理）
+const ALIGNED_BLOCK_RE = /<(p|h[1-6])(\s[^>]*\bstyle="[^"]*text-align\s*:\s*(?:left|center|right)[^"]*"[^>]*)>([\s\S]*?)<\/\1>/gi;
+
+/**
+ * 对齐段落是以原始 HTML 块存储的，而 Markdown 规范不会解析 HTML 块内部的 Markdown，
+ * 于是编辑器写进去的 `_斜体_`、`**粗体**`、行内代码会原样露出星号/下划线。
+ * 这里把这些块的内层内容补一次行内 Markdown 解析；parseInline 由调用方传入，
+ * 保持本模块只依赖 marked 类型、能被 worker 与浏览器两侧共用。
+ */
+export function renderAlignedInline(html: string, parseInline: (md: string) => string): string {
+  return html.replace(ALIGNED_BLOCK_RE, (_m, tag: string, attrs: string, inner: string) => {
+    const body = inner.trim();
+    return `<${tag}${attrs}>${body ? parseInline(body) : ''}</${tag}>`;
+  });
+}
+
 /** 空块：自身不承载文字，渲染成无内容的分隔元素 */
 export const EMPTY_BLOCKS = new Set(['divider']);
 

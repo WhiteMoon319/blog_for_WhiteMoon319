@@ -10,11 +10,13 @@
 // 否则 `:::callout` 在可视化编辑器里会退化成一行普通文字（前端却渲染成块）。
 
 import { marked } from 'marked';
-import { prBlockExtension } from '../../../src/core/marked-blocks.ts';
+import { prBlockExtension, renderAlignedInline } from '../../../src/core/marked-blocks.ts';
 
 marked.use({ extensions: [prBlockExtension] });
 
 /** Markdown → HTML（含排版块），供编辑器载入内容与源码模式回切使用 */
 export function mdToHtml(md: string): string {
-  return marked.parse(md) as string;
+  // 与前台渲染同口径：对齐段落是原始 HTML 块，内层要补一次行内解析，
+  // 否则编辑器里会看到 `_斜体_` 原样的下划线
+  return renderAlignedInline(marked.parse(md) as string, (inner) => marked.parseInline(inner) as string);
 }

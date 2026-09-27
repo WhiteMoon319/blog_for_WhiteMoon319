@@ -8,12 +8,19 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import TextAlign from '@tiptap/extension-text-align';
+import { BorderedTable } from '../lib/tiptap-table.ts';
+import {
+  BORDER_PRESETS,
+  BORDER_TOGGLES,
+  bordersFromSpec,
+  specFromBorders,
+  type TableBorder,
+} from '../lib/table-borders.ts';
 import { createLowlight, common } from 'lowlight';
 const lowlight = createLowlight(common);
 import { mdToHtml } from '../lib/marked-blocks.ts';
@@ -143,6 +150,29 @@ const turndown = createTurndown();
 const SNIPPET_ALIGN_CENTER = '<p style="text-align:center">居中文字</p>';
 const SNIPPET_ALIGN_RIGHT = '<p style="text-align:right">右对齐文字</p>';
 
+// ---- 表格框线（Excel 式逐边开关）----
+const showBorderMenu = ref(false);
+/**
+ * 当前表格的框线边集合。用函数而非 computed：编辑器状态不是 Vue 响应式源，
+ * computed 会被缓存导致连续点选时读到旧值；模板里每次渲染重新取才跟手。
+ */
+function currentBorders(): TableBorder[] {
+  if (!editor.value?.isActive('table')) return [];
+  return bordersFromSpec(editor.value.getAttributes('table').borders);
+}
+function applyBorderSpec(spec: string): void {
+  editor.value?.chain().focus().updateAttributes('table', { borders: spec }).run();
+}
+function applyBordersPreset(value: string): void {
+  applyBorderSpec(value === 'all' ? '' : value);
+}
+function toggleBorder(b: TableBorder): void {
+  const set = new Set(currentBorders());
+  if (set.has(b)) set.delete(b);
+  else set.add(b);
+  applyBorderSpec(specFromBorders([...set]));
+}
+
 const uploadingKeys = new Set<string>();
 
 // ---- 署名作者选择器 ----
@@ -216,8 +246,7 @@ const editor = useEditor({
     Link.configure({ openOnClick: false, autolink: true }),
     Image,
     Placeholder.configure({ placeholder: '落笔于此，墨韵自生……' }),
-    Table.configure({ resizable: true, HTMLAttributes: { class: 'tip-table' } }),
-    TableRow,
+    BorderedTable.configure({ resizable: true, HTMLAttributes: { class: 'tip-table' } }),    TableRow,
     TableHeader,
     TableCell,
     CodeBlockLowlight.configure({ lowlight }),
@@ -1081,6 +1110,7 @@ async function generateAiSummary() {
               <button type="button" :class="{ 'is-active': editor?.isActive('codeBlock') }" @click="editor?.chain().focus().toggleCodeBlock().run()">代码</button>
               <span class="sep"></span>
               <button type="button" :class="{ 'is-active': editor?.isActive('table') }" @click="editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">表</button>
+              <button v-if="editor?.isActive('table')" type="button" class="blk-toggle" :class="{ 'is-active': showBorderMenu }" title="表格框线（可逐边开关）" @click="showBorderMenu = !showBorderMenu">框线</button>
               <button type="button" :class="{ 'is-active': editor?.isActive('link') }" @click="setLink">链</button>
               <button type="button" @click="imageFileInput?.click()" :disabled="uploading">{{ uploading ? '…' : '图' }}</button>
               <input ref="imageFileInput" type="file" accept="image/*" hidden @change="onImagePick" />
@@ -1119,6 +1149,40 @@ async function generateAiSummary() {
           </div>
 
           <div v-show="mode === 'wysiwyg'" class="wysiwyg-area">
+            <div v-if="showBorderMenu && editor?.isActive('table')" class="border-menu" @mousedown.stop>
+              <div class="border-menu-head">
+                <strong>表格框线</strong>
+                <button type="button" class="blk-x" title="收起" @click="showBorderMenu = false">×</button>
+              </div>
+              <div class="border-menu-hint">点选逐边开关，或直接用预设</div>
+              <div class="border-presets">
+                <button
+                  v-for="p in BORDER_PRESETS"
+                  :key="p.value"
+                  type="button"
+                  @click="applyBordersPreset(p.value)"
+                >{{ p.label }}</button>
+              </div>
+              <div class="border-toggles">
+                <button
+                  v-for="b in BORDER_TOGGLES"
+                  :key="b.value"
+                  type="button"
+                  :class="{ 'is-on': currentBorders().includes(b.value) }"
+                  :title="`切换「${b.label}」框线`"
+                  @click="toggleBorder(b.value)"
+                >{{ b.label }}</button>
+              </div>
+              <div class="border-preview-wrap">
+                <div
+                  class="border-preview"
+                  :class="currentBorders().map((b) => `pv-${b}`)"
+                >
+                  <span /><span /><span /><span />
+                </div>
+                <span class="border-preview-label">示意</span>
+              </div>
+            </div>
             <div v-if="showBlockDrawer" class="blk-drawer">
               <div class="blk-drawer-head">
                 <strong>排版素材</strong>

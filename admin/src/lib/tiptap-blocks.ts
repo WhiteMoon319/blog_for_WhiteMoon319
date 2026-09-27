@@ -59,6 +59,8 @@ export const PrBlock = Node.create({
         getAttrs: (el) => {
           const cls = (el as HTMLElement).getAttribute('class') ?? '';
           const { name } = parseBlkClass(cls);
+          // 表格容器由表格节点自己接管框线（读 .blk-table 上的 bd-* 类），不在这里包成排版块
+          if (name === 'table') return false;
           // 只接管排版块，其它 section 交回通用块处理
           return name ? {} : false;
         },

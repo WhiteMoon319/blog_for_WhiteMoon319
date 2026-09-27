@@ -17,6 +17,39 @@ function alignedBlock(node: HTMLElement): 'left' | 'center' | 'right' | null {
   return m ? (m[1].toLowerCase() as 'left' | 'center' | 'right') : null;
 }
 
+// 表格：turndown 默认没有表格规则，会把 <table> 当成普通区块压成几行纯文本（结构全丢）。
+// 这里补一条 GFM 表格规则，并按表头单元格的对齐还原 `:-- / :-: / --:`。
+type CellAlign = 'left' | 'center' | 'right' | null;
+function cellAlign(el: Element): CellAlign {
+  const fromStyle = alignedBlock(el as HTMLElement);
+  if (fromStyle) return fromStyle;
+  const attr = (el.getAttribute('align') ?? '').toLowerCase();
+  return attr === 'left' || attr === 'center' || attr === 'right' ? attr : null;
+}
+function gfmCell(el: Element): string {
+  return (el.textContent ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+}
+function cellsOf(row: Element): Element[] {
+  return Array.from(row.children).filter((c) => c.nodeName === 'TD' || c.nodeName === 'TH');
+}
+function tableToGfm(node: HTMLElement): string {
+  const rows = Array.from(node.querySelectorAll('tr'));
+  if (rows.length === 0) return '';
+  // GFM 必须有表头行；无 <th> 时沿用首行（标准做法的取舍）
+  const header = cellsOf(rows[0]);
+  const body = rows.slice(1);
+  const sep = header.map((c) => {
+    const a = cellAlign(c);
+    return a === 'center' ? ':--:' : a === 'right' ? '--:' : a === 'left' ? ':--' : '---';
+  });
+  const lines = [
+    `| ${header.map(gfmCell).join(' | ')} |`,
+    `| ${sep.join(' | ')} |`,
+    ...body.map((r) => `| ${cellsOf(r).map(gfmCell).join(' | ')} |`),
+  ];
+  return `\n\n${lines.join('\n')}\n\n`;
+}
+
 export function createTurndown(): TurndownService {
   const service = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
   service.addRule('alignedBlock', {
@@ -28,6 +61,10 @@ export function createTurndown(): TurndownService {
       if (!align || align === 'left' || !content.trim()) return `\n\n${content}\n\n`;
       return `\n\n<${tag} style="text-align:${align}">${content}</${tag}>\n\n`;
     },
+  });
+  service.addRule('gfmTable', {
+    filter: 'table',
+    replacement: (_content, node) => tableToGfm(node as HTMLElement),
   });
   // 排版块（:::block）必须能回写，否则保存一次就被剥掉
   return registerPrBlockTurndown(service);

@@ -221,7 +221,7 @@ const editor = useEditor({
     TableHeader,
     TableCell,
     CodeBlockLowlight.configure({ lowlight }),
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
     PrBlock,
   ],
   editorProps: {

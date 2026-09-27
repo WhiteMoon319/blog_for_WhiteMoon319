@@ -5,6 +5,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
+import RowActions from '../components/RowActions.vue';
+import BatchBar from '../components/BatchBar.vue';
 import { fmtDate } from '../lib/format';
 import type { Collection, Post } from '../types';
 
@@ -45,6 +47,18 @@ const shown = computed(() =>
     return true;
   }),
 );
+
+// 客户端分页：列表接口一次返回全部，这里按页切片，避免几百篇一屏铺开
+const PAGE_SIZE = 20;
+const page = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(shown.value.length / PAGE_SIZE)));
+const paged = computed(() => shown.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
+watch([filter, filterCol], () => {
+  page.value = 1;
+});
+watch(totalPages, (n) => {
+  if (page.value > n) page.value = n;
+});
 
 function colName(id: number | null): string {
   return collections.value.find((c) => c.id === id)?.title ?? '未分类';
@@ -151,9 +165,9 @@ async function aiOne(p: Post) {
 }
 
 function toggleAll() {
-  const all = shown.value.map((p) => p.id);
+  const all = paged.value.map((p) => p.id);
   selected.value =
-    shown.value.length > 0 && shown.value.every((p) => selected.value.has(p.id))
+    paged.value.length > 0 && paged.value.every((p) => selected.value.has(p.id))
       ? new Set()
       : new Set(all);
 }
@@ -230,61 +244,61 @@ async function bulkAiSummary(force: boolean) {
 </script>
 
 <template>
-  <PageHead kicker="文 章" title="篇目总览" />
+  <PageHead kicker="文 章" title="篇目总览">
+    <template #actions>
+      <button v-if="!inTrash" class="btn btn-primary" @click="create">写新篇</button>
+    </template>
+  </PageHead>
 
   <div class="card" v-if="loaded">
-    <div class="card-head">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="filter-bar">
+      <div class="seg">
         <button
           v-for="f in (['all', 'published', 'draft', 'trash'] as const)"
           :key="f"
           class="btn btn-ghost mini"
-          :style="filter === f ? 'border-color:var(--cinnabar);color:var(--cinnabar);' : ''"
+          :class="{ active: filter === f }"
           @click="filter = f"
         >
           {{ f === 'all' ? '全部' : f === 'published' ? '已刊' : f === 'draft' ? '草稿' : '回收站' }}
         </button>
-        <select v-model="filterCol" class="select" style="width:auto;padding:6px 10px;font-size:0.8rem;">
-          <option :value="''">全部文集</option>
-          <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
-        </select>
       </div>
-      <button v-if="!inTrash" class="btn btn-primary" @click="create">写新篇</button>
+      <select v-model="filterCol" class="select filter-col">
+        <option :value="''">全部文集</option>
+        <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
+      </select>
+      <span class="filter-count">共 {{ shown.length }} 篇</span>
     </div>
 
-    <div class="bulk-bar" v-if="selected.size > 0">
-      <span style="color:var(--ink-light);font-size:0.85rem;">已选 {{ selected.size }} 篇</span>
+    <BatchBar :count="selected.size" @clear="selected.clear()">
       <template v-if="!inTrash">
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('publish')">批量刊发</button>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('draft')">批量撤稿</button>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('pin')">置顶</button>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('unpin')">取消置顶</button>
-        <select v-model="moveCol" class="select" style="width:auto;padding:4px 8px;font-size:0.78rem;">
+        <select v-model="moveCol" class="select filter-col">
           <option :value="''">移入文集…</option>
           <option v-for="c in collections" :key="c.id" :value="c.id">{{ c.title }}</option>
         </select>
         <button class="btn btn-ghost mini" :disabled="busy || moveCol === ''" @click="bulk('move')">移动</button>
-        <span style="flex:1"></span>
-        <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('delete')">移入回收站</button>
-        <span style="flex:1"></span>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulkAiSummary(false)">AI 摘要</button>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulkAiSummary(true)">AI 摘要（强制覆盖）</button>
+        <button class="btn btn-danger mini" :disabled="busy" @click="bulk('delete')">移入回收站</button>
       </template>
       <template v-else>
         <button class="btn btn-ghost mini" :disabled="busy" @click="bulk('restore')">恢复</button>
-        <span style="flex:1"></span>
         <button class="btn btn-danger mini" :disabled="busy" @click="bulk('purge')">彻底删除</button>
       </template>
-    </div>
+    </BatchBar>
 
     <div class="table-wrap">
-      <table class="table posts-table" v-if="shown.length">
+      <table class="table posts-table" v-if="paged.length">
         <thead>
           <tr>
             <th style="width:32px;">
               <input
                 type="checkbox"
-                :checked="shown.length > 0 && shown.every((p) => selected.has(p.id))"
+                :checked="paged.length > 0 && paged.every((p) => selected.has(p.id))"
                 @change="toggleAll"
               />
             </th>
@@ -298,7 +312,7 @@ async function bulkAiSummary(force: boolean) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in shown" :key="p.id">
+          <tr v-for="p in paged" :key="p.id">
             <td>
               <input
                 type="checkbox"
@@ -310,7 +324,7 @@ async function bulkAiSummary(force: boolean) {
               <router-link
                 v-if="!inTrash && p.status === 'draft'"
                 :to="{ path: '/editor', query: { id: p.id } }"
-                style="color:var(--ink-deep);text-decoration:none;"
+                class="cell-title"
               >
                 {{ p.title }}
               </router-link>
@@ -319,55 +333,64 @@ async function bulkAiSummary(force: boolean) {
                 :href="postUrl(p)"
                 target="_blank"
                 rel="noopener"
-                style="color:var(--ink-deep);text-decoration:none;"
+                class="cell-title"
               >
                 {{ p.title }}
               </a>
-              <span v-else style="color:var(--ink-light);">{{ p.title }}</span>
-              <span v-if="!inTrash && p.is_pinned" class="tag tag-published" style="margin-left:6px;">置顶</span>
+              <span v-else class="cell-title is-muted">{{ p.title }}</span>
+              <span v-if="!inTrash && p.is_pinned" class="tag tag-published pinned-tag">置顶</span>
             </td>
             <td class="author-cell" :title="authorNames(p)">{{ authorNames(p) }}</td>
-            <td>
+            <td class="nowrap-cell">
               <span class="color-dot" :style="{ background: colColor(p.collection_id) }"></span>
               {{ colName(p.collection_id) }}
             </td>
-            <td>
+            <td class="nowrap-cell">
               <span v-if="inTrash" class="tag tag-draft">已回收</span>
               <template v-else>
                 <span class="tag" :class="p.status === 'published' ? 'tag-published' : 'tag-draft'">
                   {{ p.status === 'published' ? '已刊' : '草稿' }}
                 </span>
-                <span v-if="p.scheduled_at" class="tag tag-draft" style="margin-left:4px;">定 {{ fmtDate(p.scheduled_at) }}</span>
+                <span v-if="p.scheduled_at" class="tag tag-draft scheduled-tag">定 {{ fmtDate(p.scheduled_at) }}</span>
               </template>
             </td>
-            <td style="color:var(--ink-light);font-size:0.82rem;">{{ p.view_count ?? 0 }}</td>
-            <td style="color:var(--ink-light);font-size:0.82rem;">{{ fmtDate(p.deleted_at ?? p.created_at) }}</td>
-            <td>
-              <div class="actions">
-                <template v-if="!inTrash">
-                  <button class="btn btn-ghost mini" @click="edit(p)">改</button>
-                  <button class="btn btn-ghost mini" @click="togglePin(p)">
-                    {{ p.is_pinned ? '去顶' : '置顶' }}
-                  </button>
-                  <button class="btn btn-ghost mini" @click="toggleStatus(p)">
-                    {{ p.status === 'published' ? '撤稿' : '刊发' }}
-                  </button>
-                  <button class="btn btn-ghost mini" :disabled="aiId === p.id" @click="aiOne(p)">
-                    {{ aiId === p.id ? '生成中…' : (p.summary?.trim() ? 'AI 重写' : 'AI 摘要') }}
-                  </button>
-                  <button class="btn btn-danger mini" @click="trash(p)">回收</button>
-                </template>
-                <template v-else>
-                  <button class="btn btn-ghost mini" @click="restoreOne(p)">恢复</button>
-                  <button class="btn btn-danger mini" @click="purgeOne(p)">焚毁</button>
-                </template>
-              </div>
+            <td class="muted-cell">{{ p.view_count ?? 0 }}</td>
+            <td class="muted-cell">{{ fmtDate(p.deleted_at ?? p.created_at) }}</td>
+            <td class="actions-cell">
+              <template v-if="!inTrash">
+                <RowActions
+                  :primary="{ label: '编辑', run: () => edit(p) }"
+                  :items="[
+                    { label: p.is_pinned ? '取消置顶' : '置顶', run: () => togglePin(p) },
+                    { label: p.status === 'published' ? '撤为草稿' : '刊发', run: () => toggleStatus(p) },
+                    {
+                      label: aiId === p.id ? 'AI 生成中…' : p.summary?.trim() ? 'AI 重写摘要' : 'AI 生成摘要',
+                      disabled: aiId === p.id,
+                      run: () => aiOne(p),
+                    },
+                    { label: '移入回收站', danger: true, run: () => trash(p) },
+                  ]"
+                />
+              </template>
+              <template v-else>
+                <RowActions
+                  :primary="{ label: '恢复', run: () => restoreOne(p) }"
+                  :items="[{ label: '彻底焚毁', danger: true, run: () => purgeOne(p) }]"
+                />
+              </template>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
     <div v-if="!shown.length" class="empty">{{ inTrash ? '回收站空空如也。' : '此间无文。' }}</div>
+    <div v-else-if="totalPages > 1" class="table-foot">
+      <span class="muted">共 {{ shown.length }} 篇 · 第 {{ page }} / {{ totalPages }} 页</span>
+      <div class="seg">
+        <button class="btn btn-ghost mini" :disabled="page <= 1" @click="page--">上一页</button>
+        <button class="btn btn-ghost mini" :disabled="page >= totalPages" @click="page++">下一页</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -379,5 +402,28 @@ async function bulkAiSummary(force: boolean) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.cell-title {
+  color: var(--ink-deep);
+  text-decoration: none;
+}
+.cell-title.is-muted {
+  color: var(--ink-light);
+}
+.pinned-tag {
+  margin-left: 6px;
+}
+.scheduled-tag {
+  margin-left: 4px;
+}
+.nowrap-cell {
+  white-space: nowrap;
+}
+.muted-cell {
+  color: var(--ink-light);
+  font-size: 0.82rem;
+}
+.actions-cell {
+  text-align: right;
 }
 </style>

@@ -210,6 +210,56 @@ textarea {
   background: var(--hairline);
 }
 
+/* ===== 列表页规格：筛选行 / 表尾统计 / 表格表头不折行 ===== */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.filter-bar .seg,
+.table-foot .seg {
+  display: inline-flex;
+  gap: 4px;
+}
+.filter-bar .seg .active,
+.seg .active {
+  background: var(--cinnabar);
+  color: #fff;
+  border-color: var(--cinnabar);
+}
+.filter-col {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+.filter-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  white-space: nowrap;
+}
+.table-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+}
+.table-foot .muted {
+  margin-right: auto;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+}
+.table th {
+  white-space: nowrap;
+}
+.table td .tag {
+  white-space: nowrap;
+}
+
 /* ===== 布局 ===== */
 .admin-main {
   max-width: 1000px;

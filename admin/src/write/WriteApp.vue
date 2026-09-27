@@ -4,6 +4,7 @@
 import { onMounted, reactive } from 'vue';
 import { api } from '../api';
 import { authState, initAuth, setAuthed } from '../store/auth';
+import AdminNav from '../components/NavBar.vue';
 
 const toast = reactive({ msg: '', err: false });
 
@@ -48,22 +49,23 @@ async function logout() {
   </div>
 
   <template v-else-if="allowed()">
-    <nav class="admin-nav">
-      <a class="admin-brand" href="/write/">
-        <span class="seal">墨</span>
-        <span>书斋写作区</span>
-      </a>
-      <div class="admin-links">
-        <router-link to="/">我的文章</router-link>
-        <router-link to="/editor">写新篇</router-link>
-        <router-link to="/collections">我的文集</router-link>
-        <router-link to="/media">媒体</router-link>
-      </div>
-      <span class="spacer"></span>
-      <a v-if="authState.role === 'admin'" class="nav-ghost" href="/admin/">后台</a>
-      <a class="nav-ghost" href="/" target="_blank">查看前台</a>
-      <button class="nav-ghost" @click="logout">退出</button>
-    </nav>
+    <AdminNav
+      seal="墨"
+      title="书斋写作区"
+      brand-href="/write/"
+      :flat="[
+        { to: '/', text: '我的文章' },
+        { to: '/editor', text: '写新篇' },
+        { to: '/collections', text: '我的文集' },
+        { to: '/media', text: '媒体' },
+      ]"
+    >
+      <template #actions>
+        <a v-if="authState.role === 'admin'" class="nav-ghost" href="/admin/">后台</a>
+        <a class="nav-ghost" href="/" target="_blank">查看前台</a>
+        <button class="nav-ghost" @click="logout">退出</button>
+      </template>
+    </AdminNav>
 
     <main class="admin-main">
       <router-view @notify="notify" />

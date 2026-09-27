@@ -12,7 +12,11 @@ const router = createRouter({
   history: createWebHistory('/admin/'),
   routes: [
     { path: '/login', name: 'login', component: () => import('./views/LoginView.vue') },
+    // 工作台整合了原「数据」页，是后台默认入口
     { path: '/', name: 'dashboard', component: () => import('./views/DashboardView.vue') },
+    // 旧地址保留重定向，避免书签/外链失效
+    { path: '/dashboard', redirect: '/' },
+    { path: '/stats', redirect: '/' },
     { path: '/collections', name: 'collections', component: () => import('./views/CollectionsView.vue') },
     { path: '/posts', name: 'posts', component: () => import('./views/PostsView.vue') },
     { path: '/media', name: 'media', component: () => import('./views/MediaView.vue') },
@@ -20,7 +24,6 @@ const router = createRouter({
     { path: '/export', name: 'export', component: () => import('./views/ExportView.vue') },
     { path: '/settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
     { path: '/pages', name: 'pages', component: () => import('./views/PagesView.vue') },
-    { path: '/stats', name: 'stats', component: () => import('./views/StatsView.vue') },
     { path: '/comments', name: 'comments', component: () => import('./views/CommentsView.vue') },
     { path: '/users', name: 'users', component: () => import('./views/UsersView.vue') },
     { path: '/editor', name: 'editor', component: () => import('./views/PostEditorView.vue') },

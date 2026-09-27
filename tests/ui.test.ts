@@ -20,8 +20,30 @@ test('导入视图：清单表格包在 table-wrap 内（移动端可横向滚�
   assert.ok(wrapClose > tableStart, 'table-wrap 必须闭合');
 });
 
-test('导入视图：拖入文件与选择文件共用同一条解析入口', () => {
-  const src = readFileSync(resolve('admin/src/views/ImportView.vue'), 'utf8');
+test('后台导航：分组呈现且不折行（不再平铺成一长排）', () => {
+  const app = readFileSync(resolve('admin/src/App.vue'), 'utf8');
+  assert.match(app, /components\/NavBar\.vue/, '后台外壳应使用共用导航组件');
+  // 三个分组名与用途固定，防回退成平铺
+  for (const label of ['写作', '管理', '配置']) {
+    assert.ok(app.includes(`label: '${label}'`), `缺少分组「${label}」`);
+  }
+  assert.ok(!/router-link to="\/stats"/.test(app), '数据页已并进工作台，导航不应再有独立入口');
+  const write = readFileSync(resolve('admin/src/write/WriteApp.vue'), 'utf8');
+  assert.match(write, /components\/NavBar\.vue/, '写作区应与后台共用同一套导航');
+  const css = readFileSync(resolve('admin/src/assets/admin.css'), 'utf8');
+  assert.match(css, /white-space:\s*nowrap/, '导航项必须 nowrap，否则中等宽度会竖排折行');
+  assert.match(css, /@media \(max-width: 1180px\)/, '缺少中等宽度断点');
+});
+
+test('后台默认入口：工作台整合了数据页，旧路径保留重定向', () => {
+  const router = readFileSync(resolve('admin/src/router.ts'), 'utf8');
+  assert.match(router, /path: '\/', name: 'dashboard'/, '根路径应落到工作台');
+  assert.match(router, /path: '\/stats', redirect: '\/'/, '旧 /stats 应重定向');
+  const dash = readFileSync(resolve('admin/src/views/DashboardView.vue'), 'utf8');
+  assert.match(dash, /StatsPanels/, '工作台应内嵌阅读数据面板');
+});
+
+test('导入视图：拖入文件与选择文件共用同一条解析入口', () => {  const src = readFileSync(resolve('admin/src/views/ImportView.vue'), 'utf8');
   assert.match(src, /@drop="onDrop"/, '拖拽区必须处理 drop');
   assert.match(src, /@dragover="onDragOver"/, '必须处理 dragover 才能接收放下');
   assert.match(src, /async function addFiles\(/, '解析入口必须是共用的 addFiles');

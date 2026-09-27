@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import StatsPanels from '../components/StatsPanels.vue';
 
 const stats = ref({ collections: 0, published: 0, drafts: 0 });
 const loaded = ref(false);
@@ -25,7 +26,13 @@ onMounted(async () => {
   <div class="page-head">
     <span class="kicker">工 作 台</span>
     <h1>主人书案</h1>
+    <div class="head-actions">
+      <router-link class="btn btn-primary" to="/editor">写新篇</router-link>
+      <router-link class="btn btn-ghost" to="/posts">管文章</router-link>
+    </div>
   </div>
+
+  <p class="panel-title">内容概览</p>
 
   <div v-if="loaded" class="stat-grid">
     <div class="card stat-card" style="--pc: var(--cinnabar);">
@@ -42,14 +49,5 @@ onMounted(async () => {
     </div>
   </div>
 
-  <div class="card pad" style="margin-top:20px;">
-    <p style="font-family:var(--font-serif);color:var(--ink-mid);line-height:2;margin:0 0 18px;">
-      于此间可新建文集、撰写文章、传图配文。写就的篇章可先置草稿，静观后刊发。
-    </p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;">
-      <router-link class="btn btn-primary" to="/editor">写新篇</router-link>
-      <router-link class="btn btn-ghost" to="/collections">理文集</router-link>
-      <router-link class="btn btn-ghost" to="/posts">管文章</router-link>
-    </div>
-  </div>
+  <StatsPanels />
 </template>

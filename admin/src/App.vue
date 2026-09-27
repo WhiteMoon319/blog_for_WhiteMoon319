@@ -5,6 +5,35 @@ import { onMounted, reactive, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from './api';
 import { authState, initAuth, setAuthed } from './store/auth';
+import AdminNav, { type NavGroup } from './components/NavBar.vue';
+
+// 导航按用途分组：平铺 12 项在中等宽度下会折行，分组后顶层只剩 4 个控件
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: '写作',
+    items: [
+      { to: '/collections', text: '文集' },
+      { to: '/posts', text: '文章' },
+      { to: '/pages', text: '页面' },
+      { to: '/media', text: '媒体' },
+    ],
+  },
+  {
+    label: '管理',
+    items: [
+      { to: '/comments', text: '评论' },
+      { to: '/users', text: '用户' },
+    ],
+  },
+  {
+    label: '配置',
+    items: [
+      { to: '/import', text: '导入' },
+      { to: '/export', text: '导出' },
+      { to: '/settings', text: '设置' },
+    ],
+  },
+];
 
 const route = useRoute();
 const router = useRouter();
@@ -65,29 +94,19 @@ async function logout() {
   </div>
 
   <template v-else-if="authState.authed && route.path !== '/login'">
-    <nav class="admin-nav">
-      <a class="admin-brand" href="/admin/">
-        <span class="seal">签</span>
-        <span>书斋后台</span>
-      </a>
-      <div class="admin-links">
-        <router-link to="/">工作台</router-link>
-        <router-link to="/collections">文集</router-link>
-        <router-link to="/posts">文章</router-link>
-        <router-link to="/media">媒体</router-link>
-        <router-link to="/import">导入</router-link>
-        <router-link to="/pages">页面</router-link>
-        <router-link to="/stats">数据</router-link>
-        <router-link to="/comments">评论</router-link>
-        <router-link to="/users">用户</router-link>
-        <router-link to="/export">导出</router-link>
-        <router-link to="/settings">设置</router-link>
-        <router-link to="/editor">写新篇</router-link>
-      </div>
-      <span class="spacer"></span>
-      <a class="nav-ghost" href="/" target="_blank">查看前台</a>
-      <button class="nav-ghost" @click="logout">退出</button>
-    </nav>
+    <AdminNav
+      seal="签"
+      title="书斋后台"
+      brand-href="/admin/"
+      :flat="[{ to: '/', text: '工作台' }]"
+      :groups="NAV_GROUPS"
+    >
+      <template #actions>
+        <router-link class="nav-ghost nav-primary" to="/editor">写新篇</router-link>
+        <a class="nav-ghost" href="/" target="_blank">查看前台</a>
+        <button class="nav-ghost" @click="logout">退出</button>
+      </template>
+    </AdminNav>
 
     <main class="admin-main">
       <router-view @notify="notify" />

@@ -112,13 +112,16 @@ textarea {
 
 .admin-links {
   display: flex;
+  align-items: center;
   gap: 4px;
   margin-left: 8px;
+  min-width: 0;
 }
 
 .admin-links a {
   padding: 6px 12px;
   font-size: 0.9rem;
+  white-space: nowrap;
   color: var(--ink-deep);
   text-decoration: none;
   border-radius: var(--radius-sm);
@@ -137,6 +140,7 @@ textarea {
 .admin-nav .nav-ghost {
   padding: 6px 14px;
   font-size: 0.85rem;
+  white-space: nowrap;
   color: var(--ink-mid);
   background: transparent;
   border: 1px solid var(--hairline);
@@ -149,6 +153,63 @@ textarea {
   border-color: var(--cinnabar);
 }
 
+/* 顶栏里的主操作（写新篇）：唯一实心按钮，全站一致 */.admin-nav .nav-primary {
+  color: #fff;
+  background: var(--cinnabar);
+  border-color: var(--cinnabar);
+}
+
+.admin-nav .nav-primary:hover {
+  color: #fff;
+  filter: brightness(1.05);
+}
+
+/* 中等宽度：收紧内边距与字号，避免折行；再窄则只留印章，品牌名收起 */
+@media (max-width: 1180px) {
+  .admin-nav {
+    gap: 10px;
+    padding: 0 14px;
+  }
+  .admin-nav .nav-ghost {
+    padding: 6px 10px;
+  }
+  .admin-links a {
+    padding: 6px 8px;
+    font-size: 0.86rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .admin-brand .brand-text {
+    display: none;
+  }
+  .admin-nav .nav-ghost {
+    padding: 6px 8px;
+    font-size: 0.78rem;
+  }
+  .admin-nav {
+    gap: 6px;
+  }
+}
+
+/* 区块小标题：同一页出现多组指标时用来划分语义 */
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-light);
+}
+.panel-title::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--hairline);
+}
+
 /* ===== 布局 ===== */
 .admin-main {
   max-width: 1000px;
@@ -158,6 +219,14 @@ textarea {
 
 .page-head {
   margin-bottom: 28px;
+}
+
+/* 头部右侧的主操作区：与标题同一行，右侧对齐 */
+.page-head .head-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .page-head .kicker {

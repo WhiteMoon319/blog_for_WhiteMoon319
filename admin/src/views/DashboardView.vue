@@ -4,6 +4,7 @@
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import StatsPanels from '../components/StatsPanels.vue';
+import PageHead from '../components/PageHead.vue';
 
 const stats = ref({ collections: 0, published: 0, drafts: 0 });
 const loaded = ref(false);
@@ -23,14 +24,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">工 作 台</span>
-    <h1>主人书案</h1>
-    <div class="head-actions">
+  <PageHead kicker="工 作 台" title="主人书案">
+    <template #actions>
       <router-link class="btn btn-primary" to="/editor">写新篇</router-link>
       <router-link class="btn btn-ghost" to="/posts">管文章</router-link>
-    </div>
-  </div>
+    </template>
+  </PageHead>
 
   <p class="panel-title">内容概览</p>
 

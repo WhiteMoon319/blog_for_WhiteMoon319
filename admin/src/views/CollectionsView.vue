@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 import type { Collection, Tag } from '../types';
 import TagChips from '../components/TagChips.vue';
 
@@ -101,10 +102,7 @@ async function remove(c: Collection) {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">文 集</span>
-    <h1>诸集目录</h1>
-  </div>
+  <PageHead kicker="文 集" title="诸集目录" />
 
   <div class="card" v-if="loaded">
     <div class="card-head">

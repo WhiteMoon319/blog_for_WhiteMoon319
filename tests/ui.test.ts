@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 test('导入视图：清单表格包在 table-wrap 内（移动端可横向滚动）', () => {
@@ -18,6 +18,17 @@ test('导入视图：清单表格包在 table-wrap 内（移动端可横向滚�
   const tableStart = src.indexOf('<table class="table">', wrapOpen);
   const wrapClose = src.indexOf('</div>', tableStart);
   assert.ok(wrapClose > tableStart, 'table-wrap 必须闭合');
+});
+
+test('后台页面骨架：统一走 PageHead，不再各写一份头部标记', () => {
+  const dir = resolve('admin/src/views');
+  const views = readdirSync(dir).filter((f) => f.endsWith('.vue') && f !== 'LoginView.vue');
+  assert.ok(views.length >= 10, '应扫到后台视图');
+  for (const f of views) {
+    const src = readFileSync(resolve(dir, f), 'utf8');
+    assert.ok(!src.includes('class="page-head"'), `${f} 不应再自己写 page-head 标记（用 <PageHead>）`);
+    assert.match(src, /components\/PageHead\.vue/, `${f} 应引入 PageHead 组件`);
+  }
 });
 
 test('后台导航：分组呈现且不折行（不再平铺成一长排）', () => {

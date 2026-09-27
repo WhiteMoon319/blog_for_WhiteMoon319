@@ -3,6 +3,7 @@
 ﻿<script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 
 interface PageItem {
   id: number;
@@ -103,11 +104,11 @@ async function deleteOne(id: number) {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">页 面</span>
-    <h1>静态页管理</h1>
-    <button class="btn btn-primary" style="margin-left:auto;" @click="openNew">新建页面</button>
-  </div>
+  <PageHead kicker="页 面" title="静态页管理">
+    <template #actions>
+      <button class="btn btn-primary" @click="openNew">新建页面</button>
+    </template>
+  </PageHead>
 
   <div v-if="!loaded" style="text-align:center;padding:40px 0;color:var(--ink-light);">加载中…</div>
 

@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 import { authState } from '../store/auth';
 import { fmtDate, fmtSize } from '../lib/format';
 import type { MediaFile } from '../types';
@@ -86,10 +87,7 @@ onMounted(loadMore);
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">媒 体</span>
-    <h1>笔墨相册</h1>
-  </div>
+  <PageHead kicker="媒 体" title="笔墨相册" />
 
   <div class="card pad">
     <div class="card-head" style="border:none;padding:0 0 16px;">

@@ -4,6 +4,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 import { fmtDate } from '../lib/format';
 import type { Collection, Post } from '../types';
 
@@ -229,10 +230,7 @@ async function bulkAiSummary(force: boolean) {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">文 章</span>
-    <h1>篇目总览</h1>
-  </div>
+  <PageHead kicker="文 章" title="篇目总览" />
 
   <div class="card" v-if="loaded">
     <div class="card-head">

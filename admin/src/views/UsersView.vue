@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -78,10 +79,7 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">用 户</span>
-    <h1>用户管理</h1>
-  </div>
+  <PageHead kicker="用 户" title="用户管理" />
 
   <div class="card">
     <div class="table-wrap">

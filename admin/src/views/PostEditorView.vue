@@ -14,6 +14,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { BorderedTable } from '../lib/tiptap-table.ts';
+import PageHead from '../components/PageHead.vue';
 import {
   BORDER_PRESETS,
   BORDER_TOGGLES,
@@ -969,10 +970,7 @@ async function generateAiSummary() {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">{{ isEdit ? '改 篇' : '新 篇' }}</span>
-    <h1>{{ isEdit ? '修改篇章' : '写下新篇' }}</h1>
-  </div>
+  <PageHead :kicker="isEdit ? '改 篇' : '新 篇'" :title="isEdit ? '修改篇章' : '写下新篇'" />
 
   <div v-if="!loading" class="card pad">
     <form @submit.prevent="save">

@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -339,10 +340,7 @@ async function deleteAiKey() {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">配 置</span>
-    <h1>站点设置</h1>
-  </div>
+  <PageHead kicker="配 置" title="站点设置" />
 
   <div class="card pad" v-if="!loading">
     <h3 style="margin:0 0 20px;">站点信息</h3>

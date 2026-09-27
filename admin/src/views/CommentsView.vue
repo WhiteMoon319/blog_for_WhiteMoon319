@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -81,10 +82,7 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">评 论</span>
-    <h1>评论审核</h1>
-  </div>
+  <PageHead kicker="评 论" title="评论审核" />
 
   <div class="card">
     <div class="card-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">

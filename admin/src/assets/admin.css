@@ -218,7 +218,32 @@ textarea {
 }
 
 .page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 28px;
+}
+
+.page-head-main {
+  min-width: 0;
+}
+
+/* 说明文字：头部里的一句话补充，不要抢标题的视觉权重 */
+.page-desc {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  color: var(--ink-light);
+}
+
+/* 头部工具栏：需要与标题同行、但比主操作更长的控件（如区间切换、筛选） */
+.head-toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* 头部右侧的主操作区：与标题同一行，右侧对齐 */

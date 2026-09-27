@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { api, download } from '../api';
+import PageHead from '../components/PageHead.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -22,10 +23,7 @@ async function exportJson() {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">数 据</span>
-    <h1>数据导出</h1>
-  </div>
+  <PageHead kicker="数 据" title="数据导出" />
 
   <div class="card pad">
     <h3 style="margin:0 0 14px;">全量数据快照（JSON）</h3>

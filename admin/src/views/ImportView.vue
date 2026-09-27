@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
+import PageHead from '../components/PageHead.vue';
 import {
   buildImportPayloads,
   slugify,
@@ -291,10 +292,7 @@ async function generateAiSummaries() {
 </script>
 
 <template>
-  <div class="page-head">
-    <span class="kicker">导 入</span>
-    <h1>批量导入</h1>
-  </div>
+  <PageHead kicker="导 入" title="批量导入" />
 
   <div class="card">
     <div class="card-head">

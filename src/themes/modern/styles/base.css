@@ -600,7 +600,9 @@ body {
   margin-top: 20px;
 }
 
-.page-hero-card .facts span {
+/* 只作用于直接子项：否则会把署名组件内部的 .byline / .byline-prefix 等 span
+   也套上胶囊边框，形成一圈套一圈。 */
+.page-hero-card .facts > span {
   padding: 4px 12px;
   border: 1px solid color-mix(in srgb, var(--cc) 20%, transparent);
   border-radius: var(--radius-pill);

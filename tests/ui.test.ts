@@ -20,6 +20,16 @@ test('导入视图：清单表格包在 table-wrap 内（移动端可横向滚�
   assert.ok(wrapClose > tableStart, 'table-wrap 必须闭合');
 });
 
+test('导入视图：拖入文件与选择文件共用同一条解析入口', () => {
+  const src = readFileSync(resolve('admin/src/views/ImportView.vue'), 'utf8');
+  assert.match(src, /@drop="onDrop"/, '拖拽区必须处理 drop');
+  assert.match(src, /@dragover="onDragOver"/, '必须处理 dragover 才能接收放下');
+  assert.match(src, /async function addFiles\(/, '解析入口必须是共用的 addFiles');
+  // 选择框与拖入都必须走 addFiles，避免两条路径行为分叉
+  assert.match(src, /async function onFiles\(e: Event\)[\s\S]*?await addFiles\(/, 'onFiles 必须复用 addFiles');
+  assert.match(src, /async function onDrop\(e: DragEvent\)[\s\S]*?await addFiles\(/, 'onDrop 必须复用 addFiles');
+});
+
 test('站点布局：字体样式表为普通 link（无被 CSP 拦截的内联 onload）', () => {
   const src = readFileSync(resolve('src/themes/classic/layouts/BaseLayout.astro'), 'utf8');
   assert.ok(src.includes("https://fonts.googleapis.com/css2?"), '应保留 Google Fonts 样式表');

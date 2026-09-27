@@ -58,14 +58,14 @@ onMounted(async () => {
   } catch {}
 });
 
-async function onFiles(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-  input.value = '';
+const ALLOWED_EXT = ['md', 'markdown', 'txt', 'docx'];
+
+// 文件来源无关：选择框与拖入都走这里
+async function addFiles(files: File[]) {
   if (files.length === 0) return;
   for (const file of files) {
     const ext = (file.name.split('.').pop() ?? '').toLowerCase();
-    if (!['md', 'markdown', 'txt', 'docx'].includes(ext)) {
+    if (!ALLOWED_EXT.includes(ext)) {
       emit('notify', `跳过不支持的格式：${file.name}`, true);
       continue;
     }
@@ -76,6 +76,46 @@ async function onFiles(e: Event) {
     }
   }
   emit('notify', `已就绪 ${items.value.length} 篇`);
+}
+
+async function onFiles(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  await addFiles(files);
+}
+
+// 拖入文件：用进入计数抵消子元素反复触发的 dragenter/dragleave，避免高亮闪烁
+const dragActive = ref(false);
+let dragDepth = 0;
+function dragHasFiles(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes('Files');
+}
+function onDragEnter(e: DragEvent) {
+  if (!dragHasFiles(e)) return;
+  e.preventDefault();
+  dragDepth += 1;
+  dragActive.value = true;
+}
+function onDragOver(e: DragEvent) {
+  if (!dragHasFiles(e)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+}
+function onDragLeave(e: DragEvent) {
+  if (!dragHasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dragActive.value = false;
+}
+async function onDrop(e: DragEvent) {
+  if (!dragHasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  dragActive.value = false;
+  await addFiles(Array.from(e.dataTransfer?.files ?? []));
+}
+function pickFiles() {
+  fileInput.value?.click();
 }
 
 async function parseOne(file: File, ext: string): Promise<ImportItem> {
@@ -263,7 +303,25 @@ async function generateAiSummaries() {
     <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
       <div class="field" style="grid-column: 1 / -1;">
         <label>源文件（.md / .txt / .docx，可多选）</label>
-        <input ref="fileInput" type="file" accept=".md,.markdown,.txt,.docx" multiple @change="onFiles" />
+        <div
+          class="dropzone"
+          :class="{ 'is-active': dragActive }"
+          role="button"
+          tabindex="0"
+          aria-label="把文件拖到这里，或点击选择文件"
+          @click="pickFiles"
+          @keydown.enter.prevent="pickFiles"
+          @keydown.space.prevent="pickFiles"
+          @dragenter="onDragEnter"
+          @dragover="onDragOver"
+          @dragleave="onDragLeave"
+          @drop="onDrop"
+        >
+          <span class="dropzone-icon" aria-hidden="true">⇪</span>
+          <span class="dropzone-title">{{ dragActive ? '松手即加入清单' : '把文件拖到这里，或点此选择' }}</span>
+          <span class="dropzone-sub">支持 .md / .markdown / .txt / .docx，可一次拖入多个</span>
+          <input ref="fileInput" class="dropzone-input" type="file" accept=".md,.markdown,.txt,.docx" multiple @change="onFiles" />
+        </div>
         <span class="hint">
           Markdown 与纯文本直接读取；Word 文档自动识别排版（标题、段落、列表、引用、代码块、图片），转换为 Markdown 后导入
         </span>
@@ -398,3 +456,51 @@ async function generateAiSummaries() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 28px 20px;
+  border: 2px dashed var(--hairline);
+  border-radius: var(--radius-lg, 10px);
+  background: var(--paper-2, rgba(0, 0, 0, 0.015));
+  color: var(--ink-light);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--cinnabar);
+  color: var(--ink-mid);
+  outline: none;
+}
+.dropzone.is-active {
+  border-color: var(--cinnabar);
+  border-style: solid;
+  background: color-mix(in srgb, var(--cinnabar) 8%, transparent);
+  color: var(--cinnabar);
+}
+.dropzone-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.dropzone-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink-deep);
+}
+.dropzone.is-active .dropzone-title {
+  color: var(--cinnabar);
+}
+.dropzone-sub {
+  font-size: 0.78rem;
+}
+.dropzone-input {
+  display: none;
+}
+</style>

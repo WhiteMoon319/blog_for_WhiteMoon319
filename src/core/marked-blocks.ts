@@ -74,11 +74,21 @@ export function parseTableBorders(attrs: string | undefined): TableBorder[] {
   return fallback;
 }
 
-/** 边集合 → 序列化字符串；`all`（默认）返回空串，便于默认表格保持纯净 */
+/** 边集合 → 序列化字符串；默认（全部框线）返回空串；匹配预设时用预设名，否则用逗号边名列表 */
 export function serializeTableBorders(borders: readonly TableBorder[]): string {
   if (sameBorders(borders, TABLE_BORDERS)) return '';
+  for (const [name, preset] of Object.entries(BORDER_PRESETS)) {
+    if (name !== 'all' && sameBorders(borders, preset)) return name;
+  }
   const picked = new Set<TableBorder>(borders);
   return TABLE_BORDERS.filter((b) => picked.has(b)).join(',');
+}
+
+/** 容器 class → 边集合（无任何 bd- 类 = 默认全部框线）。编辑器载入时用它还原框线配置 */
+export function tableBordersFromClass(className: string): TableBorder[] {
+  const cls = className.split(/\s+/);
+  if (!cls.some((c) => c === 'bd-reset' || c.startsWith('bd-'))) return [...TABLE_BORDERS];
+  return TABLE_BORDERS.filter((b) => cls.includes(`bd-${b}`));
 }
 
 /**

@@ -190,3 +190,30 @@
 .article-body [style*='text-align'] {
   text-indent: 0;
 }
+
+/* ===== 表格框线（:::table{borders=…}）=====
+   默认（容器无 bd-* 类）沿用主题原有框线；一旦配置就带 bd-reset 先清空，再由选中的 bd-* 逐边加回。
+   内部线用「相邻兄弟」画在上/左侧，避免与外侧框线叠成双线。 */
+.article-body .blk-table.bd-reset th,
+.article-body .blk-table.bd-reset td {
+  border: 0;
+}
+.article-body .blk-table.bd-top table {
+  border-top: 1px solid var(--hairline);
+}
+.article-body .blk-table.bd-bottom table {
+  border-bottom: 1px solid var(--hairline);
+}
+.article-body .blk-table.bd-left table {
+  border-left: 1px solid var(--hairline);
+}
+.article-body .blk-table.bd-right table {
+  border-right: 1px solid var(--hairline);
+}
+.article-body .blk-table.bd-innerH thead + tbody tr:first-child > *,
+.article-body .blk-table.bd-innerH tbody tr + tr > * {
+  border-top: 1px solid var(--hairline);
+}
+.article-body .blk-table.bd-innerV tr > * + * {
+  border-left: 1px solid var(--hairline);
+}

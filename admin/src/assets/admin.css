@@ -455,17 +455,22 @@ textarea {
 .editor-shell {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  /* 不能用 overflow:hidden：会切断子元素的 position:sticky，工具栏就吸不住了 */
   background: var(--paper-card);
 }
 
 .editor-toolbar {
+  position: sticky;
+  /* 吸附在后台导航（60px）之下，编辑全程可见 */
+  top: 60px;
+  z-index: 30;
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--hairline);
-  background: rgba(250, 247, 242, 0.6);
+  background: var(--paper-card);
 }
 
 .editor-toolbar button {
@@ -757,12 +762,21 @@ textarea {
 .wysiwyg-area { position: relative; }
 .wysiwyg-body { position: relative; }
 
+/* 浮层容器：高度为 0 的 sticky 层，让素材抽屉与框线菜单在滚动时也留在
+   工具栏下方，而不是跟着正文滚走（内部的绝对定位面板不占布局空间） */
+.editor-float {
+  position: sticky;
+  top: 148px;
+  height: 0;
+  z-index: 20;
+}
+
 .blk-toggle.is-active { color: var(--cinnabar); border-color: var(--cinnabar-line); }
 
 .blk-drawer {
   position: absolute;
-  /* 落在块属性浮条下方：浮条是 sticky，抽屉压住它会导致变体按钮点不到 */
-  top: 52px;
+  /* 浮层容器已让出工具栏与块属性浮条的位置，这里贴容器顶即可 */
+  top: 0;
   left: 8px;
   z-index: 20;
   width: 248px;
@@ -799,14 +813,15 @@ textarea {
 
 .blk-bar {
   position: sticky;
-  top: 0;
+  /* 吸附在编辑器工具栏之下（导航 60 + 工具栏约 46 + 间隙） */
+  top: 110px;
   z-index: 10;
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   padding: 6px 10px;
-  background: rgba(194, 58, 48, 0.06);
+  background: color-mix(in srgb, var(--cinnabar) 6%, var(--paper-card));
   border-bottom: 1px solid var(--cinnabar-line);
   font-size: 0.8rem;
 }
@@ -873,7 +888,7 @@ textarea {
 /* ===== 表格框线菜单（可展开面板） ===== */
 .border-menu {
   position: absolute;
-  top: 52px;
+  top: 0;
   right: 8px;
   z-index: 21;
   width: 214px;

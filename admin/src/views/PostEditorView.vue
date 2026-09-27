@@ -1227,7 +1227,8 @@ async function generateAiSummary() {
           </div>
 
           <div v-show="mode === 'wysiwyg'" class="wysiwyg-area">
-            <div v-if="showBorderMenu && editor?.isActive('table')" class="border-menu" @mousedown.stop>
+            <div class="editor-float">
+              <div v-if="showBorderMenu && editor?.isActive('table')" class="border-menu" @mousedown.stop>
               <div class="border-menu-head">
                 <strong>表格框线</strong>
                 <button type="button" class="blk-x" title="收起" @click="showBorderMenu = false">×</button>
@@ -1281,6 +1282,7 @@ async function generateAiSummary() {
                   <span class="blk-item-hint">{{ b.hint }}</span>
                 </button>
               </div>
+            </div>
             </div>
             <div class="wysiwyg-body">
               <div v-if="activeBlk" class="blk-bar">

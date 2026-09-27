@@ -15,13 +15,9 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { BorderedTable } from '../lib/tiptap-table.ts';
 import PageHead from '../components/PageHead.vue';
-import {
-  BORDER_PRESETS,
-  BORDER_TOGGLES,
-  bordersFromSpec,
-  specFromBorders,
-  type TableBorder,
-} from '../lib/table-borders.ts';
+import EditorBlockDrawer from '../components/EditorBlockDrawer.vue';
+import EditorBorderMenu from '../components/EditorBorderMenu.vue';
+import { bordersFromSpec, specFromBorders, type TableBorder } from '../lib/table-borders.ts';
 import { createLowlight, common } from 'lowlight';
 const lowlight = createLowlight(common);
 import { mdToHtml } from '../lib/marked-blocks.ts';
@@ -38,7 +34,7 @@ import VersionPanel from '../components/VersionPanel.vue';
 import MediaPickerModal from '../components/MediaPickerModal.vue';
 import { createTurndown, checkContentRisk } from '../lib/editor';
 import { PrBlock } from '../lib/tiptap-blocks.ts';
-import { BLOCKS, BLOCK_GROUPS, findBlock } from '../lib/blocks.ts';
+import { findBlock } from '../lib/blocks.ts';
 import { parseId } from '../lib/format';
 import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
 
@@ -1226,61 +1222,18 @@ async function generateAiSummary() {
 
           <div v-show="mode === 'wysiwyg'" class="wysiwyg-area">
             <div class="editor-float">
-              <div v-if="showBorderMenu && editor?.isActive('table')" class="border-menu" @mousedown.stop>
-              <div class="border-menu-head">
-                <strong>表格框线</strong>
-                <button type="button" class="blk-x" title="收起" @click="showBorderMenu = false">×</button>
-              </div>
-              <div class="border-menu-hint">点选逐边开关，或直接用预设</div>
-              <div class="border-presets">
-                <button
-                  v-for="p in BORDER_PRESETS"
-                  :key="p.value"
-                  type="button"
-                  @click="applyBordersPreset(p.value)"
-                >{{ p.label }}</button>
-              </div>
-              <div class="border-toggles">
-                <button
-                  v-for="b in BORDER_TOGGLES"
-                  :key="b.value"
-                  type="button"
-                  :class="{ 'is-on': currentBorders().includes(b.value) }"
-                  :title="`切换「${b.label}」框线`"
-                  @click="toggleBorder(b.value)"
-                >{{ b.label }}</button>
-              </div>
-              <div class="border-preview-wrap">
-                <div
-                  class="border-preview"
-                  :class="currentBorders().map((b) => `pv-${b}`)"
-                >
-                  <span /><span /><span /><span />
-                </div>
-                <span class="border-preview-label">示意</span>
-              </div>
-            </div>
-            <div v-if="showBlockDrawer" class="blk-drawer">
-              <div class="blk-drawer-head">
-                <strong>排版素材</strong>
-                <button type="button" class="blk-x" title="收起" @click="showBlockDrawer = false">×</button>
-              </div>
-              <p class="blk-drawer-hint">点一下插入，选中块后可切换外观。</p>
-              <div v-for="g in BLOCK_GROUPS" :key="g" class="blk-group">
-                <div class="blk-group-title">{{ g }}</div>
-                <button
-                  v-for="b in BLOCKS.filter((x) => x.group === g && !x.hidden)"
-                  :key="b.name"
-                  type="button"
-                  class="blk-item"
-                  :title="b.hint"
-                  @click="insertBlk(b.name)"
-                >
-                  <span class="blk-item-name">{{ b.label }}</span>
-                  <span class="blk-item-hint">{{ b.hint }}</span>
-                </button>
-              </div>
-            </div>
+              <EditorBorderMenu
+                v-if="showBorderMenu && editor?.isActive('table')"
+                :borders="currentBorders()"
+                @preset="applyBordersPreset"
+                @toggle="toggleBorder"
+                @close="showBorderMenu = false"
+              />
+              <EditorBlockDrawer
+                v-if="showBlockDrawer"
+                @insert="insertBlk"
+                @close="showBlockDrawer = false"
+              />
             </div>
             <div class="wysiwyg-body">
               <div v-if="activeBlk" class="blk-bar">

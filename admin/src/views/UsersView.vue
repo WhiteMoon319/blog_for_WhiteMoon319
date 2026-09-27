@@ -4,6 +4,7 @@
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
+import RowActions from '../components/RowActions.vue';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 
@@ -82,6 +83,9 @@ onMounted(load);
   <PageHead kicker="用 户" title="用户管理" />
 
   <div class="card">
+    <div class="filter-bar">
+      <span class="filter-count">共 {{ users.length }} 位用户</span>
+    </div>
     <div class="table-wrap">
       <table class="table" v-if="users.length">
         <thead>
@@ -99,37 +103,46 @@ onMounted(load);
         </thead>
         <tbody>
           <tr v-for="u in users" :key="u.id">
-            <td>{{ u.id }}</td>
+            <td class="muted-cell">{{ u.id }}</td>
             <td>{{ u.username }}</td>
             <td>{{ u.display_name }}</td>
             <td class="bio-cell">{{ u.bio }}</td>
-            <td style="font-size:0.82rem;">{{ u.email }}</td>
-            <td>
-              <span class="tag" :class="u.role === 'admin' ? 'tag-published' : u.role === 'author' ? 'tag-published' : 'tag-draft'">
+            <td class="email-cell">{{ u.email }}</td>
+            <td class="nowrap-cell">
+              <span
+                class="tag"
+                :class="u.role === 'admin' || u.role === 'author' ? 'tag-published' : 'tag-draft'"
+              >
                 {{ u.role === 'admin' ? '管理员' : u.role === 'author' ? '作者' : '读者' }}
               </span>
             </td>
-            <td>
-              <span :style="{ color: u.status === 'active' ? 'var(--ink-mid)' : 'var(--cinnabar)', fontSize: '0.82rem' }">
+            <td class="nowrap-cell">
+              <span :class="u.status === 'active' ? 'status-ok' : 'status-banned'">
                 {{ u.status === 'active' ? '正常' : '已封禁' }}
               </span>
             </td>
-            <td style="font-size:0.78rem;color:var(--ink-light);">{{ u.created_at.slice(0, 10) }}</td>
-            <td>
-              <div class="actions">
-                <button
-                  v-if="u.role !== 'admin'"
-                  class="btn btn-ghost mini"
-                  :disabled="busy"
-                  @click="setRole(u, u.role === 'author' ? 'reader' : 'author')"
-                >
-                  {{ u.role === 'author' ? '降为读者' : '提为作者' }}
-                </button>
-                <button class="btn btn-ghost mini" :disabled="busy" @click="editBio(u)">改简介</button>
-                <button class="btn btn-danger mini" :disabled="u.role === 'admin'" @click="toggleBan(u)">
-                  {{ u.status === 'active' ? '封禁' : '解封' }}
-                </button>
-              </div>
+            <td class="muted-cell date-cell">{{ u.created_at.slice(0, 10) }}</td>
+            <td class="actions-cell">
+              <RowActions
+                :primary="{ label: '改简介', disabled: busy, run: () => editBio(u) }"
+                :items="[
+                  ...(u.role !== 'admin'
+                    ? [
+                        {
+                          label: u.role === 'author' ? '降为读者' : '提为作者',
+                          disabled: busy,
+                          run: () => setRole(u, u.role === 'author' ? 'reader' : 'author'),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: u.status === 'active' ? '封禁账号' : '解除封禁',
+                    danger: u.status === 'active',
+                    disabled: busy || u.role === 'admin',
+                    run: () => toggleBan(u),
+                  },
+                ]"
+              />
             </td>
           </tr>
         </tbody>
@@ -147,5 +160,19 @@ onMounted(load);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.email-cell {
+  font-size: 0.82rem;
+}
+.date-cell {
+  font-size: 0.78rem;
+}
+.status-ok {
+  color: var(--ink-mid);
+  font-size: 0.82rem;
+}
+.status-banned {
+  color: var(--cinnabar);
+  font-size: 0.82rem;
 }
 </style>

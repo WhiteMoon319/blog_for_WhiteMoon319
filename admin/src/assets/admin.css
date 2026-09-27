@@ -849,7 +849,8 @@ textarea {
   left: 8px;
   z-index: 20;
   width: 248px;
-  max-height: 72%;
+  /* 不能用百分比：浮层是零高度容器，百分比会被算成 0 把抽屉压扁 */
+  max-height: min(70vh, 520px);
   overflow-y: auto;
   padding: 10px 12px 14px;
   background: var(--paper-card);

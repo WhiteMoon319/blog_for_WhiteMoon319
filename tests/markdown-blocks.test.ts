@@ -11,6 +11,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderMarkdown, parseBlockVariant } from '../src/lib/markdown.ts';
+import {
+  TABLE_BORDERS,
+  parseTableBorders,
+  serializeTableBorders,
+  tableBorderClasses,
+  tableBordersFromClass,
+} from '../src/core/marked-blocks.ts';
 
 function html(src: string): string {
   return renderMarkdown(src).html;
@@ -66,6 +73,34 @@ test('排版块：表格 borders 非法或缺失回落默认，且不吞内容',
 test('排版块：borders=all 与不写等价（默认观感不变）', () => {
   const tbl = '| a |\n| --- |\n| 1 |';
   assert.equal(html(`:::table{borders=all}\n${tbl}\n:::`), html(`:::table\n${tbl}\n:::`));
+});
+
+test('框线：解析 → 规范化 → 序列化 互为反函数', () => {
+  // 预设
+  assert.deepEqual(parseTableBorders('borders=none'), []);
+  assert.deepEqual(parseTableBorders('borders=all'), [...TABLE_BORDERS]);
+  assert.deepEqual(parseTableBorders('borders=outer'), ['top', 'bottom', 'left', 'right']);
+  assert.deepEqual(parseTableBorders('borders=rows'), ['top', 'bottom', 'innerH']);
+  // 固定顺序：乱序输入也按规范顺序输出
+  assert.deepEqual(parseTableBorders('borders=innerV,top'), ['top', 'innerV']);
+  // 序列化：默认 → 空串，空集合 → 'none'
+  assert.equal(serializeTableBorders([...TABLE_BORDERS]), '');
+  assert.equal(serializeTableBorders([]), 'none');
+  assert.equal(serializeTableBorders(['innerV', 'top']), 'top,innerV');
+  // 往返：spec → 边集合 → spec 幂等
+  for (const spec of ['none', 'outer', 'rows', 'cols', 'top', 'top,innerH']) {
+    const borders = parseTableBorders(`borders=${spec}`);
+    assert.equal(serializeTableBorders(borders), spec, `${spec} 往返应稳定`);
+  }
+});
+
+test('框线：class ↔ 边集合 互为反函数', () => {
+  assert.deepEqual(tableBordersFromClass('blk blk-table'), [...TABLE_BORDERS], '无 bd 类 = 默认');
+  assert.deepEqual(tableBordersFromClass('blk blk-table bd-reset'), [], 'bd-reset 单独出现 = 无框线');
+  assert.deepEqual(tableBordersFromClass('blk blk-table bd-reset bd-top bd-innerV'), ['top', 'innerV']);
+  assert.deepEqual(tableBorderClasses([...TABLE_BORDERS]), [], '默认不加类');
+  assert.deepEqual(tableBorderClasses([]), ['bd-reset']);
+  assert.deepEqual(tableBorderClasses(['bottom', 'left']), ['bd-reset', 'bd-bottom', 'bd-left']);
 });
 
 test('排版块：变体参数生效，非法变体被忽略', () => {  assert.ok(html(':::callout{type=warning}\n注意\n:::').includes('blk-callout is-warning'), 'type 变体生效');

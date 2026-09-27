@@ -8,6 +8,7 @@
 
 import TurndownService from 'turndown';
 import { registerPrBlockTurndown } from './tiptap-blocks.ts';
+import { serializeTableBorders, tableBordersFromClass } from './table-borders.ts';
 
 // 段落/标题对齐：Tiptap 的 TextAlign 落在内联 style 上，turndown 默认会丢掉，
 // 这里回写成等价的 HTML，保证「可视化点居中 → 保存 → 重开/前台渲染」不丢对齐。
@@ -64,7 +65,14 @@ export function createTurndown(): TurndownService {
   });
   service.addRule('gfmTable', {
     filter: 'table',
-    replacement: (_content, node) => tableToGfm(node as HTMLElement),
+    replacement: (_content, node) => {
+      const el = node as HTMLElement;
+      const md = tableToGfm(el);
+      // 非默认框线：包回 `:::table{borders=…}` 容器，否则纯 GFM（老文件保持干净）
+      const spec = serializeTableBorders(tableBordersFromClass(el.getAttribute('class') ?? ''));
+      if (!spec) return md;
+      return `\n\n:::table{borders=${spec}}\n${md.trim()}\n:::\n\n`;
+    },
   });
   // 排版块（:::block）必须能回写，否则保存一次就被剥掉
   return registerPrBlockTurndown(service);

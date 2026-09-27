@@ -12,6 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTurndown } from '../admin/src/lib/editor.ts';
+import { renderMarkdown } from '../src/lib/markdown.ts';
 
 test('turndown：GFM 表格往返不丢结构', () => {
   const td = createTurndown();
@@ -44,4 +45,29 @@ test('turndown：对齐段落回写为内联样式，左对齐不写标签', () 
     '<p style="text-align:center">居中</p>\n\n<p style="text-align:right">右</p>\n\n普通',
   );
   assert.equal(td.turndown('<p style="text-align:left">左</p>'), '左');
+});
+
+test('turndown：框线非默认时表格包回 :::table 容器，默认保持纯 GFM', () => {
+  const td = createTurndown();
+  const cells = '<tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr>';
+  // 默认（无 bd- 类）→ 纯 GFM
+  const plain = td.turndown(`<table class="tip-table"><thead>${cells}</table>`);
+  assert.equal(plain, '| a |\n| --- |\n| 1 |');
+  // 已配置 → 包容器
+  const none = td.turndown(`<table class="tip-table bd-reset"><thead>${cells}</table>`);
+  assert.equal(none, ':::table{borders=none}\n| a |\n| --- |\n| 1 |\n:::');
+  const custom = td.turndown(`<table class="tip-table bd-reset bd-top bd-innerV"><thead>${cells}</table>`);
+  assert.equal(custom, ':::table{borders=top,innerV}\n| a |\n| --- |\n| 1 |\n:::');
+});
+
+test('turndown：容器往返幂等（序列化 → 解析 → 再序列化）', () => {
+  const td = createTurndown();
+  const tableDom = '<table class="tip-table bd-reset bd-bottom"><thead><tr><th>x</th></tr></thead><tbody><tr><td>y</td></tr></tbody></table>';
+  const once = td.turndown(tableDom);
+  assert.equal(once, ':::table{borders=bottom}\n| x |\n| --- |\n| y |\n:::');
+  // 前台渲染：容器类应落到最终 HTML
+  const rendered = renderMarkdown(once).html;
+  assert.ok(rendered.includes('class="blk blk-table bd-reset bd-bottom"'), `容器类应保留：${rendered}`);
+  // 编辑器载入后再保存（DOM 上只剩带 bd 类的 table）应与首次一致
+  assert.equal(td.turndown(tableDom), once);
 });

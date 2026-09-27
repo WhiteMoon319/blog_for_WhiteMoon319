@@ -13,6 +13,7 @@ import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import TextAlign from '@tiptap/extension-text-align';
 import { createLowlight, common } from 'lowlight';
 const lowlight = createLowlight(common);
 import { mdToHtml } from '../lib/marked-blocks.ts';
@@ -138,6 +139,10 @@ const contentRisk = ref('');
 
 const turndown = createTurndown();
 
+// 源码模式的对齐片段：编辑器写入的内联 style 与前台渲染一致
+const SNIPPET_ALIGN_CENTER = '<p style="text-align:center">居中文字</p>';
+const SNIPPET_ALIGN_RIGHT = '<p style="text-align:right">右对齐文字</p>';
+
 const uploadingKeys = new Set<string>();
 
 // ---- 署名作者选择器 ----
@@ -216,6 +221,7 @@ const editor = useEditor({
     TableHeader,
     TableCell,
     CodeBlockLowlight.configure({ lowlight }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
     PrBlock,
   ],
   editorProps: {
@@ -1065,6 +1071,10 @@ async function generateAiSummary() {
               <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
               <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }" @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()">H3</button>
               <span class="sep"></span>
+              <button type="button" title="左对齐" :class="{ 'is-active': editor?.isActive({ textAlign: 'left' }) }" @click="editor?.chain().focus().setTextAlign('left').run()">左</button>
+              <button type="button" title="居中" :class="{ 'is-active': editor?.isActive({ textAlign: 'center' }) }" @click="editor?.chain().focus().setTextAlign('center').run()">中</button>
+              <button type="button" title="右对齐" :class="{ 'is-active': editor?.isActive({ textAlign: 'right' }) }" @click="editor?.chain().focus().setTextAlign('right').run()">右</button>
+              <span class="sep"></span>
               <button type="button" :class="{ 'is-active': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()">• 列表</button>
               <button type="button" :class="{ 'is-active': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()">1. 列表</button>
               <button type="button" :class="{ 'is-active': editor?.isActive('blockquote') }" @click="editor?.chain().focus().toggleBlockquote().run()">引文</button>
@@ -1088,6 +1098,8 @@ async function generateAiSummary() {
               <button type="button" title="删除线" @click="insertSnippet('~~', '~~', '文本')"><s>S</s></button>
               <span class="sep"></span>
               <button type="button" title="标题" @click="insertSnippet('## ', '', '小标题')">H2</button>
+              <button type="button" title="居中段落" @click="insertBlock(SNIPPET_ALIGN_CENTER)">居中</button>
+              <button type="button" title="右对齐段落" @click="insertBlock(SNIPPET_ALIGN_RIGHT)">右对齐</button>
               <button type="button" title="链接" @click="insertSnippet('[', '](https://)', '链接文字')">链</button>
               <button type="button" title="图片" @click="insertSnippet('![', '](https://)', '描述')">图</button>
               <span class="sep"></span>

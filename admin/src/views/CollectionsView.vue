@@ -4,6 +4,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
+import RowActions from '../components/RowActions.vue';
 import type { Collection, Tag } from '../types';
 import TagChips from '../components/TagChips.vue';
 
@@ -102,12 +103,15 @@ async function remove(c: Collection) {
 </script>
 
 <template>
-  <PageHead kicker="文 集" title="诸集目录" />
+  <PageHead kicker="文 集" title="诸集目录">
+    <template #actions>
+      <button class="btn btn-primary" @click="openCreate">立新集</button>
+    </template>
+  </PageHead>
 
   <div class="card" v-if="loaded">
-    <div class="card-head">
-      <h2>文集（{{ collections.length }}）</h2>
-      <button class="btn btn-primary" @click="openCreate">立新集</button>
+    <div class="filter-bar">
+      <span class="filter-count">共 {{ collections.length }} 个文集</span>
     </div>
 
     <div class="table-wrap">
@@ -122,17 +126,20 @@ async function remove(c: Collection) {
         </thead>
         <tbody>
           <tr v-for="c in collections" :key="c.id">
-            <td>{{ c.sort_order }}<span v-if="c.post_order === 'asc'" title="集内文章旧在前（正读）" style="color:var(--ink-light);font-size:0.75rem;">·正读</span></td>
+            <td class="nowrap-cell">
+              {{ c.sort_order }}
+              <span v-if="c.post_order === 'asc'" title="集内文章旧在前（正读）" class="sort-hint">·正读</span>
+            </td>
             <td class="title-cell">
               <span class="color-dot" :style="{ background: c.theme_color }"></span>{{ c.title }}
-              <span style="color:var(--ink-light);font-size:0.78rem;">/{{ c.slug }}</span>
+              <span class="slug-hint">/{{ c.slug }}</span>
             </td>
-            <td style="color:var(--ink-mid);">{{ c.summary || '—' }}</td>
-            <td>
-              <div class="actions">
-                <button class="btn btn-ghost mini" @click="openEdit(c)">改</button>
-                <button class="btn btn-danger mini" @click="remove(c)">撤</button>
-              </div>
+            <td class="summary-cell">{{ c.summary || '—' }}</td>
+            <td class="actions-cell">
+              <RowActions
+                :primary="{ label: '编辑', run: () => openEdit(c) }"
+                :items="[{ label: '删除文集', danger: true, run: () => remove(c) }]"
+              />
             </td>
           </tr>
         </tbody>

@@ -4,6 +4,7 @@
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
+import RowActions from '../components/RowActions.vue';
 
 interface PageItem {
   id: number;
@@ -91,8 +92,12 @@ async function togglePublish(p: PageItem) {
   }
 }
 
-async function deleteOne(id: number) {
-  if (!confirm('确认删除此页面？不可恢复。')) return;
+/** 新标签页打开前台页面（模板里拿不到 window，包一层） */
+function openPage(slug: string): void {
+  window.open(`/pages/${slug}`, '_blank', 'noopener');
+}
+
+async function deleteOne(id: number) {  if (!confirm('确认删除此页面？不可恢复。')) return;
   try {
     await api.deletePage(id);
     emit('notify', '已删除');
@@ -113,39 +118,48 @@ async function deleteOne(id: number) {
   <div v-if="!loaded" style="text-align:center;padding:40px 0;color:var(--ink-light);">加载中…</div>
 
   <template v-else>
-    <table class="table card pad" v-if="pages.length && !showEditor">
-      <thead>
-        <tr>
-          <th>标题</th>
-          <th>slug</th>
-          <th>状态</th>
-          <th>更新时间</th>
-          <th style="width:180px;">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in pages" :key="p.id">
-          <td>{{ p.title }}</td>
-          <td>{{ p.slug }}</td>
-          <td>
-            <span class="tag" :class="p.published ? 'tag-published' : 'tag-draft'">
-              {{ p.published ? '已发布' : '草稿' }}
-            </span>
-          </td>
-          <td style="font-size:0.82rem;color:var(--ink-light);">{{ p.updated_at?.slice(0, 10) }}</td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-ghost mini" @click="openEdit(p.id)">编</button>
-              <button class="btn btn-ghost mini" @click="togglePublish(p)">
-                {{ p.published ? '下线' : '发布' }}
-              </button>
-              <button class="btn btn-ghost mini" style="color:var(--cinnabar);" @click="deleteOne(p.id)">删</button>
-              <a class="btn btn-ghost mini" :href="`/pages/${p.slug}`" target="_blank" v-if="p.published">看</a>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="card">
+      <div class="filter-bar">
+        <span class="filter-count">共 {{ pages.length }} 个页面</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table" v-if="pages.length && !showEditor">
+          <thead>
+            <tr>
+              <th>标题</th>
+              <th>slug</th>
+              <th>状态</th>
+              <th>更新时间</th>
+              <th style="text-align:right;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in pages" :key="p.id">
+              <td>{{ p.title }}</td>
+              <td class="slug-hint">{{ p.slug }}</td>
+              <td class="nowrap-cell">
+                <span class="tag" :class="p.published ? 'tag-published' : 'tag-draft'">
+                  {{ p.published ? '已发布' : '草稿' }}
+                </span>
+              </td>
+              <td class="muted-cell">{{ p.updated_at?.slice(0, 10) }}</td>
+              <td class="actions-cell">
+                <RowActions
+                  :primary="{ label: '编辑', run: () => openEdit(p.id) }"
+                  :items="[
+                    ...(p.published
+                      ? [{ label: '查看页面', run: () => openPage(p.slug) }]
+                      : []),
+                    { label: p.published ? '下线' : '发布', run: () => togglePublish(p) },
+                    { label: '删除页面', danger: true, run: () => deleteOne(p.id) },
+                  ]"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="card pad" v-if="!pages.length && !showEditor">
       <p style="color:var(--ink-light);">暂无页面</p>

@@ -4,6 +4,7 @@
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
+import RowActions from '../components/RowActions.vue';
 import { authState } from '../store/auth';
 import { fmtDate, fmtSize } from '../lib/format';
 import type { MediaFile } from '../types';
@@ -87,15 +88,18 @@ onMounted(loadMore);
 </script>
 
 <template>
-  <PageHead kicker="媒 体" title="笔墨相册" />
-
-  <div class="card pad">
-    <div class="card-head" style="border:none;padding:0 0 16px;">
+  <PageHead kicker="媒 体" title="笔墨相册">
+    <template #actions>
       <button class="btn btn-primary" :disabled="uploading" @click="fileInput?.click()">
         {{ uploading ? '上传中…' : '上传图片' }}
       </button>
       <input ref="fileInput" type="file" accept="image/*" hidden @change="onUpload" />
-      <span style="color:var(--ink-light);font-size:0.82rem;">共 {{ files.length }} 张{{ cursor ? '+' : '' }}（旧→新）</span>
+    </template>
+  </PageHead>
+
+  <div class="card pad">
+    <div class="filter-bar" style="padding:0 0 14px;border-bottom:none;">
+      <span class="filter-count">共 {{ files.length }} 张{{ cursor ? '+' : '' }}（旧→新）</span>
     </div>
 
     <div v-if="files.length" class="media-grid">
@@ -105,10 +109,15 @@ onMounted(loadMore);
           <span class="media-key" :title="f.key">{{ f.key.split('/').pop() }}</span>
           <span class="media-meta">{{ fmtSize(f.size) }} · {{ fmtDate(f.uploaded) }}</span>
           <div class="actions">
-            <button class="btn btn-ghost mini" @click="copy(f.url)">复制链接</button>
-            <button class="btn btn-ghost mini" @click="copy(f.url, true)">复制引用</button>
-            <!-- 删除仅限管理员：R2 无归属信息，无法按作者删除 -->
-            <button v-if="authState.role === 'admin'" class="btn btn-danger mini" @click="remove(f)">删</button>
+            <RowActions
+              :primary="{ label: '复制链接', run: () => copy(f.url) }"
+              :items="[
+                { label: '复制 Markdown 引用', run: () => copy(f.url, true) },
+                ...(authState.role === 'admin'
+                  ? [{ label: '删除图片', danger: true, run: () => remove(f) }]
+                  : []),
+              ]"
+            />
           </div>
         </figcaption>
       </figure>

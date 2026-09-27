@@ -260,6 +260,29 @@ textarea {
   white-space: nowrap;
 }
 
+/* 列表单元格通用类（各列表页共用，避免逐页写 style） */
+.nowrap-cell {
+  white-space: nowrap;
+}
+.muted-cell {
+  color: var(--ink-light);
+  font-size: 0.82rem;
+}
+.summary-cell {
+  color: var(--ink-mid);
+}
+.slug-hint {
+  color: var(--ink-light);
+  font-size: 0.78rem;
+}
+.sort-hint {
+  color: var(--ink-light);
+  font-size: 0.75rem;
+}
+.actions-cell {
+  text-align: right;
+}
+
 /* ===== 布局 ===== */
 .admin-main {
   max-width: 1000px;

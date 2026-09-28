@@ -22,7 +22,9 @@ export async function DELETE(ctx: APIContext): Promise<Response> {
   const id = Number(ctx.params.id);
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
 
-  const comment = await env.DB.prepare(`SELECT id, user_id, status FROM comments WHERE id = ?`).bind(id).first<{ id: number; user_id: number; status: string }>();
+  const comment = await env.DB.prepare(`SELECT id, user_id, status FROM comments WHERE id = ?`)
+    .bind(id)
+    .first<{ id: number; user_id: number; status: string }>();
   if (!comment) return json({ error: 'not found' }, 404);
   if (comment.user_id !== auth.user.id) return json({ error: 'forbidden' }, 403);
   if (comment.status === 'approved') return json({ error: 'approved comments cannot be deleted by user' }, 403);

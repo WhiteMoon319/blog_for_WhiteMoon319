@@ -71,7 +71,10 @@ export async function planForNewContent(
 
 // 正文未被当前操作改变（状态/归属类变更）：按 posts 现行正文决策
 export async function planForPostId(db: D1Database, postId: number): Promise<VersionContentPlan> {
-  const current = await db.prepare('SELECT content_md FROM posts WHERE id = ?').bind(postId).first<{ content_md: string }>();
+  const current = await db
+    .prepare('SELECT content_md FROM posts WHERE id = ?')
+    .bind(postId)
+    .first<{ content_md: string }>();
   return planForNewContent(db, postId, current?.content_md ?? '');
 }
 
@@ -94,9 +97,9 @@ export async function materializeVersions(
 ): Promise<PostVersionRow[]> {
   const fulls = new Map<number, string>();
   for (const r of rows) if (r.base_version === null) fulls.set(r.version, r.content_md);
-  const missing = [
-    ...new Set(rows.filter((r) => r.base_version !== null).map((r) => r.base_version as number)),
-  ].filter((v) => !fulls.has(v));
+  const missing = [...new Set(rows.filter((r) => r.base_version !== null).map((r) => r.base_version as number))].filter(
+    (v) => !fulls.has(v),
+  );
   if (missing.length > 0) {
     const placeholders = missing.map(() => '?').join(',');
     const fetched = await db
@@ -114,7 +117,9 @@ export async function materializeVersions(
       if (baseFull !== undefined) {
         r.content_md = rebuildContent(baseFull, r.content_md_patch);
       } else {
-        console.warn(`materializeVersions: missing base version ${r.base_version} for post ${postId}, version ${r.version}`);
+        console.warn(
+          `materializeVersions: missing base version ${r.base_version} for post ${postId}, version ${r.version}`,
+        );
       }
     }
   }
@@ -122,18 +127,16 @@ export async function materializeVersions(
 }
 
 export async function listPostVersions(db: D1Database, postId: number, limit = 100): Promise<PostVersionRow[]> {
-  const rows = ((await db
-    .prepare(`SELECT * FROM post_versions WHERE post_id = ? ORDER BY version DESC LIMIT ?`)
-    .bind(postId, limit)
-    .all()) as { results: Array<PostVersionRow & { base_version: number | null; content_md_patch: string }> }).results;
+  const rows = (
+    (await db
+      .prepare(`SELECT * FROM post_versions WHERE post_id = ? ORDER BY version DESC LIMIT ?`)
+      .bind(postId, limit)
+      .all()) as { results: Array<PostVersionRow & { base_version: number | null; content_md_patch: string }> }
+  ).results;
   return materializeVersions(db, postId, rows ?? []);
 }
 
-export async function getPostVersion(
-  db: D1Database,
-  postId: number,
-  version: number,
-): Promise<PostVersionRow | null> {
+export async function getPostVersion(db: D1Database, postId: number, version: number): Promise<PostVersionRow | null> {
   const row = await db
     .prepare(`SELECT * FROM post_versions WHERE post_id = ? AND version = ?`)
     .bind(postId, version)

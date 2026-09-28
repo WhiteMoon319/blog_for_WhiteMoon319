@@ -72,7 +72,9 @@ const t = modernT(ctx.locale);
           {posts.map((p) => (
             <div class="post-card reveal" style={`--cc: ${collection.theme_color};`}>
               {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-              <h3 class="post-title"><CardLink href={postHref(p.slug, collection.slug)}>{p.title}</CardLink></h3>
+              <h3 class="post-title">
+                <CardLink href={postHref(p.slug, collection.slug)}>{p.title}</CardLink>
+              </h3>
               {p.summary && <p class="post-summary">{p.summary}</p>}
               <div class="post-meta">
                 <span class="post-tag">{collection.title}</span>
@@ -83,7 +85,9 @@ const t = modernT(ctx.locale);
           ))}
         </div>
       ) : (
-        <p class="section-lead" style="text-align:center;">{t('collection.empty')}</p>
+        <p class="section-lead" style="text-align:center;">
+          {t('collection.empty')}
+        </p>
       )
     }
     <Pagination current={page} totalPages={totalPages} base={`/collections/${collection.slug}/`} query="" />

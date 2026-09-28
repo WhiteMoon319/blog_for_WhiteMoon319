@@ -38,4 +38,6 @@ run('pnpm exec wrangler deploy', '部署 Worker');
 console.log(`\n${SEP}\n✅ 部署完成\n${SEP}`);
 console.log('前台：https://blog.whitemoon319.xyz');
 console.log('后台：https://blog.whitemoon319.xyz/admin/');
-console.log(`\n首次部署或密钥轮换时还需执行：\n  pnpm exec wrangler secret put BLOG_ADMIN_PASSWORD\n  pnpm exec wrangler secret put BLOG_SESSION_SECRET\n  pnpm exec wrangler secret put R2_PUBLIC_URL\n  pnpm exec wrangler secret put AI_SETTINGS_ENCRYPTION_KEY\n  pnpm exec wrangler secret put SMTP_USER\n  pnpm exec wrangler secret put SMTP_PASS\n  pnpm exec wrangler secret put SMTP_FROM`);
+console.log(
+  `\n首次部署或密钥轮换时还需执行：\n  pnpm exec wrangler secret put BLOG_ADMIN_PASSWORD\n  pnpm exec wrangler secret put BLOG_SESSION_SECRET\n  pnpm exec wrangler secret put R2_PUBLIC_URL\n  pnpm exec wrangler secret put AI_SETTINGS_ENCRYPTION_KEY\n  pnpm exec wrangler secret put SMTP_USER\n  pnpm exec wrangler secret put SMTP_PASS\n  pnpm exec wrangler secret put SMTP_FROM`,
+);

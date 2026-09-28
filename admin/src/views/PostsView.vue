@@ -21,10 +21,7 @@ const filter = ref<'all' | 'published' | 'draft' | 'trash'>('all');
 const filterCol = ref<number | ''>('');
 
 async function load() {
-  const [p, c] = await Promise.all([
-    api.posts(filter.value === 'trash' ? '&trash=1' : ''),
-    api.collections(),
-  ]);
+  const [p, c] = await Promise.all([api.posts(filter.value === 'trash' ? '&trash=1' : ''), api.collections()]);
   posts.value = p.posts;
   collections.value = c.collections;
   loaded.value = true;
@@ -167,9 +164,7 @@ async function aiOne(p: Post) {
 function toggleAll() {
   const all = paged.value.map((p) => p.id);
   selected.value =
-    paged.value.length > 0 && paged.value.every((p) => selected.value.has(p.id))
-      ? new Set()
-      : new Set(all);
+    paged.value.length > 0 && paged.value.every((p) => selected.value.has(p.id)) ? new Set() : new Set(all);
 }
 
 async function bulk(action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'pin' | 'unpin') {
@@ -215,7 +210,13 @@ async function bulkAiSummary(force: boolean) {
       const p = posts.value.find((pp) => pp.id === id);
       return p && p.summary?.trim();
     });
-    if (hasSummary && !confirm(`选中的文章中有已填写摘要的，AI 将跳过这些。\n\n如需强制覆盖全部摘要，请使用「强制覆盖」按钮。\n\n继续？`)) return;
+    if (
+      hasSummary &&
+      !confirm(
+        `选中的文章中有已填写摘要的，AI 将跳过这些。\n\n如需强制覆盖全部摘要，请使用「强制覆盖」按钮。\n\n继续？`,
+      )
+    )
+      return;
   } else {
     if (!confirm(`将强制覆盖选中 ${ids.length} 篇文章的现有摘要（包括手工填写的内容）。\n\n是否继续？`)) return;
   }
@@ -254,7 +255,7 @@ async function bulkAiSummary(force: boolean) {
     <div class="filter-bar">
       <div class="seg">
         <button
-          v-for="f in (['all', 'published', 'draft', 'trash'] as const)"
+          v-for="f in ['all', 'published', 'draft', 'trash'] as const"
           :key="f"
           class="btn btn-ghost mini"
           :class="{ active: filter === f }"
@@ -328,13 +329,7 @@ async function bulkAiSummary(force: boolean) {
               >
                 {{ p.title }}
               </router-link>
-              <a
-                v-else-if="!inTrash"
-                :href="postUrl(p)"
-                target="_blank"
-                rel="noopener"
-                class="cell-title"
-              >
+              <a v-else-if="!inTrash" :href="postUrl(p)" target="_blank" rel="noopener" class="cell-title">
                 {{ p.title }}
               </a>
               <span v-else class="cell-title is-muted">{{ p.title }}</span>

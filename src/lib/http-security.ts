@@ -44,7 +44,9 @@ export function isHttpsRequest(protocol: string, forwardedProto: string | null |
 /** 本地地址不跳转（开发服务器、健康检查） */
 export function isLocalHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
-  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host.endsWith('.localhost');
+  return (
+    host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host.endsWith('.localhost')
+  );
 }
 
 /** 是否需要把 HTTP 请求 308 跳到 HTTPS（仅生产，且非本地地址、当前不是 https） */

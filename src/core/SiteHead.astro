@@ -26,7 +26,11 @@ const pageQuery = Astro.url.searchParams.get('page') ? Astro.url.search : '';
 const canonical = `${siteUrl}${Astro.url.pathname}${pageQuery}`;
 const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
 const rawImage = Astro.props.image;
-const ogImage = rawImage ? (ABSOLUTE_URL_RE.test(rawImage) ? rawImage : `${siteUrl}/${rawImage.replace(/^\//, '')}`) : `${siteUrl}/og-default.png`;
+const ogImage = rawImage
+  ? ABSOLUTE_URL_RE.test(rawImage)
+    ? rawImage
+    : `${siteUrl}/${rawImage.replace(/^\//, '')}`
+  : `${siteUrl}/og-default.png`;
 const fullTitle = title ? `${title}｜${ctx.siteName}` : ctx.siteName;
 
 // CSP 走响应头而非 <meta>：

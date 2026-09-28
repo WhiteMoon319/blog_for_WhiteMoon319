@@ -45,7 +45,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
     });
   }
 
-const user = (await getUserByUsername(env.DB, ident)) ?? (await getUserByEmail(env.DB, ident));
+  const user = (await getUserByUsername(env.DB, ident)) ?? (await getUserByEmail(env.DB, ident));
   let ok = false;
   if (user && user.password_hash) {
     ok = await verifyPasswordHash(body.password, user.password_hash);

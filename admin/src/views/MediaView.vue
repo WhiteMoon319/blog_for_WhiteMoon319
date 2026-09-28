@@ -113,9 +113,7 @@ onMounted(loadMore);
               :primary="{ label: '复制链接', run: () => copy(f.url) }"
               :items="[
                 { label: '复制 Markdown 引用', run: () => copy(f.url, true) },
-                ...(authState.role === 'admin'
-                  ? [{ label: '删除图片', danger: true, run: () => remove(f) }]
-                  : []),
+                ...(authState.role === 'admin' ? [{ label: '删除图片', danger: true, run: () => remove(f) }] : []),
               ]"
             />
           </div>

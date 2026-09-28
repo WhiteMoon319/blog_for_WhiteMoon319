@@ -15,13 +15,16 @@ const page = await getTagPage(env.DB, name, keyword);
 if (!page) {
   return Astro.redirect('/404');
 }
-import { getSiteContext } from "../../../lib/theme-context";
+import { getSiteContext } from '../../../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 import { getTagsUnion } from '../../../lib/db';
 import { badgesByPostId } from '../../../lib/authors-view';
 const union = await getTagsUnion(env.DB, [name], keyword);
 // 列表卡署名：标签详情结果一次性取回
-const authorsByPost = await badgesByPostId(env.DB, union.posts.map((p) => p.id));
+const authorsByPost = await badgesByPostId(
+  env.DB,
+  union.posts.map((p) => p.id),
+);
 ---
 
 <TagDetailTemplate

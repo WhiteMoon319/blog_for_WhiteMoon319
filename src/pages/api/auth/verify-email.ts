@@ -19,7 +19,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   let body: { user_id?: unknown; code?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
   if (typeof body.user_id !== 'number' || typeof body.code !== 'string') {
     return json({ error: 'user_id and code required' }, 400);
   }
@@ -35,7 +39,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     `SELECT id, code_hash, expires_at, consumed FROM email_verifications
      WHERE user_id = ? AND consumed = 0 AND expires_at > datetime('now')
      ORDER BY created_at DESC LIMIT 1`,
-  ).bind(body.user_id).first<{ id: number; code_hash: string; expires_at: string; consumed: number }>();
+  )
+    .bind(body.user_id)
+    .first<{ id: number; code_hash: string; expires_at: string; consumed: number }>();
 
   if (!row) {
     // 不区分"错误"与"已过期"

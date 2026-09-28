@@ -7,12 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { CollectionRow, CollectionPatch, TagRow } from './types.ts';
-import {
-  ensureTagsStmts,
-  purgeOrphanTagsStmt,
-  setCollectionTagsStmts,
-  listCollectionTags,
-} from './tags.ts';
+import { ensureTagsStmts, purgeOrphanTagsStmt, setCollectionTagsStmts, listCollectionTags } from './tags.ts';
 import { slugWithSuffix } from '../utils.ts';
 import { planForPostId, type VersionContentPlan } from './versions.ts';
 
@@ -164,14 +159,28 @@ export async function createCollectionWithTags(
     stmts.push(purgeOrphanTagsStmt(db));
   }
   const results = await db.batch(stmts);
-  const collection = results[0].results?.[0] as CollectionRow | undefined ?? null;
+  const collection = (results[0].results?.[0] as CollectionRow | undefined) ?? null;
   if (!collection) return null;
   return { collection, tags: await listCollectionTags(db, collection.id) };
 }
 
-export async function updateCollection(db: D1Database, id: number, patch: CollectionPatch): Promise<CollectionRow | null> {
+export async function updateCollection(
+  db: D1Database,
+  id: number,
+  patch: CollectionPatch,
+): Promise<CollectionRow | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'].includes(k),
+    [
+      'title',
+      'slug',
+      'summary',
+      'theme_color',
+      'sort_order',
+      'post_order',
+      'ref_summaries',
+      'ai_prompt_id',
+      'is_public',
+    ].includes(k),
   );
   if (keys.length === 0) return getCollectionById(db, id);
   const sets = keys.map((k) => `${k} = ?`).join(', ');
@@ -191,7 +200,17 @@ export async function updateCollectionWithTags(
   tagNames: string[] | null,
 ): Promise<{ collection: CollectionRow; tags: TagRow[] } | null> {
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'].includes(k),
+    [
+      'title',
+      'slug',
+      'summary',
+      'theme_color',
+      'sort_order',
+      'post_order',
+      'ref_summaries',
+      'ai_prompt_id',
+      'is_public',
+    ].includes(k),
   );
   const stmts: D1PreparedStatement[] = [];
   if (keys.length > 0) {
@@ -205,8 +224,7 @@ export async function updateCollectionWithTags(
   }
   if (tagNames !== null) stmts.push(...setCollectionTagsStmts(db, id, tagNames));
   const results = await db.batch(stmts);
-  const collection =
-    (results[0]?.results?.[0] as CollectionRow | undefined) ?? (await getCollectionById(db, id));
+  const collection = (results[0]?.results?.[0] as CollectionRow | undefined) ?? (await getCollectionById(db, id));
   if (!collection) return null;
   return { collection, tags: await listCollectionTags(db, id) };
 }
@@ -225,7 +243,10 @@ async function collectUncategorizedSlugs(db: D1Database): Promise<Set<string>> {
 
 // 确定性分配冲突 slug：members 须按 (created_at DESC, id DESC) 排序，与 URL 解析的「保留最新一篇」一致。
 // 先占用的先进 taken 集，冲突者依次获得 slug-2/slug-3…（后缀受 SLUG_MAX 约束，最终候选必合法）。
-async function assignMemberSlugs(db: D1Database, members: Array<{ id: number; slug: string }>): Promise<Map<number, string>> {
+async function assignMemberSlugs(
+  db: D1Database,
+  members: Array<{ id: number; slug: string }>,
+): Promise<Map<number, string>> {
   const taken = await collectUncategorizedSlugs(db);
   const assigned = new Map<number, string>();
   for (const m of members) {

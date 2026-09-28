@@ -14,12 +14,9 @@ defineEmits<{ preset: [value: string]; toggle: [value: TableBorder]; close: [] }
     </div>
     <div class="border-menu-hint">点选逐边开关，或直接用预设</div>
     <div class="border-presets">
-      <button
-        v-for="p in BORDER_PRESETS"
-        :key="p.value"
-        type="button"
-        @click="$emit('preset', p.value)"
-      >{{ p.label }}</button>
+      <button v-for="p in BORDER_PRESETS" :key="p.value" type="button" @click="$emit('preset', p.value)">
+        {{ p.label }}
+      </button>
     </div>
     <div class="border-toggles">
       <button
@@ -29,12 +26,12 @@ defineEmits<{ preset: [value: string]; toggle: [value: TableBorder]; close: [] }
         :class="{ 'is-on': borders.includes(b.value) }"
         :title="`切换「${b.label}」框线`"
         @click="$emit('toggle', b.value)"
-      >{{ b.label }}</button>
+      >
+        {{ b.label }}
+      </button>
     </div>
     <div class="border-preview-wrap">
-      <div class="border-preview" :class="borders.map((b) => `pv-${b}`)">
-        <span /><span /><span /><span />
-      </div>
+      <div class="border-preview" :class="borders.map((b) => `pv-${b}`)"><span /><span /><span /><span /></div>
       <span class="border-preview-label">示意</span>
     </div>
   </div>

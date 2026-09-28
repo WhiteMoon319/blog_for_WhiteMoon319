@@ -69,7 +69,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   // 直接拉入协作者
-  const userId = typeof body.user_id === 'number' && Number.isInteger(body.user_id) && body.user_id > 0 ? body.user_id : 0;
+  const userId =
+    typeof body.user_id === 'number' && Number.isInteger(body.user_id) && body.user_id > 0 ? body.user_id : 0;
   if (!userId) return json({ error: 'user_id required' }, 400);
   if (userId === access.collection.created_by) {
     return json({ error: '归属人无需成为协作者' }, 400);

@@ -131,8 +131,7 @@ export const PrBlock = Node.create({
 export function registerPrBlockTurndown(turndown: TurndownService): TurndownService {
   turndown.addRule('prBlock', {
     filter: (node) =>
-      node.nodeName === 'SECTION' &&
-      (node.getAttribute('class') ?? '').split(/\s+/).some((c) => c.startsWith('blk-')),
+      node.nodeName === 'SECTION' && (node.getAttribute('class') ?? '').split(/\s+/).some((c) => c.startsWith('blk-')),
     replacement: (content, node) => serializeBlk(node.getAttribute('class') ?? '', content),
   });
   return turndown;

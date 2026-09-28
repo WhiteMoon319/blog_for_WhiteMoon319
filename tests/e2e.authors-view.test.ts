@@ -68,10 +68,7 @@ test('e2e：文章页署名——多作者按序、链接作者页、JSON-LD 为
   assert.ok(html.includes('砚台乙'), '应展示第一位作者');
   assert.ok(html.includes('砚台甲'), '应展示第二位作者');
   assert.ok(html.includes(`/authors/view-b/`), '署名应链接作者页');
-  assert.ok(
-    html.indexOf('砚台乙') < html.indexOf('砚台甲'),
-    '展示顺序应保持署名顺序（第一位为主作者）',
-  );
+  assert.ok(html.indexOf('砚台乙') < html.indexOf('砚台甲'), '展示顺序应保持署名顺序（第一位为主作者）');
 
   // JSON-LD：author 为数组，含全部作者
   const ld = /<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/.exec(html);

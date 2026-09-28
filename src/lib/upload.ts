@@ -6,13 +6,7 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-export const ALLOWED_IMAGE_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-  'image/avif',
-] as const;
+export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'] as const;
 
 export type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
@@ -57,9 +51,7 @@ export function detectImageType(buf: Uint8Array, declared: string): AllowedImage
     case 'image/webp':
       return ascii(buf, 0, 4) === 'RIFF' && ascii(buf, 8, 4) === 'WEBP' ? 'image/webp' : null;
     case 'image/avif':
-      return ascii(buf, 4, 4) === 'ftyp' && AVIF_BRANDS.includes(ascii(buf, 8, 4))
-        ? 'image/avif'
-        : null;
+      return ascii(buf, 4, 4) === 'ftyp' && AVIF_BRANDS.includes(ascii(buf, 8, 4)) ? 'image/avif' : null;
     default:
       return null;
   }

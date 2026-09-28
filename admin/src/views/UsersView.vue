@@ -50,9 +50,10 @@ async function toggleBan(u: UserRow) {
 /** 提为作者 / 降回读者：只有这两个方向，管理员角色不在此列 */
 async function setRole(u: UserRow, role: 'reader' | 'author') {
   const label = role === 'author' ? '提为作者' : '降为读者';
-  const extra = role === 'author'
-    ? '该作者可用同一登录入口进入后台，只能管理自己归属或署名的文章。'
-    : '降回读者后，其后台入口与内容管理权限立即失效，已刊文章与署名保留。';
+  const extra =
+    role === 'author'
+      ? '该作者可用同一登录入口进入后台，只能管理自己归属或署名的文章。'
+      : '降回读者后，其后台入口与内容管理权限立即失效，已刊文章与署名保留。';
   if (!confirm(`确要${label}「${u.username}」？\n\n${extra}`)) return;
   try {
     await api.userRole(u.id, role);
@@ -109,10 +110,7 @@ onMounted(load);
             <td class="bio-cell">{{ u.bio }}</td>
             <td class="email-cell">{{ u.email }}</td>
             <td class="nowrap-cell">
-              <span
-                class="tag"
-                :class="u.role === 'admin' || u.role === 'author' ? 'tag-published' : 'tag-draft'"
-              >
+              <span class="tag" :class="u.role === 'admin' || u.role === 'author' ? 'tag-published' : 'tag-draft'">
                 {{ u.role === 'admin' ? '管理员' : u.role === 'author' ? '作者' : '读者' }}
               </span>
             </td>

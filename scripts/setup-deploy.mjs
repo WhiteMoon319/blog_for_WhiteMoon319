@@ -17,7 +17,11 @@ import readline from 'node:readline/promises';
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const PROGRESS_FILE = '.setup-progress';
 
-const VER = '🔑'; const INFO = 'ℹ'; const OK = '✅'; const ERR = '❌'; const STEP = '🐾';
+const VER = '🔑';
+const INFO = 'ℹ';
+const OK = '✅';
+const ERR = '❌';
+const STEP = '🐾';
 
 function run(cmd, opts = {}) {
   console.log(`\n  ${cmd}`);
@@ -37,13 +41,18 @@ function saveProgress(step) {
   done.add(step);
   writeFileSync(PROGRESS_FILE, [...done].join('\n') + '\n');
 }
-function isStepDone(step) { return loadProgress().has(step); }
+function isStepDone(step) {
+  return loadProgress().has(step);
+}
 function clearProgress() {
   if (existsSync(PROGRESS_FILE)) unlinkSync(PROGRESS_FILE);
 }
 
 async function guard(step, label, fn) {
-  if (isStepDone(step)) { console.log(`${OK} ${label}——已完成，跳过`); return; }
+  if (isStepDone(step)) {
+    console.log(`${OK} ${label}——已完成，跳过`);
+    return;
+  }
   console.log(`\n${STEP} ${label}…`);
   try {
     await fn();
@@ -65,7 +74,10 @@ async function ask(question, def = '') {
 async function askSecret(question, confirm = false) {
   for (;;) {
     const a = await rl.question(`${question}（输入时不会显示） `);
-    if (!a.trim()) { console.log(`${ERR} 不能为空，请重新输入`); continue; }
+    if (!a.trim()) {
+      console.log(`${ERR} 不能为空，请重新输入`);
+      continue;
+    }
     if (!confirm) return a.trim();
     const b = await rl.question(`请再输入一次确认 `);
     if (a === b) return a.trim();
@@ -79,7 +91,9 @@ function parseD1Id(out) {
   const m2 = out.match(/database_id[^\n]*?([0-9a-f]{32})/i);
   return m2 ? m2[1] : null;
 }
-function hasEnv() { return existsSync('.env'); }
+function hasEnv() {
+  return existsSync('.env');
+}
 
 async function ensureWranglerLoggedIn() {
   try {
@@ -114,7 +128,10 @@ async function setupD1() {
     const out = runOut('pnpm exec wrangler d1 create blog-db --no-describe');
     id = parseD1Id(out);
     console.log(out);
-    if (!id) throw new Error('无法获取 D1 数据库 ID。请手动运行 pnpm exec wrangler d1 list 查看 ID，并写入 .env 的 BLOG_D1_ID=');
+    if (!id)
+      throw new Error(
+        '无法获取 D1 数据库 ID。请手动运行 pnpm exec wrangler d1 list 查看 ID，并写入 .env 的 BLOG_D1_ID=',
+      );
   }
   return id;
 }
@@ -149,14 +166,21 @@ async function setupSecrets() {
   const secrets = [
     { name: 'BLOG_ADMIN_PASSWORD', desc: '管理员登录密码（必须，≥8 位）', required: true },
     { name: 'BLOG_SESSION_SECRET', desc: '会话签名密钥（32 字节以上随机串）', required: true },
-    { name: 'AI_SETTINGS_ENCRYPTION_KEY', desc: 'AI Key/邮件凭据加密主密钥（64 位十六进制，可用下方生成）', required: false },
+    {
+      name: 'AI_SETTINGS_ENCRYPTION_KEY',
+      desc: 'AI Key/邮件凭据加密主密钥（64 位十六进制，可用下方生成）',
+      required: false,
+    },
     { name: 'SMTP_USER', desc: 'SMTP 发件邮箱（如 3287047638@qq.com）', required: false },
     { name: 'SMTP_PASS', desc: 'SMTP 授权码（QQ 邮箱需在设置中生成）', required: false },
     { name: 'SMTP_FROM', desc: '发件显示地址（通常同 SMTP_USER）', required: false },
   ];
-  const skipAll = await ask(`是否现在设置所有密钥？(y=全部设置 / n=跳过到下一步）`, 'y') !== 'n';
+  const skipAll = (await ask(`是否现在设置所有密钥？(y=全部设置 / n=跳过到下一步）`, 'y')) !== 'n';
   for (const s of secrets) {
-    if (!skipAll) { console.log(`${INFO} 跳过 ${s.name}`); continue; }
+    if (!skipAll) {
+      console.log(`${INFO} 跳过 ${s.name}`);
+      continue;
+    }
     console.log(`\n  ${INFO} ${s.name} — ${s.desc}`);
     if (s.name === 'AI_SETTINGS_ENCRYPTION_KEY') {
       const use = await ask(`手动输入还是自动生成随机密钥？(m=手动 / g=生成）`, 'g');
@@ -179,7 +203,8 @@ async function main() {
   if (process.argv.includes('--retry')) {
     clearProgress();
     console.log(`${OK} 已清除进度缓存，下次运行将从第一步开始`);
-    rl.close(); return;
+    rl.close();
+    return;
   }
 
   if (existsSync(PROGRESS_FILE)) {
@@ -202,14 +227,22 @@ async function main() {
   });
 
   await guard('login', '登录 Cloudflare', async () => {
-    if (!await ensureWranglerLoggedIn()) throw new Error('登录失败');
+    if (!(await ensureWranglerLoggedIn())) throw new Error('登录失败');
   });
 
   let d1Id;
-  await guard('d1', '创建 D1 数据库', async () => { d1Id = await setupD1(); });
-  await guard('r2', '创建 R2 存储桶', async () => { await setupR2(); });
-  await guard('dotenv', '生成 .env', async () => { if (d1Id) await writeDotEnv(d1Id); });
-  await guard('secrets', '设置生产密钥', async () => { await setupSecrets(); });
+  await guard('d1', '创建 D1 数据库', async () => {
+    d1Id = await setupD1();
+  });
+  await guard('r2', '创建 R2 存储桶', async () => {
+    await setupR2();
+  });
+  await guard('dotenv', '生成 .env', async () => {
+    if (d1Id) await writeDotEnv(d1Id);
+  });
+  await guard('secrets', '设置生产密钥', async () => {
+    await setupSecrets();
+  });
 
   await guard('config', '生成部署配置', () => {
     run('pnpm -C admin install');
@@ -220,8 +253,12 @@ async function main() {
     run('pnpm exec wrangler d1 migrations apply blog-db --remote');
   });
 
-  await guard('build', '构建', () => { run('pnpm run build'); });
-  await guard('deploy', '部署 Worker', () => { run('pnpm exec wrangler deploy'); });
+  await guard('build', '构建', () => {
+    run('pnpm run build');
+  });
+  await guard('deploy', '部署 Worker', () => {
+    run('pnpm exec wrangler deploy');
+  });
 
   clearProgress();
   console.log(`\n${'='.repeat(60)}`);

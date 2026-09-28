@@ -107,7 +107,18 @@ export async function PUT(ctx: APIContext): Promise<Response> {
         if (v.length > 20_000) return json({ error: `${k} too long` }, 400);
         try {
           const parsed = JSON.parse(v);
-          if (!Array.isArray(parsed) || parsed.some((t) => !t || typeof t.id !== 'string' || typeof t.name !== 'string' || typeof t.prompt !== 'string' || t.id.length === 0 || t.prompt.length === 0)) {
+          if (
+            !Array.isArray(parsed) ||
+            parsed.some(
+              (t) =>
+                !t ||
+                typeof t.id !== 'string' ||
+                typeof t.name !== 'string' ||
+                typeof t.prompt !== 'string' ||
+                t.id.length === 0 ||
+                t.prompt.length === 0,
+            )
+          ) {
             return json({ error: 'ai_prompt_templates 格式非法：需为 [{ id, name, prompt }]' }, 400);
           }
         } catch {

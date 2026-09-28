@@ -55,17 +55,24 @@ const t = modernT(ctx.locale);
               <div class="tl-era">{t('archive.year_posts', { year: g.year, count: g.posts.length })}</div>
               {g.posts.map(({ post, collection }) => (
                 <div class="tl-item">
-                  <div class="tl-event"><CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink><span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span></div>
-                    <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}
-                      <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
-                    </div>
+                  <div class="tl-event">
+                    <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink>
+                    <span class="tl-col"> · {collection?.title ?? t('archive.uncategorized')}</span>
+                  </div>
+                  <div class="tl-desc">
+                    {fmtDate(post.created_at)}
+                    {post.summary ? ` · ${post.summary}` : ''}
+                    <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
+                  </div>
                 </div>
               ))}
             </>
           ))}
         </div>
       ) : (
-        <p class="section-lead" style="text-align:center;">{t('archive.empty')}</p>
+        <p class="section-lead" style="text-align:center;">
+          {t('archive.empty')}
+        </p>
       )
     }
     <Pagination current={page} totalPages={totalPages} base="/archive/" query="" />

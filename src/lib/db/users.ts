@@ -41,7 +41,13 @@ export async function getUserByEmail(db: D1Database, email: string): Promise<Use
 
 export async function createUser(
   db: D1Database,
-  data: { username: string; email: string; password_hash: string; display_name?: string; role?: 'reader' | 'author' | 'admin' },
+  data: {
+    username: string;
+    email: string;
+    password_hash: string;
+    display_name?: string;
+    role?: 'reader' | 'author' | 'admin';
+  },
 ): Promise<UserRow | null> {
   const { username, email, password_hash, display_name, role } = data;
   const res = await db
@@ -76,8 +82,12 @@ export async function updatePassword(db: D1Database, userId: number, passwordHas
   return !!row;
 }
 
-export async function verifyUserPassword(db: D1Database, userOrEmail: string, password: string): Promise<UserRow | null> {
-  const user = await getUserByUsername(db, userOrEmail) ?? await getUserByEmail(db, userOrEmail);
+export async function verifyUserPassword(
+  db: D1Database,
+  userOrEmail: string,
+  password: string,
+): Promise<UserRow | null> {
+  const user = (await getUserByUsername(db, userOrEmail)) ?? (await getUserByEmail(db, userOrEmail));
   if (!user) return null;
   if (user.password_hash && user.password_hash.length > 0) {
     if (!verifyPasswordHash(password, user.password_hash)) return null;
@@ -95,21 +105,42 @@ export async function setUserEmailVerified(db: D1Database, userId: number): Prom
 
 export async function banUser(db: D1Database, userId: number): Promise<boolean> {
   const row = await db
-    .prepare(`UPDATE users SET status = CASE WHEN status = 'active' THEN 'banned' ELSE 'active' END, session_version = session_version + 1 WHERE id = ? AND role != 'admin' RETURNING id`)
+    .prepare(
+      `UPDATE users SET status = CASE WHEN status = 'active' THEN 'banned' ELSE 'active' END, session_version = session_version + 1 WHERE id = ? AND role != 'admin' RETURNING id`,
+    )
     .bind(userId)
     .first<{ id: number }>();
   return !!row;
 }
 
-export async function updateProfile(db: D1Database, userId: number, data: { display_name?: string; avatar_url?: string; notify_email?: number; bio?: string }): Promise<boolean> {
+export async function updateProfile(
+  db: D1Database,
+  userId: number,
+  data: { display_name?: string; avatar_url?: string; notify_email?: number; bio?: string },
+): Promise<boolean> {
   const sets: string[] = [];
   const vals: (string | number)[] = [];
-  if (data.display_name !== undefined) { sets.push('display_name = ?'); vals.push(data.display_name.trim()); }
-  if (data.avatar_url !== undefined) { sets.push('avatar_url = ?'); vals.push(data.avatar_url); }
-  if (data.notify_email !== undefined) { sets.push('notify_email = ?'); vals.push(data.notify_email); }
-  if (data.bio !== undefined) { sets.push('bio = ?'); vals.push(data.bio); }
+  if (data.display_name !== undefined) {
+    sets.push('display_name = ?');
+    vals.push(data.display_name.trim());
+  }
+  if (data.avatar_url !== undefined) {
+    sets.push('avatar_url = ?');
+    vals.push(data.avatar_url);
+  }
+  if (data.notify_email !== undefined) {
+    sets.push('notify_email = ?');
+    vals.push(data.notify_email);
+  }
+  if (data.bio !== undefined) {
+    sets.push('bio = ?');
+    vals.push(data.bio);
+  }
   if (sets.length === 0) return false;
-  const row = await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? RETURNING id`).bind(...vals, userId).first<{ id: number }>();
+  const row = await db
+    .prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? RETURNING id`)
+    .bind(...vals, userId)
+    .first<{ id: number }>();
   return !!row;
 }
 
@@ -127,7 +158,10 @@ export async function setUserRole(db: D1Database, userId: number, role: 'reader'
 }
 
 export async function updateEmail(db: D1Database, userId: number, email: string): Promise<boolean> {
-  const row = await db.prepare(`UPDATE users SET email = ?, email_verified = 0 WHERE id = ? RETURNING id`).bind(email.trim().toLowerCase(), userId).first<{ id: number }>();
+  const row = await db
+    .prepare(`UPDATE users SET email = ?, email_verified = 0 WHERE id = ? RETURNING id`)
+    .bind(email.trim().toLowerCase(), userId)
+    .first<{ id: number }>();
   return !!row;
 }
 
@@ -139,6 +173,9 @@ export async function listUsers(db: D1Database, role?: string): Promise<UserRow[
     args.push(role);
   }
   sql += ' ORDER BY created_at DESC';
-  const rows = await db.prepare(sql).bind(...args).all<UserRow>();
+  const rows = await db
+    .prepare(sql)
+    .bind(...args)
+    .all<UserRow>();
   return rows.results ?? [];
 }

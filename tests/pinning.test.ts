@@ -30,23 +30,35 @@ after(async () => {
 });
 
 test('置顶：创建时可置顶，置顶查询只返回置顶文章', async () => {
-  const a = await createPostWithTags(h.db, {
-    title: '置顶甲',
-    slug: 'pin-a',
-    status: 'published',
-    is_pinned: 1,
-  }, []);
-  const b = await createPostWithTags(h.db, {
-    title: '未置顶乙',
-    slug: 'pin-b',
-    status: 'published',
-    is_pinned: 0,
-  }, []);
+  const a = await createPostWithTags(
+    h.db,
+    {
+      title: '置顶甲',
+      slug: 'pin-a',
+      status: 'published',
+      is_pinned: 1,
+    },
+    [],
+  );
+  const b = await createPostWithTags(
+    h.db,
+    {
+      title: '未置顶乙',
+      slug: 'pin-b',
+      status: 'published',
+      is_pinned: 0,
+    },
+    [],
+  );
   assert.ok(a && b, '创建应成功');
   assert.equal(a.post.is_pinned, 1);
 
   const pinned = await listPublishedPosts(h.db, { pinned: true });
-  assert.deepEqual(pinned.map((p) => p.slug), ['pin-a'], '仅返回置顶文章');
+  assert.deepEqual(
+    pinned.map((p) => p.slug),
+    ['pin-a'],
+    '仅返回置顶文章',
+  );
   const all = await listPublishedPosts(h.db);
   assert.equal(all.length, 2, '置顶不影响普通列表（不隐藏）');
 });
@@ -80,7 +92,11 @@ test('置顶：批量置顶幂等，回收站文章不参与', async () => {
 });
 
 test('置顶：取消置顶幂等', async () => {
-  const created = await createPostWithTags(h.db, { title: '取消', slug: 'pin-off', status: 'published', is_pinned: 1 }, []);
+  const created = await createPostWithTags(
+    h.db,
+    { title: '取消', slug: 'pin-off', status: 'published', is_pinned: 1 },
+    [],
+  );
   assert.ok(created);
   assert.equal(await setPostsPinned(h.db, [created.post.id], false), 1);
   assert.equal(await setPostsPinned(h.db, [created.post.id], false), 0);

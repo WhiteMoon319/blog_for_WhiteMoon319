@@ -29,19 +29,13 @@ export function isAuthorOf(user: UserRow, authorIds: number[]): boolean {
   return authorIds.includes(user.id);
 }
 
-export type PostAccessResult =
-  | { ok: true; user: UserRow; post: PostRow }
-  | { ok: false; response: Response };
+export type PostAccessResult = { ok: true; user: UserRow; post: PostRow } | { ok: false; response: Response };
 
 /**
  * 单篇写操作的统一前置：作者基线权限 + 文章存在（未删除）+ 编辑权。
  * 越权返回 403 而非 404，便于调用方区分"不存在"与"不属于你"。
  */
-export async function requirePostAccess(
-  ctx: APIContext,
-  db: D1Database,
-  postId: number,
-): Promise<PostAccessResult> {
+export async function requirePostAccess(ctx: APIContext, db: D1Database, postId: number): Promise<PostAccessResult> {
   const auth = await requireAuthor(ctx);
   if (!auth.ok) return auth;
   const post = await getPostById(db, postId);

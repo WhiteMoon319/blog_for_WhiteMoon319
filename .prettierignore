@@ -1,0 +1,18 @@
+# 构建产物与依赖
+node_modules
+dist
+admin/dist
+dist-write
+runtime
+.wrangler
+.pai
+
+# 本地私有主题（被 .gitignore 忽略，可能是未完成的移植稿，不纳入格式化）
+src/themes/starter
+src/themes/wildfire
+src/themes/clarity
+
+# 锁文件与自动生成物
+pnpm-lock.yaml
+package-lock.json
+.astro

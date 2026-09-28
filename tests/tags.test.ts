@@ -95,10 +95,22 @@ test('标签：云计数——继承不重复计，未覆盖的自有标签计',
   const col = await createCollection(db, { title: '乙集', slug: 'tag-cloud' });
   assert.ok(col);
   await setCollectionTags(db, col.id, ['云试甲']);
-  const a = await createPost(db, { title: '章甲', slug: 'cloud-a', collection_id: col.id, content_md: '', status: 'published' });
+  const a = await createPost(db, {
+    title: '章甲',
+    slug: 'cloud-a',
+    collection_id: col.id,
+    content_md: '',
+    status: 'published',
+  });
   const b = await createPost(db, { title: '散篇乙', slug: 'cloud-b', content_md: '', status: 'published' });
   const c = await createPost(db, { title: '散篇丙', slug: 'cloud-c', content_md: '', status: 'draft' });
-  const d = await createPost(db, { title: '章丁', slug: 'cloud-d', collection_id: col.id, content_md: '', status: 'published' });
+  const d = await createPost(db, {
+    title: '章丁',
+    slug: 'cloud-d',
+    collection_id: col.id,
+    content_md: '',
+    status: 'published',
+  });
   assert.ok(a && b && c && d);
   await setPostOwnTags(db, b.id, ['云试甲']);
   await setPostOwnTags(db, c.id, ['云试甲']);
@@ -119,7 +131,13 @@ test('标签页：文集卡 + 未被覆盖的文章', async () => {
   const col = await createCollection(db, { title: '丙集', slug: 'tag-page' });
   assert.ok(col);
   await setCollectionTags(db, col.id, ['页试甲']);
-  const inside = await createPost(db, { title: '章子', slug: 'tagp-in', collection_id: col.id, content_md: '', status: 'published' });
+  const inside = await createPost(db, {
+    title: '章子',
+    slug: 'tagp-in',
+    collection_id: col.id,
+    content_md: '',
+    status: 'published',
+  });
   const loose = await createPost(db, { title: '散篇子', slug: 'tagp-loose', content_md: '', status: 'published' });
   const looseDraft = await createPost(db, { title: '草稿子', slug: 'tagp-draft', content_md: '', status: 'draft' });
   assert.ok(inside && loose && looseDraft);
@@ -158,9 +176,18 @@ test('标签：文集标签变更后继承即时生效（不落地复制）', as
   const col = await createCollection(db, { title: '戊集', slug: 'tag-inherit' });
   assert.ok(col);
   await setCollectionTags(db, col.id, ['继承试甲']);
-  const p = await createPost(db, { title: '章庚', slug: 'tagi-01', collection_id: col.id, content_md: '', status: 'published' });
+  const p = await createPost(db, {
+    title: '章庚',
+    slug: 'tagi-01',
+    collection_id: col.id,
+    content_md: '',
+    status: 'published',
+  });
   assert.ok(p);
-  assert.deepEqual((await listPostEffectiveTags(db, p.id)).map((t) => t.name), ['继承试甲']);
+  assert.deepEqual(
+    (await listPostEffectiveTags(db, p.id)).map((t) => t.name),
+    ['继承试甲'],
+  );
   await setCollectionTags(db, col.id, ['继承试乙']);
   assert.deepEqual(
     (await listPostEffectiveTags(db, p.id)).map((t) => t.name),
@@ -204,8 +231,20 @@ test('标签：多标签交集——同时具备全部选中标签才命中，�
   const col = await createCollection(db, { title: '己集', slug: 'tag-union' });
   assert.ok(col);
   await setCollectionTags(db, col.id, ['并集试甲', '并集试乙']);
-  const a = await createPost(db, { title: '章辛', slug: 'tu-in', collection_id: col.id, content_md: '正文', status: 'published' });
-  const b = await createPost(db, { title: '章壬', slug: 'tu-own', collection_id: col.id, content_md: '正文', status: 'published' });
+  const a = await createPost(db, {
+    title: '章辛',
+    slug: 'tu-in',
+    collection_id: col.id,
+    content_md: '正文',
+    status: 'published',
+  });
+  const b = await createPost(db, {
+    title: '章壬',
+    slug: 'tu-own',
+    collection_id: col.id,
+    content_md: '正文',
+    status: 'published',
+  });
   const loose = await createPost(db, { title: '散篇癸', slug: 'tu-loose', content_md: '', status: 'published' });
   const loose2 = await createPost(db, { title: '散篇戊', slug: 'tu-loose2', content_md: '', status: 'published' });
   const loose3 = await createPost(db, { title: '散篇己', slug: 'tu-loose3', content_md: '', status: 'published' });
@@ -240,7 +279,11 @@ test('标签：多标签交集——同时具备全部选中标签才命中，�
   );
 
   const kw = await getTagsUnion(db, ['并集试甲', '并集试乙'], '章辛');
-  assert.deepEqual(kw.collections.map((c) => c.slug), [], '关键词不匹配文集名则不出现文集');
+  assert.deepEqual(
+    kw.collections.map((c) => c.slug),
+    [],
+    '关键词不匹配文集名则不出现文集',
+  );
   assert.deepEqual(
     (kw.collectionPosts.get(col.id) ?? []).map((p) => p.slug),
     ['tu-in'],
@@ -280,11 +323,17 @@ test('检索：LIKE 通配符按字面匹配（% 与 _ 不展开）', async () =
   assert.ok(pct && under);
 
   const hit = await searchPublishedPosts(db, '100%');
-  assert.ok(hit.some((p) => p.id === pct.id), '搜索 100% 命中含字面 % 的篇章');
+  assert.ok(
+    hit.some((p) => p.id === pct.id),
+    '搜索 100% 命中含字面 % 的篇章',
+  );
   assert.ok(!hit.some((p) => p.id === under.id), '未命中无关篇章');
 
   const hit2 = await searchPublishedPosts(db, 'a_b');
-  assert.ok(hit2.some((p) => p.id === under.id), 'a_b 按字面匹配');
+  assert.ok(
+    hit2.some((p) => p.id === under.id),
+    'a_b 按字面匹配',
+  );
   assert.ok(!hit2.some((p) => p.id === pct.id));
 });
 

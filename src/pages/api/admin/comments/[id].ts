@@ -23,8 +23,13 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
 
   let body: { status?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
-  if (body.status !== 'approved' && body.status !== 'rejected') return json({ error: 'status must be approved or rejected' }, 400);
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
+  if (body.status !== 'approved' && body.status !== 'rejected')
+    return json({ error: 'status must be approved or rejected' }, 400);
 
   const ok = await updateCommentStatus(env.DB, id, body.status);
   if (!ok) return json({ error: 'not found or already processed' }, 404);

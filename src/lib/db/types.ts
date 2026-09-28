@@ -100,7 +100,17 @@ const POST_FIELDS = [
 ] as const;
 export type PostPatch = Partial<Record<(typeof POST_FIELDS)[number], string | number | null>>;
 
-const COLLECTION_FIELDS = ['title', 'slug', 'summary', 'theme_color', 'sort_order', 'post_order', 'ref_summaries', 'ai_prompt_id', 'is_public'] as const;
+const COLLECTION_FIELDS = [
+  'title',
+  'slug',
+  'summary',
+  'theme_color',
+  'sort_order',
+  'post_order',
+  'ref_summaries',
+  'ai_prompt_id',
+  'is_public',
+] as const;
 export type CollectionPatch = Partial<Record<(typeof COLLECTION_FIELDS)[number], string | number>>;
 
 export interface PostVersionRow {

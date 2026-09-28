@@ -57,7 +57,10 @@ test('排版块：表格容器按 borders 输出边类，默认不加类', () =>
   assert.ok(!outer.includes('bd-innerH'), 'outer 不含内部横线');
   // 逐边（小写边名）
   const custom = html(`:::table{borders=top,innerh,innerv}\n${tbl}\n:::`);
-  assert.ok(custom.includes('bd-top') && custom.includes('bd-innerH') && custom.includes('bd-innerV'), `大小写不敏感：${custom}`);
+  assert.ok(
+    custom.includes('bd-top') && custom.includes('bd-innerH') && custom.includes('bd-innerV'),
+    `大小写不敏感：${custom}`,
+  );
   assert.ok(!custom.includes('bd-bottom'), '未选中的边不出现');
 });
 
@@ -103,7 +106,8 @@ test('框线：class ↔ 边集合 互为反函数', () => {
   assert.deepEqual(tableBorderClasses(['bottom', 'left']), ['bd-reset', 'bd-bottom', 'bd-left']);
 });
 
-test('排版块：变体参数生效，非法变体被忽略', () => {  assert.ok(html(':::callout{type=warning}\n注意\n:::').includes('blk-callout is-warning'), 'type 变体生效');
+test('排版块：变体参数生效，非法变体被忽略', () => {
+  assert.ok(html(':::callout{type=warning}\n注意\n:::').includes('blk-callout is-warning'), 'type 变体生效');
   assert.ok(html(':::divider{style=dots}\n:::').includes('blk-divider is-dots'), 'style 变体生效');
   assert.ok(html(':::highlight{variant=gradient}\n强调\n:::').includes('is-gradient'), 'variant 等价键');
   assert.ok(!html(':::callout{type=evil}\n注意\n:::').includes('is-evil'), '非法变体不落地');
@@ -154,7 +158,9 @@ test('排版块：空块与相邻块、上下文的解析边界', () => {
 });
 
 test('排版块：script / onerror / javascript: 仍被清洗', () => {
-  const evil = html(':::callout{type=info}\n<img src=x onerror=alert(1)>\n\n<script>alert(2)</script>\n\n[坏](javascript:alert(3))\n:::');
+  const evil = html(
+    ':::callout{type=info}\n<img src=x onerror=alert(1)>\n\n<script>alert(2)</script>\n\n[坏](javascript:alert(3))\n:::',
+  );
   assert.ok(!evil.includes('<script'), 'script 被移除');
   assert.ok(!evil.includes('onerror'), 'onerror 被移除');
   assert.ok(!evil.includes('javascript:'), 'javascript: 被移除');

@@ -16,24 +16,34 @@ const editing = ref<Collection | null>(null);
 const creating = ref(false);
 const suggestions = ref<string[]>([]);
 
-const form = reactive({ title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc' as 'asc' | 'desc', ref_summaries: 0, tags: [] as string[], ai_prompt_id: 'overview' });
+const form = reactive({
+  title: '',
+  slug: '',
+  summary: '',
+  theme_color: '#c23a30',
+  sort_order: 0,
+  post_order: 'desc' as 'asc' | 'desc',
+  ref_summaries: 0,
+  tags: [] as string[],
+  ai_prompt_id: 'overview',
+});
 
 const COLORS = ['#c23a30', '#2d6a4f', '#2f4858', '#8a6d3b', '#6baed6'];
 const promptTemplates = ref<Array<{ id: string; name: string }>>([]);
 
 async function load() {
-  const [r, s] = await Promise.all([
-    api.collections(),
-    api.settings().catch(() => ({ ai_prompt_templates: '' })),
-  ]);
+  const [r, s] = await Promise.all([api.collections(), api.settings().catch(() => ({ ai_prompt_templates: '' }))]);
   collections.value = r.collections;
   loaded.value = true;
   // 加载 prompt 模板列表
   const raw = (s as Record<string, string>).ai_prompt_templates;
   try {
     const parsed = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(parsed)) promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
-  } catch { /* ignore */ }
+    if (Array.isArray(parsed))
+      promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
+  } catch {
+    /* ignore */
+  }
 }
 onMounted(async () => {
   try {
@@ -41,13 +51,26 @@ onMounted(async () => {
   } catch (e) {
     emit('notify', (e as Error).message, true);
   }
-  api.tags().then((r) => (suggestions.value = r.tags.map((t: Tag) => t.name))).catch(() => {});
+  api
+    .tags()
+    .then((r) => (suggestions.value = r.tags.map((t: Tag) => t.name)))
+    .catch(() => {});
 });
 
 function openCreate() {
   creating.value = true;
   editing.value = null;
-  Object.assign(form, { title: '', slug: '', summary: '', theme_color: '#c23a30', sort_order: 0, post_order: 'desc', ref_summaries: 0, tags: [], ai_prompt_id: 'overview' });
+  Object.assign(form, {
+    title: '',
+    slug: '',
+    summary: '',
+    theme_color: '#c23a30',
+    sort_order: 0,
+    post_order: 'desc',
+    ref_summaries: 0,
+    tags: [],
+    ai_prompt_id: 'overview',
+  });
 }
 
 async function openEdit(c: Collection) {
@@ -196,7 +219,9 @@ async function remove(c: Collection) {
         <label>AI 摘要模板</label>
         <select v-model="form.ai_prompt_id" class="select">
           <option v-for="t in promptTemplates" :key="t.id" :value="t.id">{{ t.name }}（{{ t.id }}）</option>
-          <option :value="'overview'" v-if="!promptTemplates.find((t) => t.id === 'overview')">博客摘要（overview）</option>
+          <option :value="'overview'" v-if="!promptTemplates.find((t) => t.id === 'overview')">
+            博客摘要（overview）
+          </option>
         </select>
       </div>
       <div class="field">
@@ -205,7 +230,16 @@ async function remove(c: Collection) {
       </div>
       <div class="row-10">
         <button class="btn btn-primary" type="submit">落印</button>
-        <button class="btn btn-ghost" type="button" @click="creating = false; editing = null">罢笔</button>
+        <button
+          class="btn btn-ghost"
+          type="button"
+          @click="
+            creating = false;
+            editing = null;
+          "
+        >
+          罢笔
+        </button>
       </div>
     </form>
   </div>

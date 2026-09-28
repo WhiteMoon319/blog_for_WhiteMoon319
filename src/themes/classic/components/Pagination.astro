@@ -27,17 +27,31 @@ for (let n = 1; n <= totalPages; n++) {
 {
   totalPages > 1 && (
     <nav class="pagination" aria-label="分页">
-      {current > 1 && <a class="pgn" href={pageHref(current - 1)}>上一页</a>}
+      {current > 1 && (
+        <a class="pgn" href={pageHref(current - 1)}>
+          上一页
+        </a>
+      )}
       {pages.map((n) =>
         n === '…' ? (
-          <span class="pgn-ellipsis" aria-hidden="true">…</span>
+          <span class="pgn-ellipsis" aria-hidden="true">
+            …
+          </span>
         ) : (
-          <a class={`pgn${n === current ? ' on' : ''}`} href={pageHref(n)} aria-current={n === current ? 'page' : undefined}>
+          <a
+            class={`pgn${n === current ? ' on' : ''}`}
+            href={pageHref(n)}
+            aria-current={n === current ? 'page' : undefined}
+          >
             {n}
           </a>
         ),
       )}
-      {current < totalPages && <a class="pgn" href={pageHref(current + 1)}>下一页</a>}
+      {current < totalPages && (
+        <a class="pgn" href={pageHref(current + 1)}>
+          下一页
+        </a>
+      )}
     </nav>
   )
 }
@@ -58,7 +72,10 @@ for (let n = 1; n <= totalPages; n++) {
     font-family: var(--font-serif);
     font-size: 0.95rem;
     color: var(--ink-soft);
-    transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+    transition:
+      background 0.2s var(--ease-out),
+      color 0.2s var(--ease-out),
+      border-color 0.2s var(--ease-out);
   }
   .pgn:hover {
     border-color: var(--cinnabar);

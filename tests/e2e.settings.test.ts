@@ -79,7 +79,7 @@ test('e2e：无 Origin 的 PUT 被 CSRF 拒绝（403）', async () => {
 
 async function resetPasswordToDefault() {
   // 清空 DB 凭据和限流记录，回退到 env 密码 admin123
-  await c.sql("DELETE FROM admin_credentials");
+  await c.sql('DELETE FROM admin_credentials');
   // 迁移 0027 后管理员并入 users 表：重置其密码哈希为空以回退 env 密码，并升 session_version 使旧会话失效
   await c.sql("UPDATE users SET password_hash = '', session_version = session_version + 1 WHERE username = 'admin'");
   await c.sql("DELETE FROM login_attempts WHERE key LIKE 'pwd:%'");
@@ -116,7 +116,10 @@ test('e2e：修改密码——弱密码被拒绝', async () => {
   // 太短
   assert.equal((await c.post('/api/auth/password', { old_password: 'admin123', new_password: 'ab' })).status, 400);
   // 纯字母
-  assert.equal((await c.post('/api/auth/password', { old_password: 'admin123', new_password: 'abcdefgh' })).status, 400);
+  assert.equal(
+    (await c.post('/api/auth/password', { old_password: 'admin123', new_password: 'abcdefgh' })).status,
+    400,
+  );
 });
 
 test('e2e：修改密码——新旧相同拒绝', async () => {

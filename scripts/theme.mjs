@@ -21,7 +21,17 @@ const THEMES_DIR = path.join(ROOT, 'src', 'themes');
 const ENV_FILE = path.join(ROOT, '.env');
 const TSCONFIG = path.join(ROOT, 'tsconfig.json');
 
-const CORE_TEMPLATES = ['home', 'collection', 'post', 'standalone', 'archive', 'search', 'not-found', 'tag-index', 'tag-detail'];
+const CORE_TEMPLATES = [
+  'home',
+  'collection',
+  'post',
+  'standalone',
+  'archive',
+  'search',
+  'not-found',
+  'tag-index',
+  'tag-detail',
+];
 const SYSTEM_THEMES = ['classic'];
 
 const info = (s) => console.log(`\u2139  ${s}`);
@@ -70,7 +80,8 @@ function validate(slug) {
       problems.push(`theme.json 解析失败：${e.message}`);
     }
   }
-  if (!existsSync(path.join(dir, 'layouts', 'BaseLayout.astro'))) problems.push('缺少 layouts/BaseLayout.astro（硬必需）');
+  if (!existsSync(path.join(dir, 'layouts', 'BaseLayout.astro')))
+    problems.push('缺少 layouts/BaseLayout.astro（硬必需）');
   const missingTemplates = CORE_TEMPLATES.filter((t) => !existsSync(path.join(dir, 'templates', `${t}.astro`)));
   return { problems, missingTemplates };
 }
@@ -102,7 +113,9 @@ function writeTsconfigFor(active) {
     '@theme/*': [`./src/themes/${active}/*`, './src/themes/classic/*'],
   };
   // 排除未激活的非保护主题，避免半成品打红 astro check
-  const excluded = listThemes().filter((t) => t !== active && t !== 'classic').map((t) => `src/themes/${t}`);
+  const excluded = listThemes()
+    .filter((t) => t !== active && t !== 'classic')
+    .map((t) => `src/themes/${t}`);
   json.exclude = ['dist', 'admin', 'node_modules', ...excluded];
   atomicWrite(TSCONFIG, JSON.stringify(json, null, 2) + '\n');
 }

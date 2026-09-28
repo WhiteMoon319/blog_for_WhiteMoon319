@@ -19,21 +19,25 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   const base = env.SITE_URL.replace(/\/$/, '');
   const collections = await listCollections(env.DB);
-  const posts = await env.DB
-    .prepare(
-      `SELECT p.id, p.slug, p.collection_id, p.updated_at, p.status, p.deleted_at, c.slug AS collection_slug FROM posts p
+  const posts = await env.DB.prepare(
+    `SELECT p.id, p.slug, p.collection_id, p.updated_at, p.status, p.deleted_at, c.slug AS collection_slug FROM posts p
        LEFT JOIN collections c ON c.id = p.collection_id
        WHERE p.status = 'published' AND p.deleted_at IS NULL`,
-    )
-    .all<{ id: number; slug: string; collection_id: number | null; updated_at: string; status: string; deleted_at: string | null; collection_slug: string | null }>();
+  ).all<{
+    id: number;
+    slug: string;
+    collection_id: number | null;
+    updated_at: string;
+    status: string;
+    deleted_at: string | null;
+    collection_slug: string | null;
+  }>();
   // 作者页同样纳入 sitemap：口径与作者页一致（未封禁的作者/管理员）
-  const authors = await env.DB
-    .prepare(
-      `SELECT id, username, display_name, status, created_at FROM users
+  const authors = await env.DB.prepare(
+    `SELECT id, username, display_name, status, created_at FROM users
        WHERE role IN ('author','admin') AND status = 'active'
        ORDER BY id`,
-    )
-    .all<{ id: number; username: string; display_name: string; status: string; created_at: string }>();
+  ).all<{ id: number; username: string; display_name: string; status: string; created_at: string }>();
 
   // 标签页同样纳入：口径与 /tags/ 索引一致（只收「至少有内容」的标签）
   const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
@@ -54,7 +58,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
 
   const urls = ['/', '/archive/', '/about/', '/search/'].map((path) => ({
-    path, lastmod: undefined as string | undefined,
+    path,
+    lastmod: undefined as string | undefined,
   }));
 
   for (const c of collections) {
@@ -71,10 +76,12 @@ export async function GET(ctx: APIContext): Promise<Response> {
     urls.push({ path: `/tags/${encodeURIComponent(t.name)}/`, lastmod: t.created_at });
   }
 
-  const body = urls.map((u) => {
-    const loc = `${base}${u.path}`;
-    return `  <url>\n    <loc>${loc}</loc>${u.lastmod ? `\n    <lastmod>${u.lastmod.slice(0, 10)}</lastmod>` : ''}\n  </url>`;
-  }).join('\n');
+  const body = urls
+    .map((u) => {
+      const loc = `${base}${u.path}`;
+      return `  <url>\n    <loc>${loc}</loc>${u.lastmod ? `\n    <lastmod>${u.lastmod.slice(0, 10)}</lastmod>` : ''}\n  </url>`;
+    })
+    .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`;
   sitemapCache = { key: cacheKey, xml };

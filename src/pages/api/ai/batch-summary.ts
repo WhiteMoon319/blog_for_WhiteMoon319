@@ -48,14 +48,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const ids = [...new Set(body.ids.filter((id): id is number => Number.isInteger(id) && id > 0))];
   if (ids.length === 0) return json({ error: 'invalid ids' }, 400);
 
-  const [settings, cred] = await Promise.all([
-    getAllSettings(env.DB),
-    getAiCredential(env.DB),
-  ]);
+  const [settings, cred] = await Promise.all([getAllSettings(env.DB), getAiCredential(env.DB)]);
   if (!cred) return json({ error: 'ai_api_key_not_configured' }, 400);
 
   let apiKey: string;
-  try { apiKey = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, cred.api_key_ciphertext); } catch {
+  try {
+    apiKey = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, cred.api_key_ciphertext);
+  } catch {
     return json({ error: 'failed_to_decrypt_api_key' }, 500);
   }
 
@@ -67,7 +66,16 @@ export async function POST(ctx: APIContext): Promise<Response> {
   for (const id of ids) {
     const post = await env.DB.prepare(
       `SELECT id, collection_id, content_md, summary_source, summary, deleted_at FROM posts WHERE id = ?`,
-    ).bind(id).first<{ id: number; collection_id: number | null; content_md: string; summary_source: string; summary: string; deleted_at: string | null }>();
+    )
+      .bind(id)
+      .first<{
+        id: number;
+        collection_id: number | null;
+        content_md: string;
+        summary_source: string;
+        summary: string;
+        deleted_at: string | null;
+      }>();
 
     if (!post || post.deleted_at) {
       results.push({ id, status: 'skipped', error: 'not_found' });
@@ -97,7 +105,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     let context = null;
     let promptId: string | undefined;
     if (post.collection_id !== null) {
-      const col = await env.DB.prepare('SELECT ref_summaries, ai_prompt_id FROM collections WHERE id = ?').bind(post.collection_id).first<{ ref_summaries: number; ai_prompt_id: string }>();
+      const col = await env.DB.prepare('SELECT ref_summaries, ai_prompt_id FROM collections WHERE id = ?')
+        .bind(post.collection_id)
+        .first<{ ref_summaries: number; ai_prompt_id: string }>();
       if (col?.ai_prompt_id) promptId = col.ai_prompt_id;
       if (col && col.ref_summaries === 1) {
         context = await collectContext(env.DB, post.collection_id, id);

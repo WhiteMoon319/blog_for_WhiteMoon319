@@ -33,13 +33,17 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const curCred = await getAiCredential(env.DB);
   let existingKey = '';
   if (curCred) {
-    try { existingKey = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, curCred.api_key_ciphertext); } catch {}
+    try {
+      existingKey = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, curCred.api_key_ciphertext);
+    } catch {}
   }
 
   const provider = (typeof body.provider === 'string' ? body.provider : settings.ai_provider) || 'deepseek';
-  const baseUrl = (typeof body.base_url === 'string' ? body.base_url : settings.ai_base_url) || 'https://api.deepseek.com';
+  const baseUrl =
+    (typeof body.base_url === 'string' ? body.base_url : settings.ai_base_url) || 'https://api.deepseek.com';
   const model = (typeof body.model === 'string' ? body.model : settings.ai_model) || 'deepseek-v4-flash';
-  const reasoningEffort = typeof body.reasoning_effort === 'string' ? body.reasoning_effort : (settings.ai_reasoning_effort || '');
+  const reasoningEffort =
+    typeof body.reasoning_effort === 'string' ? body.reasoning_effort : settings.ai_reasoning_effort || '';
   const apiKey = typeof body.api_key === 'string' && body.api_key.length > 0 ? body.api_key : existingKey;
 
   if (provider !== 'deepseek' && provider !== 'openai_compatible') {
@@ -76,7 +80,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
   let newKeyConfigured = false;
   let maskedKey = '';
   const stmts: D1PreparedStatement[] = Object.entries(settingsPairs).map(([k, v]) =>
-    env.DB.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(k, v),
+    env.DB.prepare(
+      `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).bind(k, v),
   );
 
   if (typeof body.api_key === 'string' && body.api_key.length > 0) {

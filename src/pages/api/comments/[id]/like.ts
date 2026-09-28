@@ -24,24 +24,30 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
 
   // 检查评论存在且已批准
-  const comment = await env.DB.prepare(`SELECT id, status FROM comments WHERE id = ?`).bind(id).first<{ id: number; status: string }>();
+  const comment = await env.DB.prepare(`SELECT id, status FROM comments WHERE id = ?`)
+    .bind(id)
+    .first<{ id: number; status: string }>();
   if (!comment || comment.status !== 'approved') return json({ error: 'not found' }, 404);
 
   // 检查是否已赞
-  const existing = await env.DB.prepare(
-    `SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?`,
-  ).bind(id, auth.user.id).first<{ 1: number }>();
+  const existing = await env.DB.prepare(`SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?`)
+    .bind(id, auth.user.id)
+    .first<{ 1: number }>();
 
   if (existing) {
     // 取消点赞
     await env.DB.prepare(`DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?`).bind(id, auth.user.id).run();
   } else {
     // 点赞（OR IGNORE 防并发重复插入）
-    await env.DB.prepare(`INSERT OR IGNORE INTO comment_likes (comment_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
+    await env.DB.prepare(`INSERT OR IGNORE INTO comment_likes (comment_id, user_id) VALUES (?, ?)`)
+      .bind(id, auth.user.id)
+      .run();
   }
 
   // 返回新点赞数
-  const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM comment_likes WHERE comment_id = ?`).bind(id).first<{ n: number }>();
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM comment_likes WHERE comment_id = ?`)
+    .bind(id)
+    .first<{ n: number }>();
 
   return json({ liked: !existing, likes_count: count?.n ?? 0 });
 }

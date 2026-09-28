@@ -7,7 +7,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listPosts, createPostWithTags, listPostAuthors, listAuthorsForPosts, filterSignableAuthorIds, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import {
+  envOf,
+  listPosts,
+  createPostWithTags,
+  listPostAuthors,
+  listAuthorsForPosts,
+  filterSignableAuthorIds,
+  parseTagsStrict,
+  isSlugConflict,
+} from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
@@ -52,7 +61,10 @@ export async function GET(ctx: APIContext): Promise<Response> {
     authorId,
   });
   // 列表页需要署名：一次 IN 查询取回全部，避免逐篇查询
-  const authorMap = await listAuthorsForPosts(env.DB, posts.map((p) => p.id));
+  const authorMap = await listAuthorsForPosts(
+    env.DB,
+    posts.map((p) => p.id),
+  );
   return json({ posts: posts.map((p) => ({ ...p, authors: authorMap.get(p.id) ?? [] })) });
 }
 
@@ -77,9 +89,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   const status = body.status === 'published' ? 'published' : 'draft';
   const collectionId =
-    typeof body.collection_id === 'number' && Number.isInteger(body.collection_id)
-      ? body.collection_id
-      : null;
+    typeof body.collection_id === 'number' && Number.isInteger(body.collection_id) ? body.collection_id : null;
 
   const slug = typeof body.slug === 'string' && body.slug.trim() ? body.slug.trim() : undefined;
   if (slug && !isValidSlug(slug)) {
@@ -100,10 +110,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   // SEO 关键词：纯文本、长度受限，超出截断会静默丢数据，因此直接 400
-  const metaKeywords =
-    typeof body.meta_keywords === 'string'
-      ? body.meta_keywords.trim().replace(/\s+/g, ' ')
-      : '';
+  const metaKeywords = typeof body.meta_keywords === 'string' ? body.meta_keywords.trim().replace(/\s+/g, ' ') : '';
   if (metaKeywords.length > 200) {
     return json({ error: 'meta_keywords too long: 最多 200 字' }, 400);
   }
@@ -139,22 +146,30 @@ export async function POST(ctx: APIContext): Promise<Response> {
     if (authorIds.length !== new Set(requested).size) {
       return json({ error: 'authors 含不可署名的用户（需为作者或管理员且未封禁）' }, 400);
     }
-    const created = await createPostWithTags(env.DB, {
-      title: body.title.trim(),
-      slug: ensureSlug(slug, body.title, 'post'),
-      collection_id: collectionId,
-      summary: typeof body.summary === 'string' ? body.summary : '',
-      content_md: typeof body.content_md === 'string' ? body.content_md : '',
-      cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
-      meta_keywords: metaKeywords,
-      is_pinned: isPinned,
-      scheduled_at: scheduledAt,
-      status,
-      created_by: auth.user.id,
-      layout,
-    }, parsedTags.tags, authorIds);
+    const created = await createPostWithTags(
+      env.DB,
+      {
+        title: body.title.trim(),
+        slug: ensureSlug(slug, body.title, 'post'),
+        collection_id: collectionId,
+        summary: typeof body.summary === 'string' ? body.summary : '',
+        content_md: typeof body.content_md === 'string' ? body.content_md : '',
+        cover_url: typeof body.cover_url === 'string' ? body.cover_url : '',
+        meta_keywords: metaKeywords,
+        is_pinned: isPinned,
+        scheduled_at: scheduledAt,
+        status,
+        created_by: auth.user.id,
+        layout,
+      },
+      parsedTags.tags,
+      authorIds,
+    );
     if (!created) return json({ error: 'post create failed' }, 500);
-    return json({ post: created.post, tags: created.tags, version: 1, authors: await listPostAuthors(env.DB, created.post.id) }, 201);
+    return json(
+      { post: created.post, tags: created.tags, version: 1, authors: await listPostAuthors(env.DB, created.post.id) },
+      201,
+    );
   } catch (e) {
     if (isSlugConflict(e)) return json({ error: 'slug already exists' }, 409);
     throw e;

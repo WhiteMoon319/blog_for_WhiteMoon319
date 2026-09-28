@@ -93,8 +93,13 @@ export async function getSiteContext(ctx: APIContext): Promise<SiteContext> {
     // 上下文组装失败时降级为最小可用上下文，保证页面仍可渲染（与计划的降级保障一致）
     console.error('[theme-context] build failed:', e);
     return {
-      siteName: 'blog', siteUrl: '', slogan: '', footerLine: '',
-      tagline: COPY_DEFAULTS.site_tagline, searchPlaceholder: '', heroNote: '',
+      siteName: 'blog',
+      siteUrl: '',
+      slogan: '',
+      footerLine: '',
+      tagline: COPY_DEFAULTS.site_tagline,
+      searchPlaceholder: '',
+      heroNote: '',
       locale: DEFAULT_LOCALE,
       user: {
         loggedIn: false,
@@ -105,7 +110,8 @@ export async function getSiteContext(ctx: APIContext): Promise<SiteContext> {
         authorHref: null,
         writeHref: null,
       },
-      nav: [], r2Base: '',
+      nav: [],
+      r2Base: '',
     };
   }
 }
@@ -148,9 +154,10 @@ async function buildSiteContext(ctx: APIContext): Promise<SiteContext> {
 
   return {
     siteName: pick('SITE_NAME', env.SITE_NAME, '我的书房'),
-    siteUrl: (pick('SITE_URL', env.SITE_URL, '')).replace(/\/+$/, ''),
+    siteUrl: pick('SITE_URL', env.SITE_URL, '').replace(/\/+$/, ''),
     slogan: pick('SITE_SLOGAN', env.SITE_SLOGAN, ''),
-    footerLine: pick('footer_line', env.FOOTER_LINE, '') || pick('SITE_POEM', env.SITE_POEM, '月下少辞令，醉后自逍遥。'),
+    footerLine:
+      pick('footer_line', env.FOOTER_LINE, '') || pick('SITE_POEM', env.SITE_POEM, '月下少辞令，醉后自逍遥。'),
     tagline: pick('site_tagline', env.SITE_TAGLINE, COPY_DEFAULTS.site_tagline),
     searchPlaceholder: pick('search_placeholder', env.SEARCH_PLACEHOLDER, ''),
     heroNote: pick('hero_note', env.HERO_NOTE, ''),

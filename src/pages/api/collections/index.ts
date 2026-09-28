@@ -7,7 +7,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listCollections, listCollectionWriteView, createCollectionWithTags, parseTagsStrict, isSlugConflict } from '../../../lib/db';
+import {
+  envOf,
+  listCollections,
+  listCollectionWriteView,
+  createCollectionWithTags,
+  parseTagsStrict,
+  isSlugConflict,
+} from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { ensureSlug, isValidSlug } from '../../../lib/utils';
 
@@ -84,18 +91,22 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   try {
     const env = await envOf();
-    const created = await createCollectionWithTags(env.DB, {
-      title: body.title.trim(),
-      slug: ensureSlug(slug, body.title, 'collection'),
-      summary: typeof body.summary === 'string' ? body.summary : '',
-      theme_color: themeColor,
-      sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
-      post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
-      ref_summaries: typeof body.ref_summaries === 'number' ? body.ref_summaries : 0,
-      ai_prompt_id: typeof body.ai_prompt_id === 'string' ? body.ai_prompt_id : 'overview',
-      created_by: auth.user.id,
-      is_public: isPublic,
-    }, parsedTags.tags);
+    const created = await createCollectionWithTags(
+      env.DB,
+      {
+        title: body.title.trim(),
+        slug: ensureSlug(slug, body.title, 'collection'),
+        summary: typeof body.summary === 'string' ? body.summary : '',
+        theme_color: themeColor,
+        sort_order: typeof body.sort_order === 'number' ? body.sort_order : 0,
+        post_order: (postOrder ?? 'desc') as 'asc' | 'desc',
+        ref_summaries: typeof body.ref_summaries === 'number' ? body.ref_summaries : 0,
+        ai_prompt_id: typeof body.ai_prompt_id === 'string' ? body.ai_prompt_id : 'overview',
+        created_by: auth.user.id,
+        is_public: isPublic,
+      },
+      parsedTags.tags,
+    );
     if (!created) return json({ error: 'collection create failed' }, 500);
     return json({ collection: created.collection, tags: created.tags }, 201);
   } catch (e) {

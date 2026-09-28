@@ -71,7 +71,10 @@ test('e2e：媒体库——未登录 401，列表含已传文件，删除后文�
   const listBody = await list.json();
   const found = (listBody.files as Array<{ key: string; url: string }>).some((f) => f.key === key);
   assert.ok(found, '媒体列表应包含刚上传的文件');
-  assert.ok(String((listBody.files as Array<{ url: string }>)[0].url).includes('/api/files/'), '无 R2_PUBLIC_URL 时用站内路径');
+  assert.ok(
+    String((listBody.files as Array<{ url: string }>)[0].url).includes('/api/files/'),
+    '无 R2_PUBLIC_URL 时用站内路径',
+  );
 
   const bad = await c.del(`/api/media?key=${encodeURIComponent('etc/passwd')}`);
   assert.equal(bad.status, 400, '非 uploads/ 前缀应拒绝');

@@ -32,7 +32,11 @@ export interface CommentTree extends CommentFlat {
   liked_by_me: boolean;
 }
 
-export async function listApprovedComments(db: D1Database, postId: number, currentUserId?: number): Promise<CommentTree[]> {
+export async function listApprovedComments(
+  db: D1Database,
+  postId: number,
+  currentUserId?: number,
+): Promise<CommentTree[]> {
   const rows = await db
     .prepare(
       `SELECT c.*, u.username, u.display_name, u.avatar_url,
@@ -85,9 +89,13 @@ export async function listApprovedComments(db: D1Database, postId: number, curre
     else byId.get(c.parent_id)?.children.push(c);
   }
 
-  tops.forEach((t, i) => { t.floor = String(i + 1); });
+  tops.forEach((t, i) => {
+    t.floor = String(i + 1);
+  });
   for (const t of tops) {
-    t.children.forEach((c, i) => { c.floor = `${t.floor}_${i + 1}`; });
+    t.children.forEach((c, i) => {
+      c.floor = `${t.floor}_${i + 1}`;
+    });
   }
   return tops;
 }
@@ -103,8 +111,15 @@ export async function createComment(
     .first<CommentRow>();
 }
 
-export async function updateCommentStatus(db: D1Database, id: number, status: 'approved' | 'rejected'): Promise<boolean> {
-  const row = await db.prepare(`UPDATE comments SET status = ? WHERE id = ? AND status = 'pending' RETURNING id`).bind(status, id).first<{ id: number }>();
+export async function updateCommentStatus(
+  db: D1Database,
+  id: number,
+  status: 'approved' | 'rejected',
+): Promise<boolean> {
+  const row = await db
+    .prepare(`UPDATE comments SET status = ? WHERE id = ? AND status = 'pending' RETURNING id`)
+    .bind(status, id)
+    .first<{ id: number }>();
   return !!row;
 }
 
@@ -124,12 +139,21 @@ export async function listCommentsForAdmin(
   page: number,
   pageSize = 20,
   postId?: number,
-): Promise<{ comments: Array<CommentRow & { username: string; display_name: string; post_title: string }>; total: number }> {
+): Promise<{
+  comments: Array<CommentRow & { username: string; display_name: string; post_title: string }>;
+  total: number;
+}> {
   const offset = (page - 1) * pageSize;
   const where = ['c.status = ?'];
   const args: (string | number)[] = [status];
-  if (postId) { where.push('c.post_id = ?'); args.push(postId); }
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM comments c WHERE ${where.join(' AND ')}`).bind(...args).first<{ n: number }>();
+  if (postId) {
+    where.push('c.post_id = ?');
+    args.push(postId);
+  }
+  const totalRow = await db
+    .prepare(`SELECT COUNT(*) AS n FROM comments c WHERE ${where.join(' AND ')}`)
+    .bind(...args)
+    .first<{ n: number }>();
   const rows = await db
     .prepare(
       `SELECT c.*, u.username, u.display_name, p.title AS post_title

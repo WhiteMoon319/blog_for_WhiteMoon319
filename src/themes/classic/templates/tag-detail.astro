@@ -54,7 +54,14 @@ const authorsByPost = Astro.props.authorsByPost ?? {};
 
   <section class="section" style="padding-top:56px;">
     <div style="margin-top:36px;">
-      <TagResults names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} authorsByPost={authorsByPost} />
+      <TagResults
+        names={[name]}
+        keyword={keyword}
+        collections={collections}
+        posts={posts}
+        collectionPosts={collectionPosts}
+        authorsByPost={authorsByPost}
+      />
     </div>
   </section>
 </BaseLayout>

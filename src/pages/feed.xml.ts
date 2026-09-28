@@ -55,18 +55,22 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
 
   // 署名：一次批量取回，改署名同样要让缓存失效（否则订阅源里的作者陈旧）
-  const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
+  const authorsByPost = await badgesByPostId(
+    env.DB,
+    posts.map((p) => p.id),
+  );
 
   // 代际 key：任一文章增删改、文集 slug 变化或署名变化即失效
-  const cacheKey =
-    posts
-      .map(
-        (p) =>
-          `${p.id}:${p.created_at}:${p.updated_at}:${p.collection_id !== null ? colMap.get(p.collection_id) ?? '' : ''}:${
-            (authorsByPost[String(p.id)] ?? []).map((a) => `${a.id}/${a.name}/${a.href ?? ''}`).join(',')
-          }`,
-      )
-      .join('|');
+  const cacheKey = posts
+    .map(
+      (p) =>
+        `${p.id}:${p.created_at}:${p.updated_at}:${p.collection_id !== null ? (colMap.get(p.collection_id) ?? '') : ''}:${(
+          authorsByPost[String(p.id)] ?? []
+        )
+          .map((a) => `${a.id}/${a.name}/${a.href ?? ''}`)
+          .join(',')}`,
+    )
+    .join('|');
   if (feedCache && feedCache.key === cacheKey) {
     return new Response(feedCache.xml, {
       headers: {
@@ -77,7 +81,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
 
   const items = posts.map((p) => {
-    const colSlug = p.collection_id !== null ? colMap.get(p.collection_id) ?? null : null;
+    const colSlug = p.collection_id !== null ? (colMap.get(p.collection_id) ?? null) : null;
     const link = `${base}${postHref(p.slug, colSlug)}`;
     const pubDate = fmtDate(p.created_at);
     const { html } = renderMarkdown(p.content_md);
@@ -113,7 +117,8 @@ export async function GET(ctx: APIContext): Promise<Response> {
     ...items,
     '</channel>',
     '</rss>',
-    ''].join('\n');
+    '',
+  ].join('\n');
 
   feedCache = { key: cacheKey, xml };
 

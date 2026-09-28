@@ -57,8 +57,7 @@ test('原子写：更新文章 + 标签——slug 冲突时正文/版本/旧标�
   assert.equal(await getLatestPostVersion(db, p.post.id), 1);
 
   await assert.rejects(
-    () =>
-      updatePostWithTags(db, p.post.id, { content_md: '改了不该生效。', slug: 'atomic-dup' }, ['新标乙'], '测试'),
+    () => updatePostWithTags(db, p.post.id, { content_md: '改了不该生效。', slug: 'atomic-dup' }, ['新标乙'], '测试'),
     /UNIQUE constraint failed/,
     '更新阶段 slug 冲突必须让整批失败',
   );
@@ -293,7 +292,9 @@ test('删除文集：故障注入——成员迁移批次失败时整批回滚�
     .first<{ n: number }>();
   assert.equal(done?.n, 60, '60 篇全部转为未分类');
   const dup = await db
-    .prepare('SELECT COUNT(*) AS n FROM (SELECT slug FROM posts WHERE collection_id IS NULL GROUP BY slug HAVING COUNT(*) > 1)')
+    .prepare(
+      'SELECT COUNT(*) AS n FROM (SELECT slug FROM posts WHERE collection_id IS NULL GROUP BY slug HAVING COUNT(*) > 1)',
+    )
     .first<{ n: number }>();
   assert.equal(dup?.n, 0, '迁移后未分类 slug 无重复');
 });
@@ -306,7 +307,12 @@ test('删除文集：空集与小型集（≤48）走单事务尾批', async () 
   const small = await createCollection(db, { title: '小集', slug: 'small-col' });
   assert.ok(small);
   for (let i = 0; i < 3; i++) {
-    const p = await createPost(db, { title: `小章${i}`, slug: `small-ch-${i}`, collection_id: small.id, status: 'published' });
+    const p = await createPost(db, {
+      title: `小章${i}`,
+      slug: `small-ch-${i}`,
+      collection_id: small.id,
+      status: 'published',
+    });
     assert.ok(p);
   }
   assert.equal(await deleteCollection(db, small.id), true);
@@ -350,7 +356,10 @@ test('FTS：更新触发器带 WHEN——view_count 不触发重建，内容变�
   assert.ok((await countInFts('新词Q7')) >= 1, '新词应入索引');
 
   const hits = await searchPublishedPosts(db, '新词Q7');
-  assert.ok(hits.some((h) => h.id === p.id), '搜索能命中更新后的内容');
+  assert.ok(
+    hits.some((h) => h.id === p.id),
+    '搜索能命中更新后的内容',
+  );
 
   await deletePost(db, p.id);
   assert.equal(await countInFts('新词Q7'), 0, '删除后索引同步清除');

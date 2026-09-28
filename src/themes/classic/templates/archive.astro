@@ -50,20 +50,29 @@ const authorsByPost = Astro.props.authorsByPost ?? {};
         <div class="timeline">
           {groups.map((g) => (
             <>
-              <div class="tl-era">{g.year} 年 <small>共 {g.posts.length} 篇</small></div>
+              <div class="tl-era">
+                {g.year} 年 <small>共 {g.posts.length} 篇</small>
+              </div>
               {g.posts.map(({ post, collection }) => (
                 <div class="tl-item">
-                  <div class="tl-event">{collection?.title ?? '未分类'} · <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink></div>
-                <div class="tl-desc">{fmtDate(post.created_at)}{post.summary ? ` · ${post.summary}` : ''}
-                  <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
-                </div>
+                  <div class="tl-event">
+                    {collection?.title ?? '未分类'} ·{' '}
+                    <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink>
+                  </div>
+                  <div class="tl-desc">
+                    {fmtDate(post.created_at)}
+                    {post.summary ? ` · ${post.summary}` : ''}
+                    <AuthorByline authors={authorsByPost[String(post.id)] ?? []} variant="card" />
+                  </div>
                 </div>
               ))}
             </>
           ))}
         </div>
       ) : (
-        <p class="section-lead reveal in" style="text-align:center;">尚无文章。</p>
+        <p class="section-lead reveal in" style="text-align:center;">
+          尚无文章。
+        </p>
       )
     }
     <Pagination current={page} totalPages={totalPages} base="/archive/" query="" />

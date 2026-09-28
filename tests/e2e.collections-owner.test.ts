@@ -45,7 +45,11 @@ test('e2e：文集——作者可建，"我的文集"只列自建', async () => 
   assert.equal(anonMine.status, 401, '未登录看我的文集应 401');
   c.setSession(reader.cookie);
   assert.equal((await c.get('/api/collections?mine=1')).status, 403, '读者看我的文集应 403');
-  assert.equal((await c.post('/api/collections', { title: '读者建集', slug: 'col-by-reader' })).status, 403, '读者建文集应 403');
+  assert.equal(
+    (await c.post('/api/collections', { title: '读者建集', slug: 'col-by-reader' })).status,
+    403,
+    '读者建文集应 403',
+  );
 
   c.setSession(authorA.cookie);
   const created = await c.post('/api/collections', { title: '甲自建集', slug: 'col-a-own', summary: '甲写的集' });
@@ -59,12 +63,21 @@ test('e2e：文集——作者可建，"我的文集"只列自建', async () => 
   assert.equal(createdB.status, 201);
 
   c.setSession(authorA.cookie);
-  const mineA = (await (await c.get('/api/collections?mine=1')).json()).collections as Array<{ id: number; title: string }>;
-  assert.ok(mineA.some((x) => x.id === colAId), '我的文集含自建');
+  const mineA = (await (await c.get('/api/collections?mine=1')).json()).collections as Array<{
+    id: number;
+    title: string;
+  }>;
+  assert.ok(
+    mineA.some((x) => x.id === colAId),
+    '我的文集含自建',
+  );
   assert.ok(!mineA.some((x) => x.title === '乙自建集'), '我的文集不含他人合集');
 
   const all = (await (await c.get('/api/collections')).json()).collections as Array<{ id: number }>;
-  assert.ok(all.some((x) => x.id === colAId), '公开列表仍返回全量文集（写文选择器要用）');
+  assert.ok(
+    all.some((x) => x.id === colAId),
+    '公开列表仍返回全量文集（写文选择器要用）',
+  );
 });
 
 test('e2e：文集——作者只能改删自建，改删他人文集 403', async () => {
@@ -97,7 +110,12 @@ test('e2e：文集——删除保护与自建文集删除', async () => {
   c.setSession(authorB.cookie);
   const colCreated = await c.post('/api/collections', { title: '共享集', slug: 'col-shared' });
   const colId = (await colCreated.json()).collection.id as number;
-  const postByB = await c.post('/api/posts', { collection_id: colId, title: '乙的稿', slug: 'col-post-b', status: 'draft' });
+  const postByB = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '乙的稿',
+    slug: 'col-post-b',
+    status: 'draft',
+  });
   assert.equal(postByB.status, 201);
   const postIdB = (await postByB.json()).post.id as number;
 
@@ -111,7 +129,12 @@ test('e2e：文集——删除保护与自建文集删除', async () => {
   const mine = await c.post('/api/collections', { title: '甲共享集', slug: 'col-a-shared' });
   const mineId = (await mine.json()).collection.id as number;
   c.setSession(adminCookie);
-  const foreign = await c.post('/api/posts', { collection_id: mineId, title: '他人稿', slug: 'col-a-foreign', status: 'draft' });
+  const foreign = await c.post('/api/posts', {
+    collection_id: mineId,
+    title: '他人稿',
+    slug: 'col-a-foreign',
+    status: 'draft',
+  });
   assert.equal(foreign.status, 201, '管理员可把文章写进他人文集');
 
   c.setSession(authorA.cookie);
@@ -124,7 +147,12 @@ test('e2e：文集——删除保护与自建文集删除', async () => {
   const moved = await c.put(`/api/posts/${(await foreign.json()).post.id as number}`, { collection_id: null });
   assert.equal(moved.status, 200);
   c.setSession(authorA.cookie);
-  const own = await c.post('/api/posts', { collection_id: mineId, title: '自己的稿', slug: 'col-a-own-post', status: 'draft' });
+  const own = await c.post('/api/posts', {
+    collection_id: mineId,
+    title: '自己的稿',
+    slug: 'col-a-own-post',
+    status: 'draft',
+  });
   assert.equal(own.status, 201);
   assert.equal((await c.del(`/api/collections/${mineId}`)).status, 200, '只剩自己的文章时可删');
   const migrated = await c.sql('SELECT collection_id FROM posts WHERE slug = ?', 'col-a-own-post');
@@ -169,7 +197,12 @@ test('e2e：私有文集拒绝他人写入，申请并由归属人同意后放�
 
   // 乙写入被拒：创建、改文集、批量移动三条路径都要拦
   c.setSession(authorB.cookie);
-  const deniedCreate = await c.post('/api/posts', { collection_id: colId, title: '乙投私稿', slug: 'col-priv-b', status: 'draft' });
+  const deniedCreate = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '乙投私稿',
+    slug: 'col-priv-b',
+    status: 'draft',
+  });
   assert.equal(deniedCreate.status, 403, '往他人私有文集建文应 403');
   assert.ok(String((await deniedCreate.json()).error).includes('私有'), '应提示私有文集');
 
@@ -195,30 +228,59 @@ test('e2e：私有文集拒绝他人写入，申请并由归属人同意后放�
   assert.equal((await asked.json()).status, 'pending');
   const again = await c.post(`/api/collections/${colId}/join`, { message: '再问一次' });
   assert.equal(again.status, 201, '重复申请应幂等成功');
-  assert.equal((await c.post('/api/posts', { collection_id: colId, title: '还没同意', slug: 'col-priv-b4' })).status, 403, '未同意前仍不可写');
+  assert.equal(
+    (await c.post('/api/posts', { collection_id: colId, title: '还没同意', slug: 'col-priv-b4' })).status,
+    403,
+    '未同意前仍不可写',
+  );
 
   // 归属人看到申请并同意
   c.setSession(authorA.cookie);
   const inbox = await (await c.get(`/api/collections/${colId}/members`)).json();
   assert.equal((inbox.invites as unknown[]).length, 1, '归属人应看到待处理申请');
   const inviteId = (inbox.invites as Array<{ id: number }>)[0].id;
-  assert.equal((await c.post(`/api/collections/${colId}/members`, { approve_id: inviteId })).status, 200, '归属人可同意申请');
+  assert.equal(
+    (await c.post(`/api/collections/${colId}/members`, { approve_id: inviteId })).status,
+    200,
+    '归属人可同意申请',
+  );
   const afterApprove = await (await c.get(`/api/collections/${colId}/members`)).json();
-  assert.deepEqual((afterApprove.members as Array<{ user_id: number }>).map((m) => m.user_id), [authorB.id], '同意后应进入协作者列表');
+  assert.deepEqual(
+    (afterApprove.members as Array<{ user_id: number }>).map((m) => m.user_id),
+    [authorB.id],
+    '同意后应进入协作者列表',
+  );
 
   // 乙可写了；移除后又不可写，但已写入的文章保留
   c.setSession(authorB.cookie);
-  const allowed = await c.post('/api/posts', { collection_id: colId, title: '乙通过后的稿', slug: 'col-priv-b5', status: 'draft' });
+  const allowed = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '乙通过后的稿',
+    slug: 'col-priv-b5',
+    status: 'draft',
+  });
   assert.equal(allowed.status, 201, '协作者可写私有文集');
   const allowedId = (await allowed.json()).post.id as number;
 
   c.setSession(authorA.cookie);
-  assert.equal((await c.del(`/api/collections/${colId}/members?user_id=${authorB.id}`)).status, 200, '归属人可移除协作者');
+  assert.equal(
+    (await c.del(`/api/collections/${colId}/members?user_id=${authorB.id}`)).status,
+    200,
+    '归属人可移除协作者',
+  );
   c.setSession(authorB.cookie);
-  assert.equal((await c.post('/api/posts', { collection_id: colId, title: '被移除后', slug: 'col-priv-b6' })).status, 403, '移除后立即不可写');
+  assert.equal(
+    (await c.post('/api/posts', { collection_id: colId, title: '被移除后', slug: 'col-priv-b6' })).status,
+    403,
+    '移除后立即不可写',
+  );
   const kept = await c.sql('SELECT collection_id FROM posts WHERE id = ?', allowedId);
   assert.equal(Number(kept.results[0]?.collection_id), colId, '移除协作者不改动已写入的文章');
-  assert.equal((await c.put(`/api/posts/${allowedId}`, { title: '只改标题' })).status, 200, '既有文章仍可编辑（不校验当前所在文集）');
+  assert.equal(
+    (await c.put(`/api/posts/${allowedId}`, { title: '只改标题' })).status,
+    200,
+    '既有文章仍可编辑（不校验当前所在文集）',
+  );
 });
 
 test('e2e：公用文集任何作者可写，归属人可切换公用/私有', async () => {
@@ -234,7 +296,8 @@ test('e2e：公用文集任何作者可写，归属人可切换公用/私有', a
 
   c.setSession(authorB.cookie);
   assert.equal(
-    (await c.post('/api/posts', { collection_id: colId, title: '乙投公集', slug: 'col-pub-b', status: 'draft' })).status,
+    (await c.post('/api/posts', { collection_id: colId, title: '乙投公集', slug: 'col-pub-b', status: 'draft' }))
+      .status,
     201,
     '公用文集任何作者可写',
   );
@@ -248,7 +311,11 @@ test('e2e：公用文集任何作者可写，归属人可切换公用/私有', a
     403,
     '改回私有后不可再写入',
   );
-  assert.equal((await c.post(`/api/collections/${colId}/join`, { message: '给我开个权限' })).status, 201, '公有仍可申请');
+  assert.equal(
+    (await c.post(`/api/collections/${colId}/join`, { message: '给我开个权限' })).status,
+    201,
+    '公有仍可申请',
+  );
 
   // 非归属人不可改公用状态
   assert.equal((await c.put(`/api/collections/${colId}`, { is_public: true })).status, 403, '非归属人不可改');

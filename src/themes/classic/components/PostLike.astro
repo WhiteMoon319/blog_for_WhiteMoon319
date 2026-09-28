@@ -29,9 +29,15 @@ const { postId, likes, liked } = Astro.props;
       btn.disabled = true;
       try {
         const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST', credentials: 'same-origin' });
-        const data = await res.json() as { liked?: boolean; likes_count?: number; error?: string };
-        if (res.status === 401) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
-        if (res.status === 403 && data.error === 'email_required') { location.href = '/verify-email/'; return; }
+        const data = (await res.json()) as { liked?: boolean; likes_count?: number; error?: string };
+        if (res.status === 401) {
+          location.href = '/login/?redirect=' + encodeURIComponent(location.pathname);
+          return;
+        }
+        if (res.status === 403 && data.error === 'email_required') {
+          location.href = '/verify-email/';
+          return;
+        }
         if (!res.ok) return;
         btn.dataset.liked = data.liked ? '1' : '0';
         heartEl.textContent = data.liked ? '❤' : '♡';
@@ -58,6 +64,11 @@ const { postId, likes, liked } = Astro.props;
     border-color: var(--cinnabar);
     color: var(--cinnabar);
   }
-  .post-like-btn:hover { background: color-mix(in srgb, var(--cinnabar) 8%, transparent); }
-  .post-like-hint { font-size: 0.78rem; color: var(--ink-light); }
+  .post-like-btn:hover {
+    background: color-mix(in srgb, var(--cinnabar) 8%, transparent);
+  }
+  .post-like-hint {
+    font-size: 0.78rem;
+    color: var(--ink-light);
+  }
 </style>

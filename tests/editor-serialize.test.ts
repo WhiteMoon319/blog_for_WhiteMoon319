@@ -33,8 +33,7 @@ test('turndown：表格列对齐回写为 :-- / :-: / --:', () => {
 
 test('turndown：单元格竖线被转义，不破坏表结构', () => {
   const td = createTurndown();
-  const html =
-    '<table><thead><tr><th>x</th></tr></thead><tbody><tr><td>a | b</td></tr></tbody></table>';
+  const html = '<table><thead><tr><th>x</th></tr></thead><tbody><tr><td>a | b</td></tr></tbody></table>';
   assert.equal(td.turndown(html), '| x |\n| --- |\n| a \\| b |');
 });
 
@@ -72,7 +71,8 @@ test('turndown：框线非默认时表格包回 :::table 容器，默认保持�
 
 test('turndown：容器往返幂等（序列化 → 解析 → 再序列化）', () => {
   const td = createTurndown();
-  const tableDom = '<table class="tip-table bd-reset bd-bottom"><thead><tr><th>x</th></tr></thead><tbody><tr><td>y</td></tr></tbody></table>';
+  const tableDom =
+    '<table class="tip-table bd-reset bd-bottom"><thead><tr><th>x</th></tr></thead><tbody><tr><td>y</td></tr></tbody></table>';
   const once = td.turndown(tableDom);
   assert.equal(once, ':::table{borders=bottom}\n| x |\n| --- |\n| y |\n:::');
   // 前台渲染：容器类应落到最终 HTML

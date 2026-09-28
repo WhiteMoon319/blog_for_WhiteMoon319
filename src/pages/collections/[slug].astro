@@ -33,7 +33,10 @@ const siteUrl = env.SITE_URL.replace(/\/$/, '');
 // 文集署名：归属作者（单一），无归属时不渲染
 const owner = await collectionOwnerBadge(env.DB, collection.id);
 // 列表卡署名：一次批量取回全部，不逐篇查询
-const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
+const authorsByPost = await badgesByPostId(
+  env.DB,
+  posts.map((p) => p.id),
+);
 const collectionUrl = `${siteUrl}/collections/${encodeURI(collection.slug)}/`;
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -51,7 +54,7 @@ const jsonLd = {
     })),
   },
 };
-import { getSiteContext } from "../../lib/theme-context";
+import { getSiteContext } from '../../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 ---
 

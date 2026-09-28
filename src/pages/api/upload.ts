@@ -35,10 +35,7 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const head = new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer());
   const type = detectImageType(head, declared) as AllowedImageType | null;
   if (!type) {
-    return json(
-      { error: 'unsupported file type: 仅允许 png/jpeg/webp/gif/avif 图片，且需与文件内容一致' },
-      415,
-    );
+    return json({ error: 'unsupported file type: 仅允许 png/jpeg/webp/gif/avif 图片，且需与文件内容一致' }, 415);
   }
 
   const now = new Date();

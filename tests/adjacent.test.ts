@@ -45,7 +45,12 @@ test('同秒文章：prev/next 以 id 决胜序', async () => {
   assert.equal(p0, null);
 });
 
-async function insertIn(db: D1Database, title: string, createdAt: string, collectionId: number | null): Promise<number> {
+async function insertIn(
+  db: D1Database,
+  title: string,
+  createdAt: string,
+  collectionId: number | null,
+): Promise<number> {
   const res = await db
     .prepare(
       `INSERT INTO posts (collection_id, title, slug, summary, content_md, status, created_at, updated_at)
@@ -58,11 +63,15 @@ async function insertIn(db: D1Database, title: string, createdAt: string, collec
 
 test('相邻文章：文集内优先，组内没有才跨文集回退', async () => {
   const col = await db
-    .prepare(`INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('A 集', 'col-a', '', '#c23a30', 1) RETURNING id`)
+    .prepare(
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('A 集', 'col-a', '', '#c23a30', 1) RETURNING id`,
+    )
     .first<{ id: number }>();
   const colId = col!.id;
   const colT = await db
-    .prepare(`INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('T 集', 'col-t', '', '#c23a30', 2) RETURNING id`)
+    .prepare(
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('T 集', 'col-t', '', '#c23a30', 2) RETURNING id`,
+    )
     .first<{ id: number }>();
   const colTId = colT!.id;
   // 时间线：A1(t1) < A2(t2) < T(t3, 另一文集) < A3(t4)
@@ -84,7 +93,9 @@ test('相邻文章：文集内优先，组内没有才跨文集回退', async ()
 
 test('相邻文章：未分类自成一组（collection_id 为 NULL）', async () => {
   const col = await db
-    .prepare(`INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('E 集', 'col-e', '', '#c23a30', 2) RETURNING id`)
+    .prepare(
+      `INSERT INTO collections (title, slug, summary, theme_color, sort_order) VALUES ('E 集', 'col-e', '', '#c23a30', 2) RETURNING id`,
+    )
     .first<{ id: number }>();
   const colId = col!.id;
   // 时间线：U1(t1, 未分类) < E1(t2, E 集) < U2(t3, 未分类) < E2(t4, E 集)

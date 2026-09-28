@@ -24,17 +24,25 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!Number.isInteger(id) || id <= 0) return json({ error: 'invalid id' }, 400);
 
   // 文章必须存在且已发布
-  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(id).first<{ id: number; status: string; deleted_at: string | null }>();
+  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`)
+    .bind(id)
+    .first<{ id: number; status: string; deleted_at: string | null }>();
   if (!post || post.status !== 'published' || post.deleted_at) return json({ error: 'not found' }, 404);
 
   // 检查是否已赞
-  const existing = await env.DB.prepare(`SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?`).bind(id, auth.user.id).first<{ 1: number }>();
+  const existing = await env.DB.prepare(`SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?`)
+    .bind(id, auth.user.id)
+    .first<{ 1: number }>();
   if (existing) {
     await env.DB.prepare(`DELETE FROM post_likes WHERE post_id = ? AND user_id = ?`).bind(id, auth.user.id).run();
   } else {
-    await env.DB.prepare(`INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)`).bind(id, auth.user.id).run();
+    await env.DB.prepare(`INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)`)
+      .bind(id, auth.user.id)
+      .run();
   }
 
-  const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?`).bind(id).first<{ n: number }>();
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?`)
+    .bind(id)
+    .first<{ n: number }>();
   return json({ liked: !existing, likes_count: count?.n ?? 0 });
 }

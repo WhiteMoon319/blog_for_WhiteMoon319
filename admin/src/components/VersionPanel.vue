@@ -118,7 +118,8 @@ onMounted(() => {
 });
 
 async function restoreVersion(v: PostVersion) {
-  if (!confirm(`确认回滚到 v${v.version}（${v.created_at.slice(0, 10)}）？当前内容将被覆盖，并生成一条新版本记录。`)) return;
+  if (!confirm(`确认回滚到 v${v.version}（${v.created_at.slice(0, 10)}）？当前内容将被覆盖，并生成一条新版本记录。`))
+    return;
   versionsBusy.value = true;
   try {
     await api.restorePostVersion(props.postId, v.version);
@@ -149,7 +150,10 @@ async function restoreVersion(v: PostVersion) {
               :key="v.version"
               class="ver-item"
               :class="{ on: selVersion === v.version }"
-              @click="selVersion = v.version; refreshDiff()"
+              @click="
+                selVersion = v.version;
+                refreshDiff();
+              "
             >
               <div class="ver-head">
                 <span class="ver-no">v{{ v.version }}</span>
@@ -172,12 +176,16 @@ async function restoreVersion(v: PostVersion) {
         <section class="versions-diff">
           <div class="diff-toolbar">
             <select v-model="selVersion" class="select w-auto" @change="refreshDiff">
-              <option v-for="v in versions" :key="v.version" :value="v.version">基线 v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
+              <option v-for="v in versions" :key="v.version" :value="v.version">
+                基线 v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）
+              </option>
             </select>
             <span class="diff-arrow">→</span>
             <select v-model="cmpTarget" class="select w-auto" @change="refreshDiff">
               <option value="current">当前工作区（未保存）</option>
-              <option v-for="v in versions" :key="v.version" :value="v.version">v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）</option>
+              <option v-for="v in versions" :key="v.version" :value="v.version">
+                v{{ v.version }}（{{ v.created_at.slice(0, 10) }}）
+              </option>
             </select>
             <span class="diff-legend">
               <span class="lg lg-add">＋新增</span>

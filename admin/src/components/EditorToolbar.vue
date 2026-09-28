@@ -28,7 +28,8 @@ const SNIPPET_ALIGN_RIGHT = '<p style="text-align:right">右对齐文字</p>';
 const SNIPPET_TABLE = '| 列一 | 列二 |\n| --- | --- |\n| 单元格 | 单元格 |';
 const SNIPPET_CODE = '```\n代码…\n```';
 const SNIPPET_MATH = '$$\nE = mc^2\n$$';
-const SNIPPET_MERMAID = '```mermaid\ngraph TD\n  A[起点] --> B{判断}\n  B -->|是| C[结果]\n  B -->|否| D[另一路径]\n```';
+const SNIPPET_MERMAID =
+  '```mermaid\ngraph TD\n  A[起点] --> B{判断}\n  B -->|是| C[结果]\n  B -->|否| D[另一路径]\n```';
 const SNIPPET_MARKMAP = '```markmap\n# 脑图标题\n## 分支一\n### 子分支\n## 分支二\n```';
 
 // ---- 工具条：两个下拉菜单（插入 / 格式），把原先铺满两行的按钮收起来 ----
@@ -88,33 +89,110 @@ function editorChain(fn: (ed: Editor) => void): void {
 <template>
   <div class="editor-toolbar">
     <div class="mode-seg">
-      <button type="button" class="mode-toggle" :class="{ active: mode === 'wysiwyg' }" @click="emit('switch-mode', 'wysiwyg')">可视化</button>
-      <button type="button" class="mode-toggle" :class="{ active: mode === 'source' }" @click="emit('switch-mode', 'source')">源码</button>
+      <button
+        type="button"
+        class="mode-toggle"
+        :class="{ active: mode === 'wysiwyg' }"
+        @click="emit('switch-mode', 'wysiwyg')"
+      >
+        可视化
+      </button>
+      <button
+        type="button"
+        class="mode-toggle"
+        :class="{ active: mode === 'source' }"
+        @click="emit('switch-mode', 'source')"
+      >
+        源码
+      </button>
     </div>
 
     <span class="sep"></span>
 
-    <button type="button" title="粗体" :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('bold') }" @click="ci('bold')"><b>B</b></button>
-    <button type="button" title="斜体" :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('italic') }" @click="ci('italic')"><i>I</i></button>
-    <button type="button" title="删除线" :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('strike') }" @click="ci('strike')"><s>S</s></button>
+    <button
+      type="button"
+      title="粗体"
+      :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('bold') }"
+      @click="ci('bold')"
+    >
+      <b>B</b>
+    </button>
+    <button
+      type="button"
+      title="斜体"
+      :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('italic') }"
+      @click="ci('italic')"
+    >
+      <i>I</i>
+    </button>
+    <button
+      type="button"
+      title="删除线"
+      :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('strike') }"
+      @click="ci('strike')"
+    >
+      <s>S</s>
+    </button>
 
     <span class="sep"></span>
 
-    <button type="button" title="二级标题" :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('heading', { level: 2 }) }" @click="ci('h2')">H2</button>
-    <button type="button" title="三级标题" :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('heading', { level: 3 }) }" @click="ci('h3')">H3</button>
+    <button
+      type="button"
+      title="二级标题"
+      :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('heading', { level: 2 }) }"
+      @click="ci('h2')"
+    >
+      H2
+    </button>
+    <button
+      type="button"
+      title="三级标题"
+      :class="{ 'is-active': mode === 'wysiwyg' && editor?.isActive('heading', { level: 3 }) }"
+      @click="ci('h3')"
+    >
+      H3
+    </button>
 
     <span class="sep"></span>
 
     <div class="tb-menu">
-      <button type="button" class="tb-menu-btn" :class="{ 'is-active': openMenu === 'insert' }" @click.stop="toggleMenu('insert')">插入 <span class="caret">▾</span></button>
+      <button
+        type="button"
+        class="tb-menu-btn"
+        :class="{ 'is-active': openMenu === 'insert' }"
+        @click.stop="toggleMenu('insert')"
+      >
+        插入 <span class="caret">▾</span>
+      </button>
       <div v-if="openMenu === 'insert'" class="tb-panel" @mousedown.stop>
         <template v-if="mode === 'wysiwyg'">
-          <button type="button" :disabled="uploading" @click="menuAction(() => emit('insert-image'))">{{ uploading ? '图片（上传中…）' : '图片' }}</button>
+          <button type="button" :disabled="uploading" @click="menuAction(() => emit('insert-image'))">
+            {{ uploading ? '图片（上传中…）' : '图片' }}
+          </button>
           <button type="button" @click="menuAction(() => emit('open-picker'))">从媒体库选</button>
           <button type="button" @click="menuAction(() => emit('set-link'))">链接</button>
-          <button type="button" @click="menuAction(() => editorChain((ed) => ed.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()))">表格</button>
-          <button type="button" @click="menuAction(() => editorChain((ed) => ed.chain().focus().setHorizontalRule().run()))">分割线</button>
-          <button type="button" @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleCodeBlock().run()))">代码块</button>
+          <button
+            type="button"
+            @click="
+              menuAction(() =>
+                editorChain((ed) => ed.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()),
+              )
+            "
+          >
+            表格
+          </button>
+          <button
+            type="button"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().setHorizontalRule().run()))"
+          >
+            分割线
+          </button>
+          <button
+            type="button"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleCodeBlock().run()))"
+          >
+            代码块
+          </button>
         </template>
         <template v-else>
           <button type="button" @click="menuAction(() => emit('snippet', '![', '](https://)', '描述'))">图片</button>
@@ -131,16 +209,59 @@ function editorChain(fn: (ed: Editor) => void): void {
     </div>
 
     <div class="tb-menu">
-      <button type="button" class="tb-menu-btn" :class="{ 'is-active': openMenu === 'format' }" @click.stop="toggleMenu('format')">格式 <span class="caret">▾</span></button>
+      <button
+        type="button"
+        class="tb-menu-btn"
+        :class="{ 'is-active': openMenu === 'format' }"
+        @click.stop="toggleMenu('format')"
+      >
+        格式 <span class="caret">▾</span>
+      </button>
       <div v-if="openMenu === 'format'" class="tb-panel" @mousedown.stop>
         <template v-if="mode === 'wysiwyg'">
-          <button type="button" :class="{ 'is-active': editor?.isActive('bulletList') }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleBulletList().run()))">无序列表</button>
-          <button type="button" :class="{ 'is-active': editor?.isActive('orderedList') }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleOrderedList().run()))">有序列表</button>
-          <button type="button" :class="{ 'is-active': editor?.isActive('blockquote') }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleBlockquote().run()))">引文</button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive('bulletList') }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleBulletList().run()))"
+          >
+            无序列表
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive('orderedList') }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleOrderedList().run()))"
+          >
+            有序列表
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive('blockquote') }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().toggleBlockquote().run()))"
+          >
+            引文
+          </button>
           <span class="tb-panel-sep"></span>
-          <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'left' }) }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('left').run()))">左对齐</button>
-          <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'center' }) }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('center').run()))">居中</button>
-          <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'right' }) }" @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('right').run()))">右对齐</button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive({ textAlign: 'left' }) }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('left').run()))"
+          >
+            左对齐
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive({ textAlign: 'center' }) }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('center').run()))"
+          >
+            居中
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': editor?.isActive({ textAlign: 'right' }) }"
+            @click="menuAction(() => editorChain((ed) => ed.chain().focus().setTextAlign('right').run()))"
+          >
+            右对齐
+          </button>
         </template>
         <template v-else>
           <button type="button" @click="menuAction(() => emit('snippet', '- 条目'))">无序列表</button>
@@ -160,7 +281,9 @@ function editorChain(fn: (ed: Editor) => void): void {
       :class="{ 'is-active': showBorderMenu }"
       title="表格框线（可逐边开关）"
       @click="emit('toggle-borders')"
-    >框线</button>
+    >
+      框线
+    </button>
 
     <span class="tb-spacer"></span>
 
@@ -171,7 +294,9 @@ function editorChain(fn: (ed: Editor) => void): void {
       :disabled="mode === 'source'"
       title="公众号式排版素材（仅可视化模式）"
       @click="emit('toggle-blocks')"
-    >✦ 排版</button>
+    >
+      ✦ 排版
+    </button>
     <template v-if="mode === 'wysiwyg'">
       <button type="button" title="撤销" @click="editorChain((ed) => ed.chain().focus().undo().run())">↩</button>
       <button type="button" title="重做" @click="editorChain((ed) => ed.chain().focus().redo().run())">↪</button>

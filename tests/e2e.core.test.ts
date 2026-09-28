@@ -134,7 +134,10 @@ test('e2e：站点 CSP 走响应头（含 frame-ancestors）并放行 Google Fon
   const res = await c.get('/');
   assert.equal(res.status, 200);
   const csp = res.headers.get('content-security-policy') ?? '';
-  assert.ok(csp.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"), 'CSP 应放行 Google Fonts 样式表');
+  assert.ok(
+    csp.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"),
+    'CSP 应放行 Google Fonts 样式表',
+  );
   assert.ok(csp.includes("frame-ancestors 'none'"), 'frame-ancestors 只能在响应头里生效');
   const html = await res.text();
   assert.ok(!html.includes('http-equiv="Content-Security-Policy"'), 'CSP 不应再写在 meta 里');

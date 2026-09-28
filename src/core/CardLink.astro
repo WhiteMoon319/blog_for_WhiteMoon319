@@ -15,24 +15,24 @@ const { href } = Astro.props;
 <a class="card-hit" href={href}><slot /></a>
 
 <style>
-.card-hit {
-  color: inherit;
-  text-decoration: none;
-}
-/* 铺满最近定位祖先（即卡片容器），承接整卡点击 */
-.card-hit::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-/* 键盘焦点落在标题链接上时，外框画满整卡 */
-.card-hit:focus-visible {
-  outline: none;
-}
-.card-hit:focus-visible::after {
-  outline: 2px solid var(--focus-ring, currentColor);
-  outline-offset: 2px;
-  border-radius: inherit;
-}
+  .card-hit {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* 铺满最近定位祖先（即卡片容器），承接整卡点击 */
+  .card-hit::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  /* 键盘焦点落在标题链接上时，外框画满整卡 */
+  .card-hit:focus-visible {
+    outline: none;
+  }
+  .card-hit:focus-visible::after {
+    outline: 2px solid var(--focus-ring, currentColor);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
 </style>

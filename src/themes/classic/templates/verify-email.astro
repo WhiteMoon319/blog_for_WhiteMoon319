@@ -25,7 +25,12 @@ const { ctx } = Astro.props;
         <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;">验证</button>
         <p id="verify-error" class="auth-error" style="display:none;"></p>
       </form>
-      <button id="resend-btn" class="btn btn-ghost" type="button" style="width:100%;justify-content:center;margin-top:8px;">重新发送验证码</button>
+      <button
+        id="resend-btn"
+        class="btn btn-ghost"
+        type="button"
+        style="width:100%;justify-content:center;margin-top:8px;">重新发送验证码</button
+      >
       <p class="auth-alt"><a href="/login/">返回登录</a></p>
     </div>
   </div>
@@ -45,9 +50,15 @@ const { ctx } = Astro.props;
   let email = '';
 
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(async (r) => {
-    if (r.status !== 200) { location.href = '/login/?redirect=' + encodeURIComponent(location.pathname); return; }
-    const data = await r.json() as { email_verified?: boolean; sub?: string; email?: string };
-    if (data.email_verified) { location.href = safeRedirect; return; }
+    if (r.status !== 200) {
+      location.href = '/login/?redirect=' + encodeURIComponent(location.pathname);
+      return;
+    }
+    const data = (await r.json()) as { email_verified?: boolean; sub?: string; email?: string };
+    if (data.email_verified) {
+      location.href = safeRedirect;
+      return;
+    }
     userId = data.sub ? parseInt(data.sub.replace('user:', '')) : null;
     email = data.email ?? '';
   });
@@ -59,12 +70,13 @@ const { ctx } = Astro.props;
     const code = codeInput.value.trim();
     if (!code) return;
     const res = await fetch('/api/auth/verify-email', {
-      method: 'POST', credentials: 'same-origin',
+      method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, code }),
     });
     if (!res.ok) {
-      const data = await res.json() as { error?: string };
+      const data = (await res.json()) as { error?: string };
       errEl.textContent = data.error ?? '验证失败';
       errEl.style.display = 'block';
       return;
@@ -76,10 +88,13 @@ const { ctx } = Astro.props;
     if (!email) return;
     resendBtn.disabled = true;
     const res = await fetch('/api/auth/resend-verification', {
-      method: 'POST', credentials: 'same-origin',
+      method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    setTimeout(() => { resendBtn.disabled = false; }, 60 * 1000);
+    setTimeout(() => {
+      resendBtn.disabled = false;
+    }, 60 * 1000);
   });
 </script>

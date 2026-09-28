@@ -22,12 +22,7 @@ import {
   type PostRow,
 } from '../../../lib/db';
 import { slugBase, slugWithSuffix } from '../../../lib/utils';
-import {
-  parseIds,
-  parseCreateItem,
-  BATCH_MAX_CREATE,
-  type BatchCreateItem,
-} from '../../../lib/api/validate';
+import { parseIds, parseCreateItem, BATCH_MAX_CREATE, type BatchCreateItem } from '../../../lib/api/validate';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
 import { checkBatchOwned } from '../../../lib/api/post-access.ts';
 import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
@@ -141,8 +136,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     }
 
     const placeholders = ids.map(() => '?').join(', ');
-    const rows = await env.DB
-      .prepare(`SELECT id, slug, collection_id FROM posts WHERE id IN (${placeholders}) AND deleted_at IS NULL`)
+    const rows = await env.DB.prepare(
+      `SELECT id, slug, collection_id FROM posts WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+    )
       .bind(...ids)
       .all<{ id: number; slug: string; collection_id: number | null }>();
     const found = rows.results ?? [];
@@ -153,9 +149,10 @@ export async function POST(ctx: APIContext): Promise<Response> {
     // 预检目标范围内的 slug 冲突（含本批文章之间的互撞），全部通过才执行，
     // 执行阶段用单个 D1 事务（batch）保证「全成功或全失败」。
     const taken = new Set<string>();
-    const scope = target === null
-      ? env.DB.prepare('SELECT slug FROM posts WHERE collection_id IS NULL')
-      : env.DB.prepare('SELECT slug FROM posts WHERE collection_id = ?').bind(target);
+    const scope =
+      target === null
+        ? env.DB.prepare('SELECT slug FROM posts WHERE collection_id IS NULL')
+        : env.DB.prepare('SELECT slug FROM posts WHERE collection_id = ?').bind(target);
     const scopeRows = await scope.all<{ slug: string }>();
     for (const r of scopeRows.results ?? []) taken.add(r.slug);
     // 仅在文章本就在目标范围（同范围重定位）时移除其 slug，避免把目标范围内
@@ -183,20 +180,19 @@ export async function POST(ctx: APIContext): Promise<Response> {
       // 版本 INSERT 先于 UPDATE：UPDATE 读到的是迁移前状态，与预检一致；
       // 版本显式绑定新 collection_id，仍记录迁移后的归属。
       stmts.push(
-        env.DB
-          .prepare(
-            `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
+        env.DB.prepare(
+          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
              SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
                     title, slug, ?, summary, summary_source, ?, ?, ?, cover_url, status, meta_keywords, '自动保存',
                     COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
              FROM posts WHERE id = ?`,
-          )
-          .bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id, r.id),
+        ).bind(r.id, r.id, target, plan.content_md, plan.content_md_patch, plan.base_version, r.id, r.id),
       );
       stmts.push(
-        env.DB
-          .prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`)
-          .bind(target, r.id),
+        env.DB.prepare(`UPDATE posts SET collection_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(
+          target,
+          r.id,
+        ),
       );
     }
     try {
@@ -233,8 +229,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   // publish / draft：仅对实际状态不同且未删除的文章留档（已刊发的重复刊发不产生版本；回收站文章不参与）
   const status = action === 'publish' ? 'published' : 'draft';
-  const preflight = await env.DB
-    .prepare(`SELECT id FROM posts WHERE id IN (${ids.map(() => '?').join(',')}) AND status <> ? AND deleted_at IS NULL`)
+  const preflight = await env.DB.prepare(
+    `SELECT id FROM posts WHERE id IN (${ids.map(() => '?').join(',')}) AND status <> ? AND deleted_at IS NULL`,
+  )
     .bind(...ids, status)
     .all<{ id: number }>();
   const changed = (preflight.results ?? []).map((r) => r.id);
@@ -247,22 +244,18 @@ export async function POST(ctx: APIContext): Promise<Response> {
     // 并发重复刊发/并发删除时守卫落空，不会产生多余版本；
     // 版本内容用显式的新 status（此时 posts.status 仍是旧值）。
     stmts.push(
-      env.DB
-        .prepare(
-          `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
+      env.DB.prepare(
+        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, content_md_patch, base_version, cover_url, status, meta_keywords, message, authors)
            SELECT ?, COALESCE((SELECT MAX(version) FROM post_versions WHERE post_id = ?), 0) + 1,
                   title, slug, collection_id, summary, summary_source, ?, ?, ?, cover_url, ?, meta_keywords, ?,
                   COALESCE((SELECT json_group_array(user_id) FROM (SELECT user_id FROM post_authors WHERE post_id = ? ORDER BY sort_order, user_id)), '[]')
            FROM posts WHERE id = ? AND status <> ?`,
-        )
-        .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, id, status),
+      ).bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, status, message, id, id, status),
     );
     stmts.push(
-      env.DB
-        .prepare(
-          `UPDATE posts SET status = ?, scheduled_at = NULL, updated_at = datetime('now') WHERE id = ? AND status <> ?`,
-        )
-        .bind(status, id, status),
+      env.DB.prepare(
+        `UPDATE posts SET status = ?, scheduled_at = NULL, updated_at = datetime('now') WHERE id = ? AND status <> ?`,
+      ).bind(status, id, status),
     );
   }
   await env.DB.batch(stmts);

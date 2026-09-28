@@ -28,17 +28,16 @@ async function exportJson() {
   <div class="card pad">
     <h3 class="section-title-tight">全量数据快照（JSON）</h3>
     <p class="prose-note">
-      包含文集、文章（含回收站，保留 deleted_at）、全部版本历史与标签关联，并标注 schema 与迁移版本。
-      当前为<span class="text-danger">只读导出</span>，不包含登录口令、会话、密钥与媒体文件本体；
-      在导入功能落地前，请勿把它当作可一键恢复的备份。
+      包含文集、文章（含回收站，保留 deleted_at）、全部版本历史与标签关联，并标注 schema 与迁移版本。 当前为<span
+        class="text-danger"
+        >只读导出</span
+      >，不包含登录口令、会话、密钥与媒体文件本体； 在导入功能落地前，请勿把它当作可一键恢复的备份。
     </p>
     <div class="row-wrap">
       <button class="btn btn-primary" :disabled="busy" @click="exportJson">
         {{ busy ? '导出中…' : '导出全量快照' }}
       </button>
-      <span class="text-muted-sm">
-        单篇 Markdown 可从文章编辑器内导出
-      </span>
+      <span class="text-muted-sm"> 单篇 Markdown 可从文章编辑器内导出 </span>
     </div>
   </div>
 

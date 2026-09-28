@@ -66,13 +66,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="row-actions">
-    <button
-      v-if="primary"
-      type="button"
-      class="btn btn-ghost mini"
-      :disabled="primary.disabled"
-      @click="primary.run()"
-    >
+    <button v-if="primary" type="button" class="btn btn-ghost mini" :disabled="primary.disabled" @click="primary.run()">
       {{ primary.label }}
     </button>
     <div v-if="items && items.length" class="ra-menu">

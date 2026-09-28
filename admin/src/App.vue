@@ -125,7 +125,9 @@ async function logout() {
 <style scoped>
 .toast-enter-active,
 .toast-leave-active {
-  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+  transition:
+    opacity 0.25s var(--ease),
+    transform 0.25s var(--ease);
 }
 .toast-enter-from,
 .toast-leave-to {

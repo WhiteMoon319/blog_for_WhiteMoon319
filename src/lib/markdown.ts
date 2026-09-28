@@ -89,7 +89,10 @@ export { parseBlockVariant } from '../core/marked-blocks.ts';
 
 // 把占位符替换回原始 LaTeX，用于生成标题 id 与 TOC 文本（避免占位符泄露进 id）
 function rawTextOf(text: string, math: Array<{ tex: string; display: boolean }>): string {
-  return text.replace(new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'), (_m, idx: string) => math[Number(idx)]?.tex ?? '');
+  return text.replace(
+    new RegExp(`${MATH_MARKER}(\\d+)${MATH_MARKER}`, 'g'),
+    (_m, idx: string) => math[Number(idx)]?.tex ?? '',
+  );
 }
 
 export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
@@ -139,16 +142,57 @@ export function renderMarkdown(src: string): { html: string; toc: TocItem[] } {
   });
 
   // 对齐段落存的是原始 HTML 块，内部的 `_斜体_` / `**粗体**` 需要补一次行内解析
-  const raw = renderAlignedInline(marked.parse(pre, { async: false }) as string, (md) =>
-    marked.parseInline(md) as string,
+  const raw = renderAlignedInline(
+    marked.parse(pre, { async: false }) as string,
+    (md) => marked.parseInline(md) as string,
   );
 
   const html = sanitizeHtml(restoreMath(raw, math), {
     allowedTags: [
-      'a', 'address', 'article', 'aside', 'blockquote', 'br', 'code', 'del', 'details', 'div', 'em',
-      'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'ins',
-      'kbd', 'li', 'mark', 'ol', 'p', 'pre', 's', 'section', 'small', 'span', 'strong', 'sub', 'sup',
-      'summary', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
+      'a',
+      'address',
+      'article',
+      'aside',
+      'blockquote',
+      'br',
+      'code',
+      'del',
+      'details',
+      'div',
+      'em',
+      'figcaption',
+      'figure',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'hr',
+      'i',
+      'img',
+      'ins',
+      'kbd',
+      'li',
+      'mark',
+      'ol',
+      'p',
+      'pre',
+      's',
+      'section',
+      'small',
+      'span',
+      'strong',
+      'sub',
+      'sup',
+      'summary',
+      'table',
+      'tbody',
+      'td',
+      'th',
+      'thead',
+      'tr',
+      'ul',
     ],
     allowedAttributes: {
       // role / aria-hidden 供排版块（如分割线）表达语义；align 承载手写 HTML 的居中对齐

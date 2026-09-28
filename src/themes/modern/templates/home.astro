@@ -72,7 +72,9 @@ const t = modernT(ctx.locale);
         <div class="portal-grid">
           {collections.map((c) => (
             <div class="portal-card reveal" style={`--pc: ${c.theme_color};`}>
-              <h3><CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink></h3>
+              <h3>
+                <CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
+              </h3>
               <p class="portal-sub">{c.summary}</p>
               {collectionOwners[String(c.id)] && (
                 <AuthorByline authors={[collectionOwners[String(c.id)]]} variant="card" />
@@ -101,7 +103,9 @@ const t = modernT(ctx.locale);
             return (
               <div class="post-card reveal" style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
+                <h3 class="post-title">
+                  <CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink>
+                </h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
@@ -131,7 +135,9 @@ const t = modernT(ctx.locale);
             return (
               <div class="post-card reveal" style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
+                <h3 class="post-title">
+                  <CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink>
+                </h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}

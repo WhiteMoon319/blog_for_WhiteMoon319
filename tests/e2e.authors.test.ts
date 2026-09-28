@@ -10,7 +10,15 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeE2e, HAS_BUILD, ORIGIN_HEADERS, seedUserSession, loginAsAdmin, type E2eClient, type SeededUser } from './helpers/e2e.ts';
+import {
+  makeE2e,
+  HAS_BUILD,
+  ORIGIN_HEADERS,
+  seedUserSession,
+  loginAsAdmin,
+  type E2eClient,
+  type SeededUser,
+} from './helpers/e2e.ts';
 
 let c: E2eClient;
 let colId = 0;
@@ -99,7 +107,10 @@ test('e2e：作者可创建/编辑自己的文章，归属人记为自己', asyn
   const list = await c.get('/api/posts?status=draft');
   assert.equal(list.status, 200);
   const mine = (await list.json()).posts as Array<{ id: number; created_by: number | null }>;
-  assert.ok(mine.some((p) => p.id === id), '作者草稿列表应含自己的文章');
+  assert.ok(
+    mine.some((p) => p.id === id),
+    '作者草稿列表应含自己的文章',
+  );
 
   c.setSession(authorA.cookie);
   const detail = await c.get(`/api/posts/${id}`);
@@ -144,11 +155,7 @@ test('e2e：作者不能读写他人文章、他人版本与批量操作', async
   assert.equal((await c.del(`/api/posts/${adminPost}`)).status, 403, '删他人文章应 403');
   assert.equal((await c.get(`/api/posts/${adminPost}/versions`)).status, 403, '看他人版本列表应 403');
   assert.equal((await c.get(`/api/posts/${adminPost}/versions/1`)).status, 403, '看他人版本详情应 403');
-  assert.equal(
-    (await c.post(`/api/posts/${adminPost}/versions/1/restore`, {})).status,
-    403,
-    '回滚他人版本应 403',
-  );
+  assert.equal((await c.post(`/api/posts/${adminPost}/versions/1/restore`, {})).status, 403, '回滚他人版本应 403');
 
   const batchTrash = await c.post('/api/posts/batch', { action: 'trash', ids: [adminPost] });
   assert.equal(batchTrash.status, 403, '批量删除含他人文章应 403');
@@ -195,7 +202,10 @@ test('e2e：管理员全通，作者列表只看得到自己', async () => {
 
   c.setSession(authorA.cookie);
   const mine = (await (await c.get('/api/posts?status=draft')).json()).posts as Array<{ id: number }>;
-  assert.ok(mine.some((p) => p.id === aPost), '作者列表含自己的文章');
+  assert.ok(
+    mine.some((p) => p.id === aPost),
+    '作者列表含自己的文章',
+  );
   assert.ok(!mine.some((p) => p.id === adminPost), '作者列表不含他人文章');
 
   const trash = await c.get('/api/posts?status=all&trash=1');
@@ -207,7 +217,10 @@ test('e2e：管理员全通，作者列表只看得到自己', async () => {
     c.setSession(adminCookie);
     return (await (await c.get('/api/posts?status=all')).json()).posts as Array<{ id: number }>;
   })();
-  assert.ok(adminAll.some((p) => p.id === adminPost), '管理员列表可见他人文章');
+  assert.ok(
+    adminAll.some((p) => p.id === adminPost),
+    '管理员列表可见他人文章',
+  );
 
   // 管理员可改、可删作者的文章
   c.setSession(adminCookie);
@@ -280,10 +293,19 @@ test('e2e：文章署名写入、替换与清空，非法署名被拒', async ()
 
   c.setSession(authorA.cookie);
   // 缺省署名 = 创建者本人
-  const plain = await c.post('/api/posts', { collection_id: colId, title: '默认署名', slug: 'authz-default-sign', status: 'draft' });
+  const plain = await c.post('/api/posts', {
+    collection_id: colId,
+    title: '默认署名',
+    slug: 'authz-default-sign',
+    status: 'draft',
+  });
   assert.equal(plain.status, 201);
   const plainBody = await plain.json();
-  assert.deepEqual((plainBody.authors as Array<{ id: number }>).map((a) => a.id), [authorA.id], '新文默认署名创建者');
+  assert.deepEqual(
+    (plainBody.authors as Array<{ id: number }>).map((a) => a.id),
+    [authorA.id],
+    '新文默认署名创建者',
+  );
 
   // 显式多人署名：第一位为主作者
   const multi = await c.post('/api/posts', {
@@ -296,7 +318,11 @@ test('e2e：文章署名写入、替换与清空，非法署名被拒', async ()
   assert.equal(multi.status, 201);
   const multiId = (await multi.json()).post.id as number;
   const detail = await (await c.get(`/api/posts/${multiId}`)).json();
-  assert.deepEqual((detail.authors as Array<{ id: number }>).map((a) => a.id), [authorB.id, authorA.id], '署名应保序');
+  assert.deepEqual(
+    (detail.authors as Array<{ id: number }>).map((a) => a.id),
+    [authorB.id, authorA.id],
+    '署名应保序',
+  );
 
   const replaced = await c.put(`/api/posts/${multiId}`, { authors: [authorA.id] });
   assert.equal(replaced.status, 200);
@@ -357,7 +383,11 @@ test('e2e：写作区依赖接口——作者名单、列表署名、AI 摘要�
     authors: Array<{ id: number; username: string }>;
   }>;
   const row = rows.find((p) => p.id === createdId);
-  assert.deepEqual(row?.authors.map((a) => a.id), [authorB.id, authorA.id], '列表应带有序署名');
+  assert.deepEqual(
+    row?.authors.map((a) => a.id),
+    [authorB.id, authorA.id],
+    '列表应带有序署名',
+  );
   assert.ok(row?.authors[0].username, '署名应含用户名（前台链接用）');
 
   // AI 摘要类接口：作者已过鉴权（本环境未配置 AI 密钥 → 500 配置错误，而非 403）

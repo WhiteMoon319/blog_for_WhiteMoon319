@@ -134,7 +134,9 @@ function moveAuthor(index: number, delta: number): void {
           title="下移"
           :disabled="idx === form.author_ids.length - 1"
           @click="moveAuthor(idx, 1)"
-        >↓</button>
+        >
+          ↓
+        </button>
         <button type="button" class="chip-op" title="移除" @click="removeAuthor(idx)">×</button>
       </span>
       <select class="select select-xs" @change="addAuthor">
@@ -144,9 +146,7 @@ function moveAuthor(index: number, delta: number): void {
         </option>
       </select>
     </div>
-    <div class="hint mt-6">
-      留空则文章无署名；前台按此顺序展示并链接到各作者页。
-    </div>
+    <div class="hint mt-6">留空则文章无署名；前台按此顺序展示并链接到各作者页。</div>
   </div>
 
   <div class="field">
@@ -170,7 +170,12 @@ function moveAuthor(index: number, delta: number): void {
         >
           <option v-for="t in promptTemplates" :key="t.id" :value="t.id">{{ t.name }}（{{ t.id }}）</option>
         </select>
-        <button type="button" class="btn btn-ghost nowrap mt-2" :disabled="generatingSummary" @click="emit('generate-summary')">
+        <button
+          type="button"
+          class="btn btn-ghost nowrap mt-2"
+          :disabled="generatingSummary"
+          @click="emit('generate-summary')"
+        >
           {{ generatingSummary ? '生成中…' : 'AI 生成' }}
         </button>
       </div>
@@ -195,11 +200,7 @@ function moveAuthor(index: number, delta: number): void {
     <label>定时发布（到点自动刊发；仅草稿可设）</label>
     <div class="row-wrap">
       <label class="checkbox-row">
-        <input
-          type="checkbox"
-          v-model="form.scheduled_enabled"
-          :disabled="form.status === 'published'"
-        />
+        <input type="checkbox" v-model="form.scheduled_enabled" :disabled="form.status === 'published'" />
         启用
       </label>
       <input
@@ -211,8 +212,7 @@ function moveAuthor(index: number, delta: number): void {
       />
     </div>
     <div class="hint mt-8">
-      按本机时区展示，提交后转为 UTC 存储；cron 每 5 分钟轮询，到点可能略有延迟，不承诺秒级准点。
-      手动刊发会清空定时。
+      按本机时区展示，提交后转为 UTC 存储；cron 每 5 分钟轮询，到点可能略有延迟，不承诺秒级准点。 手动刊发会清空定时。
     </div>
   </div>
 
@@ -220,12 +220,7 @@ function moveAuthor(index: number, delta: number): void {
     <label>封面</label>
     <div class="row-wrap">
       <button class="btn btn-ghost" type="button" @click="emit('pick-cover')" :disabled="uploading">上传封面</button>
-      <img
-        v-if="form.cover_url"
-        :src="form.cover_url"
-        alt="封面"
-        class="cover-thumb"
-      />
+      <img v-if="form.cover_url" :src="form.cover_url" alt="封面" class="cover-thumb" />
       <button v-if="form.cover_url" class="btn btn-danger mini" type="button" @click="form.cover_url = ''">
         去封面
       </button>

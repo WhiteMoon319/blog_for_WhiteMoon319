@@ -70,12 +70,14 @@ async function renderDiagrams() {
   // 动态注入 KaTeX 和 hljs 样式（仅首次需要）
   if (!document.querySelector('link[href="/_assets/katex.min.css"]')) {
     const katexLink = document.createElement('link');
-    katexLink.rel = 'stylesheet'; katexLink.href = '/_assets/katex.min.css';
+    katexLink.rel = 'stylesheet';
+    katexLink.href = '/_assets/katex.min.css';
     document.head.appendChild(katexLink);
   }
   if (!document.querySelector('link[href="/_assets/github-dark.css"]')) {
     const hljsLink = document.createElement('link');
-    hljsLink.rel = 'stylesheet'; hljsLink.href = '/_assets/github-dark.css';
+    hljsLink.rel = 'stylesheet';
+    hljsLink.href = '/_assets/github-dark.css';
     document.head.appendChild(hljsLink);
   }
 
@@ -100,10 +102,7 @@ async function renderDiagrams() {
   const markmapEls = Array.from(host.querySelectorAll<HTMLElement>('.diagram.markmap'));
   if (markmapEls.length > 0) {
     // 动态 import markmap（约 500KB，按需加载）
-    const [{ Transformer }, { Markmap }] = await Promise.all([
-      import('markmap-lib'),
-      import('markmap-view'),
-    ]);
+    const [{ Transformer }, { Markmap }] = await Promise.all([import('markmap-lib'), import('markmap-view')]);
     const transformer = new Transformer();
     markmapEls.forEach((el) => {
       try {
@@ -152,7 +151,9 @@ function insertBlock(block: string): void {
   if (!view) return;
   const text = view.state.doc.toString();
   const insert = `\n\n${block}\n\n`;
-  view.dispatch({ changes: { from: 0, to: text.length, insert: text.trim() ? text.replace(/\n+$/, '') + insert : insert } });
+  view.dispatch({
+    changes: { from: 0, to: text.length, insert: text.trim() ? text.replace(/\n+$/, '') + insert : insert },
+  });
   view.focus();
 }
 
@@ -162,7 +163,8 @@ defineExpose({ insertSnippet, insertBlock });
 <template>
   <div class="source-area">
     <div class="source-blk-hint">
-      排版块语法：<code>:::name{type=variant}</code> … <code>:::</code>（块名如 callout / quote / steps / divider）。记不住就在可视化模式点「✦ 排版」插入。
+      排版块语法：<code>:::name{type=variant}</code> … <code>:::</code>（块名如 callout / quote / steps /
+      divider）。记不住就在可视化模式点「✦ 排版」插入。
     </div>
     <div ref="cmHost" class="cm-host" />
     <div ref="previewHost" class="source-preview" :class="{ refreshing: previewing }">

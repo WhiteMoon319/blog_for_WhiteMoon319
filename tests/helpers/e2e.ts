@@ -154,7 +154,9 @@ export async function makeE2e(): Promise<E2eClient> {
     ],
   });
   const db = await mf.getD1Database('DB');
-  for (const file of readdirSync(resolve('db/migrations')).filter((f) => f.endsWith('.sql')).sort()) {
+  for (const file of readdirSync(resolve('db/migrations'))
+    .filter((f) => f.endsWith('.sql'))
+    .sort()) {
     for (const stmt of readStatements(`db/migrations/${file}`)) {
       await db.prepare(stmt).run();
     }
@@ -231,7 +233,10 @@ export async function makeE2e(): Promise<E2eClient> {
     },
     async sql(stmt: string, ...binds: (string | number | null)[]) {
       // 直接操作测试数据库：用于制造 API 无法表达的状态（如把定时回拨到过去）
-      return db.prepare(stmt).bind(...binds).all();
+      return db
+        .prepare(stmt)
+        .bind(...binds)
+        .all();
     },
     multipart(files) {
       const boundary = `----e2eBoundary${Math.random().toString(36).slice(2)}`;

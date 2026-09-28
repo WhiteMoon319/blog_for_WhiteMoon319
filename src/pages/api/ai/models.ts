@@ -20,10 +20,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   const env = await envOf();
   if (!env.AI_SETTINGS_ENCRYPTION_KEY) return json({ error: 'encryption_key_not_configured' }, 500);
 
-  const [settings, cred] = await Promise.all([
-    getAllSettings(env.DB),
-    getAiCredential(env.DB),
-  ]);
+  const [settings, cred] = await Promise.all([getAllSettings(env.DB), getAiCredential(env.DB)]);
   if (!cred) return json({ error: 'ai_api_key_not_configured' }, 400);
 
   let apiKey: string;

@@ -125,7 +125,9 @@ export async function setCredentials(db: D1Database, passwordHash: string, sessi
 
 export async function incrementSessionVersion(db: D1Database): Promise<number> {
   await db
-    .prepare(`UPDATE admin_credentials SET session_version = session_version + 1, updated_at = datetime('now') WHERE id = 1`)
+    .prepare(
+      `UPDATE admin_credentials SET session_version = session_version + 1, updated_at = datetime('now') WHERE id = 1`,
+    )
     .run();
   const row = await getCredentials(db);
   return row?.session_version ?? 2;

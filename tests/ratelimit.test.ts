@@ -65,7 +65,11 @@ test('登录限流：并发请求不会全部通过（原子计数）', async ()
     const passed = results.filter((r) => r.ok).length;
     assert.ok(passed >= 1, '至少有一个请求通过');
     assert.ok(passed <= 5, `20 个并发请求只有 ${passed} 个通过，不应绕过阈值`);
-    assert.equal(results.filter((r) => !r.ok).every((r) => r.retryAfter > 0), true, '被拒请求应带 Retry-After');
+    assert.equal(
+      results.filter((r) => !r.ok).every((r) => r.retryAfter > 0),
+      true,
+      '被拒请求应带 Retry-After',
+    );
   });
 });
 

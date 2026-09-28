@@ -28,7 +28,8 @@ interface AuthorRow {
  * （href 为 null），文章与署名本身保留，不因账号状态把内容下架。
  */
 export function toAuthorBadge(row: AuthorRow): AuthorBadge {
-  const linkable = (row.status ?? 'active') === 'active' && (row.role === undefined || row.role === 'author' || row.role === 'admin');
+  const linkable =
+    (row.status ?? 'active') === 'active' && (row.role === undefined || row.role === 'author' || row.role === 'admin');
   const username = row.username;
   return {
     id: row.id,
@@ -62,10 +63,7 @@ export async function listPostAuthorBadges(db: D1Database, postId: number): Prom
  * 批量署名：列表页一次查完（按 90 个 id 分块，D1 单查询绑定参数上限 100）。
  * 返回普通对象（key 为文章 id 字符串）以便直接写进 props 传给主题模板。
  */
-export async function badgesByPostId(
-  db: D1Database,
-  postIds: number[],
-): Promise<Record<string, AuthorBadge[]>> {
+export async function badgesByPostId(db: D1Database, postIds: number[]): Promise<Record<string, AuthorBadge[]>> {
   const out: Record<string, AuthorBadge[]> = {};
   const ids = [...new Set(postIds.filter((n) => Number.isInteger(n) && n > 0))];
   if (ids.length === 0) return out;

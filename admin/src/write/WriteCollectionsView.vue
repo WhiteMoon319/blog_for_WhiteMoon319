@@ -20,7 +20,9 @@ const draft = ref({ title: '', slug: '', summary: '', is_public: false });
 // 展开的协作面板：文集 id → 成员/申请
 const openId = ref<number | null>(null);
 const members = ref<Array<{ user_id: number; username: string; display_name: string }>>([]);
-const invites = ref<Array<{ id: number; user_id: number; username: string; display_name: string; message: string }>>([]);
+const invites = ref<Array<{ id: number; user_id: number; username: string; display_name: string; message: string }>>(
+  [],
+);
 const pickUser = ref<number | ''>('');
 
 /** 别人的私有文集：我能看到，但需要申请才能写入 */
@@ -90,7 +92,10 @@ async function rename(c: CollectionWriteView) {
 }
 
 async function remove(c: CollectionWriteView) {
-  if (!confirm(`确要删除文集「${c.title}」？其中的文章会移到未分类（不会被删除）。\n\n若集内有他人文章，删除会被拒绝。`)) return;
+  if (
+    !confirm(`确要删除文集「${c.title}」？其中的文章会移到未分类（不会被删除）。\n\n若集内有他人文章，删除会被拒绝。`)
+  )
+    return;
   try {
     await api.deleteCollection(c.id);
     emit('notify', '文集已删除');
@@ -189,9 +194,7 @@ onMounted(load);
   <div class="page-head">
     <span class="kicker">文 集</span>
     <h1>我的文集</h1>
-    <p class="hint mt-6">
-      公用文集任何作者都能投稿；私有文集只有你与拉入的协作者能投稿。别人想投稿需你同意。
-    </p>
+    <p class="hint mt-6">公用文集任何作者都能投稿；私有文集只有你与拉入的协作者能投稿。别人想投稿需你同意。</p>
   </div>
 
   <div class="card">
@@ -267,7 +270,11 @@ onMounted(load);
                 <div v-if="invites.length" class="panel-block">
                   <strong>待处理申请</strong>
                   <div v-for="i in invites" :key="i.id" class="panel-row">
-                    <span>{{ i.display_name || i.username }} 申请投稿<template v-if="i.message">：{{ i.message }}</template></span>
+                    <span
+                      >{{ i.display_name || i.username }} 申请投稿<template v-if="i.message"
+                        >：{{ i.message }}</template
+                      ></span
+                    >
                     <span>
                       <button class="btn btn-primary mini" @click="decide(i.id, true)">同意</button>
                       <button class="btn btn-ghost mini" @click="decide(i.id, false)">拒绝</button>
@@ -319,7 +326,9 @@ onMounted(load);
         <tbody>
           <tr v-for="c in needInvite" :key="c.id">
             <td>{{ c.title }}</td>
-            <td class="muted-cell">{{ c.invite_status === 'pending' ? '申请待处理' : c.invite_status === 'rejected' ? '已被拒绝' : '—' }}</td>
+            <td class="muted-cell">
+              {{ c.invite_status === 'pending' ? '申请待处理' : c.invite_status === 'rejected' ? '已被拒绝' : '—' }}
+            </td>
             <td>
               <button class="btn btn-ghost mini" :disabled="c.invite_status === 'pending'" @click="join(c)">
                 {{ inviteLabel(c) }}

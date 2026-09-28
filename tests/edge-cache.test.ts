@@ -23,16 +23,38 @@ import {
 } from '../src/lib/edge-cache.ts';
 import { signToken, verifyTokenShape } from '../src/lib/auth.ts';
 
-const html = (status = 200, headers: Record<string, string> = {}) =>
-  ({ status, headers: new Headers({ 'content-type': 'text/html; charset=utf-8', ...headers }) });
+const html = (status = 200, headers: Record<string, string> = {}) => ({
+  status,
+  headers: new Headers({ 'content-type': 'text/html; charset=utf-8', ...headers }),
+});
 
 test('边缘缓存：裸路径与带尾斜杠等价（/admin、/search 曾漏判成可缓存）', () => {
-  for (const p of ['/admin', '/admin/', '/admin/posts', '/search', '/search/', '/write', '/write/', '/api', '/api/posts', '/login', '/account']) {
+  for (const p of [
+    '/admin',
+    '/admin/',
+    '/admin/posts',
+    '/search',
+    '/search/',
+    '/write',
+    '/write/',
+    '/api',
+    '/api/posts',
+    '/login',
+    '/account',
+  ]) {
     assert.equal(isNoCachePath(p), true, `${p} 应免缓存`);
     assert.equal(isPublicCacheablePath(p), false, `${p} 不该走公开缓存`);
   }
   // 路径段匹配：不能把同前缀的其它路径误伤/漏判
-  for (const p of ['/', '/posts/hello/', '/collections/essays/', '/tags/tech/', '/administrator', '/searching', '/writers']) {
+  for (const p of [
+    '/',
+    '/posts/hello/',
+    '/collections/essays/',
+    '/tags/tech/',
+    '/administrator',
+    '/searching',
+    '/writers',
+  ]) {
     assert.equal(isNoCachePath(p), false, `${p} 应允许缓存`);
   }
 });
@@ -56,7 +78,10 @@ test('边缘缓存：只有匿名静态 200 HTML 才可入缓存', () => {
   // 非 200 / 非 HTML 不入缓存
   assert.equal(isStorableHtmlResponse(html(404)), false);
   assert.equal(isStorableHtmlResponse(html(302)), false);
-  assert.equal(isStorableHtmlResponse({ status: 200, headers: new Headers({ 'content-type': 'application/json' }) }), false);
+  assert.equal(
+    isStorableHtmlResponse({ status: 200, headers: new Headers({ 'content-type': 'application/json' }) }),
+    false,
+  );
 });
 
 test('边缘缓存：开关与前置条件', () => {
@@ -94,12 +119,17 @@ test('会话 cookie：只认签名有效且未过期的 token（伪造 cookie �
   // 过期
   const expired = await signToken(secret, 'user:1', 3);
   const [payload] = expired.split('.');
-  const oldPayload = Buffer.from(JSON.stringify({ sub: 'user:1', ver: 3, exp: Math.floor(Date.now() / 1000) - 10 })).toString('base64url');
+  const oldPayload = Buffer.from(
+    JSON.stringify({ sub: 'user:1', ver: 3, exp: Math.floor(Date.now() / 1000) - 10 }),
+  ).toString('base64url');
   assert.equal(await verifyTokenShape(secret, `${oldPayload}.${expired.split('.')[1]}`), null);
   assert.ok(payload);
   // 密钥缺失/过短 → 一律拒绝
   assert.equal(await verifyTokenShape(undefined, valid), null);
   assert.equal(await verifyTokenShape('short', valid), null);
   // 结构不合法
-  assert.equal(await verifyTokenShape(secret, `${Buffer.from(JSON.stringify({ sub: 'user:1' })).toString('base64url')}.x`), null);
+  assert.equal(
+    await verifyTokenShape(secret, `${Buffer.from(JSON.stringify({ sub: 'user:1' })).toString('base64url')}.x`),
+    null,
+  );
 });

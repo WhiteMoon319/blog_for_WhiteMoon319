@@ -39,7 +39,11 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);
 
   let body: { display_name?: unknown; avatar_url?: unknown; notify_email?: unknown; email?: unknown; bio?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   const profile: { display_name?: string; avatar_url?: string; notify_email?: number; bio?: string } = {};
   if (typeof body.display_name === 'string' && body.display_name.trim()) {
@@ -72,7 +76,9 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (typeof body.email === 'string' && body.email.trim().toLowerCase() !== auth.user.email) {
     const newEmail = body.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return json({ error: 'email 格式无效' }, 400);
-    const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(newEmail).first<{ id: number }>();
+    const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
+      .bind(newEmail)
+      .first<{ id: number }>();
     if (existing) return json({ error: '该邮箱已被使用' }, 409);
     try {
       await updateEmail(env.DB, auth.user.id, newEmail);
@@ -84,10 +90,16 @@ export async function PUT(ctx: APIContext): Promise<Response> {
     try {
       const code = await generateVerificationCode();
       const codeHash = await hashVerificationCode(code);
-      await env.DB.prepare(`INSERT INTO email_verifications (user_id, code_hash, expires_at) VALUES (?, ?, datetime('now', '+5 minutes'))`).bind(auth.user.id, codeHash).run();
+      await env.DB.prepare(
+        `INSERT INTO email_verifications (user_id, code_hash, expires_at) VALUES (?, ?, datetime('now', '+5 minutes'))`,
+      )
+        .bind(auth.user.id, codeHash)
+        .run();
       const mail = verificationEmail(code);
       await sendEmail(newEmail, mail.subject, mail.text);
-    } catch { /* 邮件发送失败静默 */ }
+    } catch {
+      /* 邮件发送失败静默 */
+    }
   }
 
   return json({ ok: true });

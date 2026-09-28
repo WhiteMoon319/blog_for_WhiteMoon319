@@ -27,7 +27,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!attempt.ok) return json({ error: 'too many comments' }, 429);
 
   let body: { post_id?: unknown; parent_id?: unknown; body?: unknown; attachments?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   const postId = Number(body.post_id);
   if (!Number.isInteger(postId) || postId <= 0) return json({ error: 'post_id required' }, 400);
@@ -35,7 +39,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const commentBody = body.body.trim();
   if (commentBody.length > 2000) return json({ error: 'body too long' }, 400);
 
-  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(postId).first<{ id: number; status: string; deleted_at: string | null }>();
+  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`)
+    .bind(postId)
+    .first<{ id: number; status: string; deleted_at: string | null }>();
   if (!post || post.status !== 'published' || post.deleted_at) return json({ error: 'post not found' }, 404);
 
   let parentId: number | null = null;
@@ -43,7 +49,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (body.parent_id !== undefined && body.parent_id !== null) {
     parentId = Number(body.parent_id);
     if (!Number.isInteger(parentId) || parentId <= 0) return json({ error: 'invalid parent_id' }, 400);
-    const parent = await env.DB.prepare(`SELECT id, parent_id, status, user_id FROM comments WHERE id = ? AND post_id = ?`).bind(parentId, postId).first<{ id: number; parent_id: number | null; status: string; user_id: number }>();
+    const parent = await env.DB.prepare(
+      `SELECT id, parent_id, status, user_id FROM comments WHERE id = ? AND post_id = ?`,
+    )
+      .bind(parentId, postId)
+      .first<{ id: number; parent_id: number | null; status: string; user_id: number }>();
     if (!parent || parent.status !== 'approved') return json({ error: 'parent not found' }, 404);
     if (parent.parent_id !== null) return json({ error: 'nested reply too deep' }, 400);
     parentAuthorId = parent.user_id;
@@ -51,7 +61,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   let attachments: string[] = [];
   if (Array.isArray(body.attachments)) {
-    attachments = body.attachments.filter((k) => typeof k === 'string' && /^comment\/[0-9a-f-]{36}\.(png|jpg|jpeg|webp|gif)$/i.test(k));
+    attachments = body.attachments.filter(
+      (k) => typeof k === 'string' && /^comment\/[0-9a-f-]{36}\.(png|jpg|jpeg|webp|gif)$/i.test(k),
+    );
     if (attachments.length > 3) return json({ error: '最多 3 张图片' }, 400);
   }
 
@@ -64,11 +76,15 @@ export async function POST(ctx: APIContext): Promise<Response> {
   });
   if (!comment) return json({ error: '发表失败' }, 500);
 
-    // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
+  // 命中敏感关键词 → 保持 pending 人工审核；未命中 → 直接展示
   const settings = await getAllSettings(env.DB);
   const keywords = settings.comment_review_keywords ?? '';
   const needsReview = keywords
-    ? keywords.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean).some((w) => commentBody.toLowerCase().includes(w))
+    ? keywords
+        .split(',')
+        .map((k) => k.trim().toLowerCase())
+        .filter(Boolean)
+        .some((w) => commentBody.toLowerCase().includes(w))
     : false;
   let finalStatus: 'pending' | 'approved' = 'pending';
   if (!needsReview) {
@@ -78,14 +94,22 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   // 回复通知：被回复者开启了邮件提醒（await 确保响应返回前完成发送）
   if (parentAuthorId && parentAuthorId !== auth.user.id) {
-    const parentUser = await env.DB.prepare('SELECT email, email_verified, notify_email, display_name FROM users WHERE id = ?').bind(parentAuthorId).first<{ email: string; email_verified: number; notify_email: number; display_name: string }>();
+    const parentUser = await env.DB.prepare(
+      'SELECT email, email_verified, notify_email, display_name FROM users WHERE id = ?',
+    )
+      .bind(parentAuthorId)
+      .first<{ email: string; email_verified: number; notify_email: number; display_name: string }>();
     if (parentUser && parentUser.email_verified && parentUser.notify_email) {
       try {
         const { sendEmail } = await import('../../../lib/email');
-        await sendEmail(parentUser.email, '有人回复了您的评论 - 月下独酌',
+        await sendEmail(
+          parentUser.email,
+          '有人回复了您的评论 - 月下独酌',
           `${parentUser.display_name} 您好，\n\n${auth.user.display_name || auth.user.username} 回复了您在「月下独酌」的评论：\n\n"${commentBody.slice(0, 200)}"\n\n请前往博客查看。`,
         );
-      } catch { /* 邮件发送失败静默 */ }
+      } catch {
+        /* 邮件发送失败静默 */
+      }
     }
   }
 

@@ -27,9 +27,25 @@ export interface PageInput {
 
 const SLUG_MAX_LENGTH = 120;
 const RESERVED_SLUGS = new Set([
-  'admin', 'api', 'login', 'logout', 'feed', 'rss', 'atom', 'sitemap',
-  'search', 'tags', 'archive', 'collections', 'media', 'export', 'upload',
-  'pages', 'me', 'index', 'robots',
+  'admin',
+  'api',
+  'login',
+  'logout',
+  'feed',
+  'rss',
+  'atom',
+  'sitemap',
+  'search',
+  'tags',
+  'archive',
+  'collections',
+  'media',
+  'export',
+  'upload',
+  'pages',
+  'me',
+  'index',
+  'robots',
 ]);
 
 function slugError(slug: string): string | null {
@@ -47,7 +63,7 @@ export function validatePageSlug(slug: string): { ok: true } | { ok: false; erro
 // 与文章、文集 slug 的跨表冲突校验（路由层面 `/posts/{slug}`、`/collections/{slug}` 与 `/pages/{slug}` 并存）
 export async function pageSlugConflicts(db: D1Database, slug: string): Promise<string | null> {
   const post = await db
-    .prepare("SELECT slug FROM posts WHERE slug = ? AND deleted_at IS NULL LIMIT 1")
+    .prepare('SELECT slug FROM posts WHERE slug = ? AND deleted_at IS NULL LIMIT 1')
     .bind(slug)
     .first<{ slug: string }>();
   if (post) return `slug "${slug}" 已被文章占用`;
@@ -81,9 +97,7 @@ export async function createPage(db: D1Database, data: PageInput): Promise<PageR
   const existing = await getPageBySlug(db, data.slug);
   if (existing) throw new Error(`slug "${data.slug}" 已存在`);
   const result = await db
-    .prepare(
-      `INSERT INTO pages (slug, title, content_md, published) VALUES (?, ?, ?, ?)`,
-    )
+    .prepare(`INSERT INTO pages (slug, title, content_md, published) VALUES (?, ?, ?, ?)`)
     .bind(data.slug, data.title, data.content_md ?? '', data.published ?? 0)
     .run();
   const row = await getPageById(db, result.meta.last_row_id as unknown as number);
@@ -91,18 +105,23 @@ export async function createPage(db: D1Database, data: PageInput): Promise<PageR
   return row;
 }
 
-export async function updatePage(
-  db: D1Database,
-  id: number,
-  data: Partial<PageInput>,
-): Promise<PageRow | null> {
+export async function updatePage(db: D1Database, id: number, data: Partial<PageInput>): Promise<PageRow | null> {
   const current = await getPageById(db, id);
   if (!current) return null;
   const sets: string[] = [];
   const values: (string | number)[] = [];
-  if (data.title !== undefined) { sets.push('title = ?'); values.push(data.title); }
-  if (data.content_md !== undefined) { sets.push('content_md = ?'); values.push(data.content_md); }
-  if (data.published !== undefined) { sets.push('published = ?'); values.push(data.published); }
+  if (data.title !== undefined) {
+    sets.push('title = ?');
+    values.push(data.title);
+  }
+  if (data.content_md !== undefined) {
+    sets.push('content_md = ?');
+    values.push(data.content_md);
+  }
+  if (data.published !== undefined) {
+    sets.push('published = ?');
+    values.push(data.published);
+  }
   if (data.slug !== undefined && data.slug !== current.slug) {
     const val = slugError(data.slug);
     if (val) throw new Error(val);

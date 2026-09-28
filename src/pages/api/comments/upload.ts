@@ -14,7 +14,13 @@ import { publicBase } from '../../../lib/utils';
 
 export const prerender = false;
 
-const ALLOWED = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' } as const;
+const ALLOWED = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+} as const;
 const MAX_SIZE = 2 * 1024 * 1024;
 
 export async function POST(ctx: APIContext): Promise<Response> {
@@ -39,7 +45,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const detected = detectImageType(buf, file.type);
   if (!detected) return json({ error: '仅支持 png/jpeg/webp/gif 图片' }, 400);
 
-  const ext = detected === 'image/png' ? 'png' : detected === 'image/jpeg' ? 'jpg' : detected === 'image/webp' ? 'webp' : 'gif';
+  const ext =
+    detected === 'image/png' ? 'png' : detected === 'image/jpeg' ? 'jpg' : detected === 'image/webp' ? 'webp' : 'gif';
 
   const key = `comment/${crypto.randomUUID()}.${ext}`;
   await env.IMAGES.put(key, buf, { httpMetadata: { contentType: detected } });

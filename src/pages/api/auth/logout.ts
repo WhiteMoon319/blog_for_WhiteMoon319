@@ -24,7 +24,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     if (mm) {
       try {
         await incrementUserSessionVersion(env.DB, Number(mm[1]));
-      } catch { /* 升版本失败不阻塞登出 */ }
+      } catch {
+        /* 升版本失败不阻塞登出 */
+      }
     }
   }
   clearSessionCookie(ctx);

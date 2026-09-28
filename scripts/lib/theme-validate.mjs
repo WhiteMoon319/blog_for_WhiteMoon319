@@ -29,7 +29,18 @@ export const HARD_LIMITS = {
   allowedExtensions: ['.astro', '.ts', '.json', '.css', '.png', '.jpg', '.svg', '.webp', '.woff', '.woff2', '.md'],
   slugPattern: /^[a-z0-9][a-z0-9-]{1,30}$/,
   reservedSlugs: ['classic', 'modern'],
-  coreTemplates: ['home', 'collection', 'post', 'standalone', 'archive', 'search', 'not-found', 'tag-index', 'tag-detail', 'author'],
+  coreTemplates: [
+    'home',
+    'collection',
+    'post',
+    'standalone',
+    'archive',
+    'search',
+    'not-found',
+    'tag-index',
+    'tag-detail',
+    'author',
+  ],
 };
 
 const REQUIRED_MANIFEST_FIELDS = ['name', 'slug', 'version', 'engine_version', 'author', 'license'];
@@ -72,7 +83,8 @@ export function assertInstallableSlug(slug) {
 /** 敏感导入扫描：files 为 { 相对路径: 文本 } 映射 */
 export function scanImports(files) {
   const violations = [];
-  const importRe = /(?:^|[^\w$])(?:import\s+[^'"]*?from\s*|import\s*\(\s*|export\s+(?:\*|{[^}]*})\s*from\s*|require\s*\(\s*)(['"])([^'"]+)\1/g;
+  const importRe =
+    /(?:^|[^\w$])(?:import\s+[^'"]*?from\s*|import\s*\(\s*|export\s+(?:\*|{[^}]*})\s*from\s*|require\s*\(\s*)(['"])([^'"]+)\1/g;
   for (const [relPath, text] of Object.entries(files)) {
     if (!/\.(astro|ts)$/.test(relPath)) continue;
     let m;
@@ -130,7 +142,8 @@ export function validateExtracted(files, expectedSlug = null, allowReserved = fa
   }
 
   // 条目与单文件限制、扩展名白名单
-  if (entries.length > HARD_LIMITS.maxEntries) fail(errors, `条目数 ${entries.length} 超上限 ${HARD_LIMITS.maxEntries}`);
+  if (entries.length > HARD_LIMITS.maxEntries)
+    fail(errors, `条目数 ${entries.length} 超上限 ${HARD_LIMITS.maxEntries}`);
   for (const [r, data] of Object.entries(themed)) {
     if (data.length > HARD_LIMITS.maxFileBytes) fail(errors, `单文件超限(≤512KB)：${r}`);
     const dot = r.lastIndexOf('.');
@@ -173,7 +186,13 @@ export function inspectZip(buf, expectedSlug = null, allowReserved = false) {
   let totalUncompressed = 0;
   for (const data of Object.values(entries)) totalUncompressed += data.length;
   if (buf.length > 0 && totalUncompressed / buf.length > HARD_LIMITS.maxCompressionRatio) {
-    return { errors: [`压缩比 ${(totalUncompressed / buf.length).toFixed(1)} 超过 ${HARD_LIMITS.maxCompressionRatio}，疑似炸弹`], warnings: [], manifest: null };
+    return {
+      errors: [
+        `压缩比 ${(totalUncompressed / buf.length).toFixed(1)} 超过 ${HARD_LIMITS.maxCompressionRatio}，疑似炸弹`,
+      ],
+      warnings: [],
+      manifest: null,
+    };
   }
   const result = validateExtracted(entries, expectedSlug, allowReserved);
   return { ...result, files: entries };
@@ -193,7 +212,15 @@ export function packDir(dir, dirName) {
   walk(dir, '');
   const zipped = zipSync(files);
   const back = inspectZip(zipped, dirName, true);
-  return { buffer: zipped, report: { errors: back.errors, warnings: back.warnings, manifest: back.manifest, entryCount: Object.keys(files).length } };
+  return {
+    buffer: zipped,
+    report: {
+      errors: back.errors,
+      warnings: back.warnings,
+      manifest: back.manifest,
+      entryCount: Object.keys(files).length,
+    },
+  };
 }
 
 /** 解压 zip 到目标目录（已做路径安全校验） */
@@ -201,7 +228,10 @@ export function unpackZip(buf, destDir, expectedSlug = null, allowReserved = fal
   const inspected = inspectZip(buf, expectedSlug, allowReserved);
   if (inspected.errors.length > 0) return inspected;
   const rels = Object.keys(inspected.files);
-  if (rels.length === 0) { inspected.errors.push('zip 无文件条目'); return inspected; }
+  if (rels.length === 0) {
+    inspected.errors.push('zip 无文件条目');
+    return inspected;
+  }
   const firstTop = rels.length ? rels[0].split('/')[0] : null;
   const singleTop = firstTop != null && rels.every((r) => r.startsWith(`${firstTop}/`));
   for (const [p, data] of Object.entries(inspected.files)) {

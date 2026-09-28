@@ -36,12 +36,7 @@ const { ctx, author, total, page, totalPages, posts, joinedAt, avatarUrl, jsonLd
 const t = modernT(ctx.locale);
 ---
 
-<BaseLayout
-  ctx={ctx}
-  title={author.name}
-  description={author.bio || `${author.name}`}
-  image={avatarUrl || undefined}
->
+<BaseLayout ctx={ctx} title={author.name} description={author.bio || `${author.name}`} image={avatarUrl || undefined}>
   {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
   <div class="page-hero">
     <a class="page-back reveal in" href="/">{t('author.back')}</a>
@@ -58,22 +53,28 @@ const t = modernT(ctx.locale);
   </div>
 
   <section class="section" style="padding-top:56px;">
-    {posts.length > 0 ? (
-      <div class="posts-grid">
-        {posts.map((p) => (
-          <div class="post-card reveal">
-            {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-            <h3 class="post-title"><CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink></h3>
-            {p.summary && <p class="post-summary">{p.summary}</p>}
-            <div class="post-meta">
-              <span>{fmtDate(p.created_at)}</span>
+    {
+      posts.length > 0 ? (
+        <div class="posts-grid">
+          {posts.map((p) => (
+            <div class="post-card reveal">
+              {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
+              <h3 class="post-title">
+                <CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink>
+              </h3>
+              {p.summary && <p class="post-summary">{p.summary}</p>}
+              <div class="post-meta">
+                <span>{fmtDate(p.created_at)}</span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p class="section-lead" style="text-align:center;">{t('author.empty')}</p>
-    )}
+          ))}
+        </div>
+      ) : (
+        <p class="section-lead" style="text-align:center;">
+          {t('author.empty')}
+        </p>
+      )
+    }
     <Pagination current={page} totalPages={totalPages} base={`/authors/${author.username}/`} query="" />
   </section>
 </BaseLayout>

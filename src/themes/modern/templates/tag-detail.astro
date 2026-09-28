@@ -49,14 +49,24 @@ const t = modernT(ctx.locale);
       <p class="character-kicker">{t('tags.kicker')}</p>
       <h1>{name}</h1>
       <p class="lead">
-        {t('tags.detail_lead', { collections: collectionsCount, posts: postsCount })}{keyword ? t('tags.detail_keyword', { keyword }) : ''}
+        {t('tags.detail_lead', { collections: collectionsCount, posts: postsCount })}{
+          keyword ? t('tags.detail_keyword', { keyword }) : ''
+        }
       </p>
     </div>
   </div>
 
   <section class="section" style="padding-top:48px;">
     <div style="margin-top:36px;">
-      <TagResults locale={ctx.locale} names={[name]} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} authorsByPost={authorsByPost} />
+      <TagResults
+        locale={ctx.locale}
+        names={[name]}
+        keyword={keyword}
+        collections={collections}
+        posts={posts}
+        collectionPosts={collectionPosts}
+        authorsByPost={authorsByPost}
+      />
     </div>
   </section>
 </BaseLayout>

@@ -11,8 +11,16 @@ import type { CollectionRow, PostRow, PostVersionRow, TagRow } from './types.ts'
 // 全量导出只允许的非敏感 settings 键（显式白名单，杜绝 SELECT * 泄漏）。
 // 任何新增设置键必须按此显式登记后才可进入导出。
 const EXPORTABLE_SETTINGS = new Set([
-  'SITE_NAME', 'SITE_SLOGAN', 'SITE_POEM', 'SITE_URL',
-  'ai_provider', 'ai_base_url', 'ai_model', 'ai_reasoning_effort', 'ai_multi_summary', 'ai_candidate_count',
+  'SITE_NAME',
+  'SITE_SLOGAN',
+  'SITE_POEM',
+  'SITE_URL',
+  'ai_provider',
+  'ai_base_url',
+  'ai_model',
+  'ai_reasoning_effort',
+  'ai_multi_summary',
+  'ai_candidate_count',
 ]);
 
 function isExportableSetting(key: string): boolean {
@@ -73,21 +81,28 @@ export interface ExportSnapshot {
 // 明确不含：管理员密码/口令、会话、Cookie、BLOG_SESSION_SECRET、CSRF 凭据、R2 媒体二进制。
 // 回收站文章也一并导出并保留 deleted_at，使快照能忠实反映任意时刻的完整 CMS 状态。
 export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot> {
-  const [collections, posts, post_versions, tags, collection_tags, post_tags, post_authors, collaborators, invites] = await Promise.all([
-    db.prepare('SELECT * FROM collections ORDER BY sort_order, id').all<CollectionRow>(),
-    db.prepare('SELECT * FROM posts ORDER BY created_at, id').all<PostRow>(),
-    db.prepare('SELECT * FROM post_versions ORDER BY post_id, version').all<PostVersionRow>(),
-    db.prepare('SELECT * FROM tags ORDER BY name').all<TagRow>(),
-    db.prepare('SELECT collection_id, tag_id FROM collection_tags ORDER BY collection_id, tag_id').all<CollectionTagRow>(),
-    db.prepare('SELECT post_id, tag_id FROM post_tags ORDER BY post_id, tag_id').all<PostTagRow>(),
-    db.prepare('SELECT post_id, user_id, sort_order FROM post_authors ORDER BY post_id, sort_order').all<PostAuthorRow>(),
-    db
-      .prepare('SELECT collection_id, user_id FROM collection_collaborators ORDER BY collection_id, user_id')
-      .all<CollectionCollaboratorRow>(),
-    db
-      .prepare('SELECT collection_id, user_id, status, message FROM collection_invites ORDER BY collection_id, user_id')
-      .all<CollectionInviteExportRow>(),
-  ]);
+  const [collections, posts, post_versions, tags, collection_tags, post_tags, post_authors, collaborators, invites] =
+    await Promise.all([
+      db.prepare('SELECT * FROM collections ORDER BY sort_order, id').all<CollectionRow>(),
+      db.prepare('SELECT * FROM posts ORDER BY created_at, id').all<PostRow>(),
+      db.prepare('SELECT * FROM post_versions ORDER BY post_id, version').all<PostVersionRow>(),
+      db.prepare('SELECT * FROM tags ORDER BY name').all<TagRow>(),
+      db
+        .prepare('SELECT collection_id, tag_id FROM collection_tags ORDER BY collection_id, tag_id')
+        .all<CollectionTagRow>(),
+      db.prepare('SELECT post_id, tag_id FROM post_tags ORDER BY post_id, tag_id').all<PostTagRow>(),
+      db
+        .prepare('SELECT post_id, user_id, sort_order FROM post_authors ORDER BY post_id, sort_order')
+        .all<PostAuthorRow>(),
+      db
+        .prepare('SELECT collection_id, user_id FROM collection_collaborators ORDER BY collection_id, user_id')
+        .all<CollectionCollaboratorRow>(),
+      db
+        .prepare(
+          'SELECT collection_id, user_id, status, message FROM collection_invites ORDER BY collection_id, user_id',
+        )
+        .all<CollectionInviteExportRow>(),
+    ]);
 
   let pages: Array<Record<string, unknown>> = [];
   let settings: Array<Record<string, unknown>> = [];
@@ -95,22 +110,36 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
   let comments: Array<Record<string, unknown>> = [];
   try {
     pages = (await db.prepare('SELECT * FROM pages ORDER BY id').all<Record<string, unknown>>()).results ?? [];
-  } catch { pages = []; }
+  } catch {
+    pages = [];
+  }
   try {
-    const rows = (await db.prepare('SELECT key, value FROM settings ORDER BY key').all<{ key: string; value: string }>()).results ?? [];
+    const rows =
+      (await db.prepare('SELECT key, value FROM settings ORDER BY key').all<{ key: string; value: string }>())
+        .results ?? [];
     settings = rows.filter((r) => isExportableSetting(r.key)).map((r) => ({ key: r.key, value: r.value }));
-  } catch { settings = []; }
+  } catch {
+    settings = [];
+  }
   try {
     // users：仅白名单字段，排除敏感信息；含作者简介与头像（作者页展示用）
-    users = (await db.prepare(
-      `SELECT id, username, display_name, email, role, status, bio, avatar_url, created_at FROM users ORDER BY id`,
-    ).all<Record<string, unknown>>()).results ?? [];
-  } catch { users = []; }
+    users =
+      (
+        await db
+          .prepare(
+            `SELECT id, username, display_name, email, role, status, bio, avatar_url, created_at FROM users ORDER BY id`,
+          )
+          .all<Record<string, unknown>>()
+      ).results ?? [];
+  } catch {
+    users = [];
+  }
   try {
-    comments = (await db.prepare(
-      `SELECT * FROM comments ORDER BY post_id, id`,
-    ).all<Record<string, unknown>>()).results ?? [];
-  } catch { comments = []; }
+    comments =
+      (await db.prepare(`SELECT * FROM comments ORDER BY post_id, id`).all<Record<string, unknown>>()).results ?? [];
+  } catch {
+    comments = [];
+  }
 
   let migrationVersion = 'unknown';
   try {
@@ -144,13 +173,14 @@ export async function exportFullSnapshot(db: D1Database): Promise<ExportSnapshot
 
 // 单篇 Markdown 导出：YAML frontmatter（值一律双引号转义）+ 正文。
 // 回收站文章也可导出（快照语义），是否恢复由用户决定。
-export async function exportPostMarkdown(db: D1Database, id: number): Promise<{ filename: string; body: string } | null> {
+export async function exportPostMarkdown(
+  db: D1Database,
+  id: number,
+): Promise<{ filename: string; body: string } | null> {
   const post = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first<PostRow>();
   if (!post) return null;
   const tags = await db
-    .prepare(
-      `SELECT t.name FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE pt.post_id = ? ORDER BY t.name`,
-    )
+    .prepare(`SELECT t.name FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE pt.post_id = ? ORDER BY t.name`)
     .bind(id)
     .all<{ name: string }>();
 

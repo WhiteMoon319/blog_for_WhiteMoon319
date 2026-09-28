@@ -51,8 +51,7 @@ const corpusText = computed(() => {
   const c = stats.value?.corpus;
   if (!c) return { num: '—', label: `${scopeName.value}总字数` };
   const n = c.total_chars;
-  const text =
-    n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : n >= 1000 ? `${(n / 1000).toFixed(1)} 千` : String(n);
+  const text = n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : n >= 1000 ? `${(n / 1000).toFixed(1)} 千` : String(n);
   return {
     num: text,
     label: `${scopeName.value} · ${c.post_count} 篇（已刊 ${c.published_chars.toLocaleString()} 字）`,
@@ -98,7 +97,10 @@ onMounted(() => {
         :key="d"
         class="btn btn-ghost mini"
         :class="{ active: days === d }"
-        @click="days = d; loadTrends()"
+        @click="
+          days = d;
+          loadTrends();
+        "
       >
         {{ d }} 日
       </button>
@@ -153,9 +155,7 @@ onMounted(() => {
         <h2>每日阅读</h2>
         <span class="muted">{{ stats.start_day }} → {{ stats.end_day }}</span>
       </div>
-      <div v-if="stats.total_views === 0" class="muted py-24">
-        暂无阅读数据。读者访问文章页后，趋势将在这里呈现。
-      </div>
+      <div v-if="stats.total_views === 0" class="muted py-24">暂无阅读数据。读者访问文章页后，趋势将在这里呈现。</div>
       <div v-else class="bar-chart">
         <div v-for="p in stats.daily" :key="p.day" class="bar-col" :title="`${p.day}：${p.views} 次`">
           <div class="bar" :style="{ height: `${Math.max(4, (p.views / maxViews) * 100)}%` }" />

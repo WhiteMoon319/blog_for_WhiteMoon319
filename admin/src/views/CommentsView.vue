@@ -55,7 +55,12 @@ function searchByPost() {
 }
 
 function parseAttachments(att: string): string[] {
-  try { const a = JSON.parse(att); return Array.isArray(a) ? a : []; } catch { return []; }
+  try {
+    const a = JSON.parse(att);
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
+  }
 }
 
 async function moderate(id: number, status: 'approved' | 'rejected') {
@@ -89,7 +94,7 @@ onMounted(load);
     <div class="filter-bar">
       <div class="seg">
         <button
-          v-for="t in (['pending', 'approved', 'rejected'] as const)"
+          v-for="t in ['pending', 'approved', 'rejected'] as const"
           :key="t"
           class="btn btn-ghost mini"
           :class="{ active: tab === t }"
@@ -154,11 +159,23 @@ onMounted(load);
     <div v-if="total > pageSize" class="table-foot">
       <span class="muted">第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span>
       <div class="seg">
-        <button class="btn btn-ghost mini" :disabled="page <= 1 || busy" @click="page--; load()">上一页</button>
+        <button
+          class="btn btn-ghost mini"
+          :disabled="page <= 1 || busy"
+          @click="
+            page--;
+            load();
+          "
+        >
+          上一页
+        </button>
         <button
           class="btn btn-ghost mini"
           :disabled="page >= Math.ceil(total / pageSize) || busy"
-          @click="page++; load()"
+          @click="
+            page++;
+            load();
+          "
         >
           下一页
         </button>

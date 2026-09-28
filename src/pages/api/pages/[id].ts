@@ -36,7 +36,11 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   if (!Number.isFinite(id)) return json({ error: 'invalid id' }, 400);
 
   let body: Record<string, unknown>;
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   const data: Record<string, string | number> = {};
   if (typeof body.title === 'string') data.title = body.title.trim();

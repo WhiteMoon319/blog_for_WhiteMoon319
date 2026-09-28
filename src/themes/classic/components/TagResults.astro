@@ -48,7 +48,9 @@ const active = names.length > 0;
             <summary>
               <div class="collection-title-row">
                 <h3 class="post-title">{c.title}</h3>
-                <span class="collection-meta">{c.post_count} 篇{active ? ` · ${names.join(' / ')}` : ''}</span>
+                <span class="collection-meta">
+                  {c.post_count} 篇{active ? ` · ${names.join(' / ')}` : ''}
+                </span>
               </div>
               {c.summary && <p class="post-summary">{c.summary}</p>}
             </summary>
@@ -83,7 +85,9 @@ const active = names.length > 0;
       <div class="posts-grid">
         {posts.map((p, i) => (
           <div class="post-card reveal" data-delay={String((i % 3) + 1)}>
-            <h3 class="post-title"><CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink></h3>
+            <h3 class="post-title">
+              <CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink>
+            </h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
               <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />

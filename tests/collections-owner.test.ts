@@ -52,8 +52,14 @@ async function mkUser(username: string, role: 'reader' | 'author' | 'admin' = 'a
 
 test('迁移 0035：collections.created_by 齐备且历史文集回填到管理员', async () => {
   const cols = await db.prepare(`SELECT name FROM pragma_table_info('collections')`).all<{ name: string }>();
-  assert.ok(cols.results?.some((c) => c.name === 'created_by'), 'collections.created_by 应存在');
-  assert.ok(cols.results?.some((c) => c.name === 'is_public'), 'collections.is_public 应存在');
+  assert.ok(
+    cols.results?.some((c) => c.name === 'created_by'),
+    'collections.created_by 应存在',
+  );
+  assert.ok(
+    cols.results?.some((c) => c.name === 'is_public'),
+    'collections.is_public 应存在',
+  );
 
   const collabTable = await db
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'collection_collaborators'`)
@@ -83,7 +89,9 @@ test('迁移 0035：collections.created_by 齐备且历史文集回填到管理�
     )
     .run();
   await db.prepare('UPDATE collections SET is_public = 1').run();
-  const admin = await db.prepare(`SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`).first<{ id: number }>();
+  const admin = await db
+    .prepare(`SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`)
+    .first<{ id: number }>();
   assert.ok(admin, '迁移 0027 应已种下管理员');
   const after = await db
     .prepare('SELECT created_by, is_public FROM collections WHERE id = ?')
@@ -100,12 +108,25 @@ test('文集归属：创建带归属人，"我的文集"只列自建', async () 
   const mineA = await createCollection(db, { title: '甲集', slug: 'owner-a', created_by: a.id });
   const mineB = await createCollectionWithTags(db, { title: '乙集', slug: 'owner-b', created_by: b.id }, []);
   assert.ok(mineA && mineB);
-  assert.equal((await db.prepare('SELECT created_by FROM collections WHERE id = ?').bind(mineA!.id).first<{ created_by: number }>())?.created_by, a.id, '归属人应落库');
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT created_by FROM collections WHERE id = ?')
+        .bind(mineA!.id)
+        .first<{ created_by: number }>()
+    )?.created_by,
+    a.id,
+    '归属人应落库',
+  );
 
   const all = await listCollections(db);
   const onlyA = await listCollections(db, { ownerId: a.id });
   assert.ok(all.length >= 2, '全量列表含全部文集');
-  assert.deepEqual(onlyA.map((c) => c.id), [mineA!.id], 'ownerId 过滤只返回自建');
+  assert.deepEqual(
+    onlyA.map((c) => c.id),
+    [mineA!.id],
+    'ownerId 过滤只返回自建',
+  );
 });
 
 test('文集管理权：管理员全权，作者仅自建，读者不可', async () => {
@@ -133,7 +154,12 @@ test('删除保护：统计文集内他人归属文章（含无归属历史文�
   assert.ok(col);
 
   const own = await createPost(db, { title: '自己的', slug: 'col-del-own', collection_id: col!.id, created_by: a.id });
-  const other = await createPost(db, { title: '别人的', slug: 'col-del-other', collection_id: col!.id, created_by: b.id });
+  const other = await createPost(db, {
+    title: '别人的',
+    slug: 'col-del-other',
+    collection_id: col!.id,
+    created_by: b.id,
+  });
   const legacy = await createPost(db, { title: '无归属', slug: 'col-del-legacy', collection_id: col!.id });
   assert.ok(own && other && legacy);
 
@@ -152,8 +178,18 @@ test('文集写入权：公用/私有 × 归属人/协作者/管理员', async (
   const admin = await mkUser('cw-admin', 'admin');
   const reader = await mkUser('cw-reader', 'reader');
 
-  const privateCol = await createCollection(db, { title: '私集', slug: 'cw-private', created_by: owner.id, is_public: 0 });
-  const publicCol = await createCollection(db, { title: '公集', slug: 'cw-public', created_by: owner.id, is_public: 1 });
+  const privateCol = await createCollection(db, {
+    title: '私集',
+    slug: 'cw-private',
+    created_by: owner.id,
+    is_public: 0,
+  });
+  const publicCol = await createCollection(db, {
+    title: '公集',
+    slug: 'cw-public',
+    created_by: owner.id,
+    is_public: 1,
+  });
   assert.ok(privateCol && publicCol);
 
   assert.equal(await canWriteIntoCollection(db, owner, privateCol!), true, '归属人可写自建私有集');
@@ -167,7 +203,11 @@ test('文集写入权：公用/私有 × 归属人/协作者/管理员', async (
   assert.equal(await isCollectionCollaborator(db, privateCol!.id, collab.id), true);
 
   const members = await listCollectionCollaborators(db, privateCol!.id);
-  assert.deepEqual(members.map((m) => m.user_id), [collab.id], '成员列表应按拉入顺序返回');
+  assert.deepEqual(
+    members.map((m) => m.user_id),
+    [collab.id],
+    '成员列表应按拉入顺序返回',
+  );
 
   assert.equal(await removeCollectionCollaborator(db, privateCol!.id, collab.id), true);
   assert.equal(await canWriteIntoCollection(db, collab, privateCol!), false, '移除后立即失去写入权');
@@ -205,7 +245,11 @@ test('协作申请：申请 → 同意成为协作者 / 拒绝仍不可写', asy
   assert.equal(accepted?.status, 'accepted');
   assert.equal(await isCollectionCollaborator(db, col!.id, asker.id), true);
   assert.equal(await canWriteIntoCollection(db, asker, col!), true);
-  assert.equal(await requestCollectionInvite(db, col!.id, asker.id, '还能申请吗'), 'accepted', '已是协作者时告知已通过');
+  assert.equal(
+    await requestCollectionInvite(db, col!.id, asker.id, '还能申请吗'),
+    'accepted',
+    '已是协作者时告知已通过',
+  );
 
   const mine = await listInvitesByUser(db, asker.id);
   assert.equal(mine[0].status, 'accepted', '申请人可看到自己申请的状态');
@@ -221,7 +265,12 @@ test('写作区文集视图：关系与申请状态一次取回', async () => {
 
   const mine = await createCollection(db, { title: '我的集', slug: 'cv-mine', created_by: owner.id, is_public: 0 });
   const pub = await createCollection(db, { title: '公集', slug: 'cv-pub', created_by: admin.id, is_public: 1 });
-  const hidden = await createCollection(db, { title: '别人的私集', slug: 'cv-hidden', created_by: admin.id, is_public: 0 });
+  const hidden = await createCollection(db, {
+    title: '别人的私集',
+    slug: 'cv-hidden',
+    created_by: admin.id,
+    is_public: 0,
+  });
   assert.ok(mine && pub && hidden);
 
   await addCollectionCollaborator(db, hidden!.id, collab.id);

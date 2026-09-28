@@ -231,10 +231,12 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
         `         SELECT DISTINCT c.*,
                 (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id AND p.status = 'published' AND p.deleted_at IS NULL) AS post_count
          FROM collections c
-         WHERE 1=1${tagIds.length > 0
-           ? ` AND (SELECT COUNT(DISTINCT ct.tag_id) FROM collection_tags ct
+         WHERE 1=1${
+           tagIds.length > 0
+             ? ` AND (SELECT COUNT(DISTINCT ct.tag_id) FROM collection_tags ct
                     WHERE ct.collection_id = c.id AND ct.tag_id IN (${inList})) = ${need}`
-           : ''}${kwCol}
+             : ''
+         }${kwCol}
          ORDER BY c.sort_order ASC, c.id ASC`,
       )
       .bind(...inArgs, ...(kw ? [`%${likeKw}%`, `%${likeKw}%`] : []))
@@ -242,21 +244,23 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
     tagIds.length > 0
       ? db
           .prepare(
-             `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
+            `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
              LEFT JOIN collections c ON c.id = p.collection_id
              WHERE p.status = 'published' AND p.deleted_at IS NULL
                AND (SELECT COUNT(DISTINCT t3.tag_id) FROM (
                      SELECT tag_id FROM post_tags WHERE post_id = p.id
                      UNION SELECT tag_id FROM collection_tags WHERE collection_id = p.collection_id
                    ) t3 WHERE t3.tag_id IN (${inList})) = ${need}
-               ${kw
-                 ? ''
-                 : `AND NOT EXISTS (
+               ${
+                 kw
+                   ? ''
+                   : `AND NOT EXISTS (
                      SELECT 1 FROM collections c2
                      WHERE c2.id = p.collection_id
                        AND (SELECT COUNT(DISTINCT ct2.tag_id) FROM collection_tags ct2
                             WHERE ct2.collection_id = c2.id AND ct2.tag_id IN (${inList})) = ${need}
-                   )`}${kwPost}
+                   )`
+               }${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
           .bind(...(kw ? [...inArgs, `%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : [...inArgs, ...inArgs]))
@@ -267,19 +271,21 @@ export async function getTagsUnion(db: D1Database, names: string[], keyword = ''
              WHERE p.status = 'published' AND p.deleted_at IS NULL AND p.collection_id IS NULL${kwPost}
              ORDER BY p.created_at DESC, p.id DESC`,
           )
-.bind(...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))
-      .all<PostWithCollection>(),
+          .bind(...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))
+          .all<PostWithCollection>(),
     db
       .prepare(
         `SELECT DISTINCT p.*, c.slug AS collection_slug FROM posts p
          JOIN collections c ON c.id = p.collection_id
          WHERE p.status = 'published' AND p.deleted_at IS NULL
-           AND (${tagIds.length > 0
-             ? `(SELECT COUNT(DISTINCT t3.tag_id) FROM (
+           AND (${
+             tagIds.length > 0
+               ? `(SELECT COUNT(DISTINCT t3.tag_id) FROM (
                   SELECT tag_id FROM post_tags WHERE post_id = p.id
                   UNION SELECT tag_id FROM collection_tags WHERE collection_id = p.collection_id
                 ) t3 WHERE t3.tag_id IN (${inList})) = ${need}`
-             : `1=1`})${kwPost}
+               : `1=1`
+           })${kwPost}
          ORDER BY p.created_at ASC, p.id ASC`,
       )
       .bind(...inArgs, ...(kw ? [`%${likeKw}%`, `%${likeKw}%`, `%${likeKw}%`] : []))

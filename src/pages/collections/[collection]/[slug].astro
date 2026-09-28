@@ -1,12 +1,21 @@
 ---
 // 月下独酌 · blog（blog_for_WhiteMoon319）
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
-import { envOf, getCollectionBySlug, getPublishedPostInCollection, getAdjacentPosts, incrementViewCount, recordDailyView, listPostEffectiveTags, getReadingProgress } from '../../../lib/db';
+import {
+  envOf,
+  getCollectionBySlug,
+  getPublishedPostInCollection,
+  getAdjacentPosts,
+  incrementViewCount,
+  recordDailyView,
+  listPostEffectiveTags,
+  getReadingProgress,
+} from '../../../lib/db';
 import { renderMarkdown } from '../../../lib/markdown';
 import { resolveUser } from '../../../lib/auth';
 import { listPostAuthorBadges } from '../../../lib/authors-view';
 import PostTemplate from '@theme/templates/post.astro';
-import { getSiteContext } from "../../../lib/theme-context";
+import { getSiteContext } from '../../../lib/theme-context';
 
 const env = await envOf();
 const { collection: collectionSlug, slug } = Astro.params;
@@ -24,8 +33,14 @@ const { prev, next } = await getAdjacentPosts(env.DB, post);
 const { html, toc } = renderMarkdown(post.content_md);
 // 文章点赞：计数 + 当前用户是否已赞
 const user = await resolveUser(Astro);
-const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?').bind(post.id).first<{ n: number }>();
-const liked = !!user && !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').bind(post.id, user.user.id).first());
+const likeCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM post_likes WHERE post_id = ?')
+  .bind(post.id)
+  .first<{ n: number }>();
+const liked =
+  !!user &&
+  !!(await env.DB.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
+    .bind(post.id, user.user.id)
+    .first());
 const siteCtx = await getSiteContext(Astro);
 // 署名：与独立文章页同一契约
 const authors = await listPostAuthorBadges(env.DB, post.id);

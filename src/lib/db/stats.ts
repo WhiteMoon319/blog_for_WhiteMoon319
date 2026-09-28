@@ -105,10 +105,7 @@ export interface CorpusStats {
 // 正文字数统计（content_md 字符数，不含回收站文章）。
 // 传 collection_id 时仅统计该文集；collection_id = null 表示未分类文章；不传表示全站。
 // SQLite LENGTH() 对 TEXT 按字符计数，中文按 1 字计。
-export async function getCorpusStats(
-  db: D1Database,
-  collectionId?: number | null,
-): Promise<CorpusStats> {
+export async function getCorpusStats(db: D1Database, collectionId?: number | null): Promise<CorpusStats> {
   const where =
     collectionId === undefined
       ? 'deleted_at IS NULL'

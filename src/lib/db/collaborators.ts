@@ -64,7 +64,13 @@ export async function listCollectionWriteView(
   const inviteMap = new Map(invites.map((i) => [i.collection_id, i.status]));
   return (collections.results ?? []).map((c) => {
     const relation: CollectionWriteView['relation'] =
-      c.created_by === user.id ? 'owner' : collabSet.has(c.id) ? 'collaborator' : c.is_public === 1 ? 'public' : 'private';
+      c.created_by === user.id
+        ? 'owner'
+        : collabSet.has(c.id)
+          ? 'collaborator'
+          : c.is_public === 1
+            ? 'public'
+            : 'private';
     return {
       id: c.id,
       title: c.title,
@@ -87,11 +93,7 @@ export async function listCollaboratingCollectionIds(db: D1Database, userId: num
   return (rows.results ?? []).map((r) => r.collection_id);
 }
 
-export async function isCollectionCollaborator(
-  db: D1Database,
-  collectionId: number,
-  userId: number,
-): Promise<boolean> {
+export async function isCollectionCollaborator(db: D1Database, collectionId: number, userId: number): Promise<boolean> {
   const row = await db
     .prepare('SELECT 1 AS ok FROM collection_collaborators WHERE collection_id = ? AND user_id = ?')
     .bind(collectionId, userId)
@@ -100,10 +102,7 @@ export async function isCollectionCollaborator(
 }
 
 /** 某文集的全部协作者（归属人/管理员可见的成员列表） */
-export async function listCollectionCollaborators(
-  db: D1Database,
-  collectionId: number,
-): Promise<CollaboratorRow[]> {
+export async function listCollectionCollaborators(db: D1Database, collectionId: number): Promise<CollaboratorRow[]> {
   const rows = await db
     .prepare(
       `SELECT cc.user_id, u.username, u.display_name, u.avatar_url, cc.created_at
@@ -117,11 +116,7 @@ export async function listCollectionCollaborators(
 }
 
 /** 拉入协作者（幂等）：已是协作者时无副作用 */
-export async function addCollectionCollaborator(
-  db: D1Database,
-  collectionId: number,
-  userId: number,
-): Promise<void> {
+export async function addCollectionCollaborator(db: D1Database, collectionId: number, userId: number): Promise<void> {
   await db
     .prepare('INSERT OR IGNORE INTO collection_collaborators (collection_id, user_id) VALUES (?, ?)')
     .bind(collectionId, userId)
@@ -189,7 +184,10 @@ export async function listCollectionInvites(
     args.push(status);
   }
   sql += ' ORDER BY ci.created_at ASC, ci.id ASC';
-  const rows = await db.prepare(sql).bind(...args).all<CollectionInviteRow>();
+  const rows = await db
+    .prepare(sql)
+    .bind(...args)
+    .all<CollectionInviteRow>();
   return rows.results ?? [];
 }
 

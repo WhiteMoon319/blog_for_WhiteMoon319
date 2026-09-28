@@ -38,7 +38,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const scrollPct = Math.max(-1, Math.min(100, Math.round(rawPct)));
 
   // 仅记录已发布文章
-  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`).bind(postId).first<{ id: number; status: string; deleted_at: string | null }>();
+  const post = await env.DB.prepare(`SELECT id, status, deleted_at FROM posts WHERE id = ?`)
+    .bind(postId)
+    .first<{ id: number; status: string; deleted_at: string | null }>();
   if (!post || post.status !== 'published' || post.deleted_at) return json({ error: 'not found' }, 404);
 
   await saveReading(env.DB, auth.user.id, postId, scrollPct);

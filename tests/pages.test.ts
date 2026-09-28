@@ -56,7 +56,10 @@ test('页面：CRUD 全链路', async () => {
   const listAll = await listPages(h.db, true);
   assert.ok(listAll.some((x) => x.slug === 'guides'));
   const listPub = await listPages(h.db, false);
-  assert.ok(listPub.some((x) => x.slug === 'guides'), '已发布页在公开列表');
+  assert.ok(
+    listPub.some((x) => x.slug === 'guides'),
+    '已发布页在公开列表',
+  );
 
   const updated = await updatePage(h.db, p.id, { title: '新标题', published: 0 });
   assert.equal(updated?.title, '新标题');
@@ -64,7 +67,10 @@ test('页面：CRUD 全链路', async () => {
   const listPub2 = await listPages(h.db, false);
   assert.ok(!listPub2.some((x) => x.slug === 'guides'), '下线后不在公开列表');
   const listAll2 = await listPages(h.db, true);
-  assert.ok(listAll2.some((x) => x.slug === 'guides'), '下线后仍可在管理列表');
+  assert.ok(
+    listAll2.some((x) => x.slug === 'guides'),
+    '下线后仍可在管理列表',
+  );
 
   const ok = await deletePage(h.db, p.id);
   assert.equal(ok, true);

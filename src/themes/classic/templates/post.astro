@@ -123,15 +123,24 @@ const bodyClass = ['article-body', 'reveal', 'in', articleLayoutClass(layout)].f
 const t = classicT(ctx.locale);
 ---
 
-<BaseLayout ctx={ctx} title={title} description={summary ?? undefined} keywords={keywords ?? undefined} image={ogImage ?? undefined} noindex={noindex}>
+<BaseLayout
+  ctx={ctx}
+  title={title}
+  description={summary ?? undefined}
+  keywords={keywords ?? undefined}
+  image={ogImage ?? undefined}
+  noindex={noindex}
+>
   {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
 
-  {isPreview && (
-    <div class="preview-banner">
-      草稿预览 · 仅你可见
-      {previewBadgeText}
-    </div>
-  )}
+  {
+    isPreview && (
+      <div class="preview-banner">
+        草稿预览 · 仅你可见
+        {previewBadgeText}
+      </div>
+    )
+  }
 
   <div class="page-hero" style={`--cc: ${accentColor};`}>
     <a class="page-back reveal in" href={backHref}>{backLabel}</a>
@@ -141,53 +150,96 @@ const t = classicT(ctx.locale);
       <h1>{title}</h1>
       {summary && <p class="lead">{summary}</p>}
       <div class="facts">
-        {authors.length > 0 && (
-          <span class="fact-byline">
-            <AuthorByline authors={authors} prefix={t('post.byline')} variant="post" />
-          </span>
-        )}
+        {
+          authors.length > 0 && (
+            <span class="fact-byline">
+              <AuthorByline authors={authors} prefix={t('post.byline')} variant="post" />
+            </span>
+          )
+        }
         <span>成于 {fmtDate(createdAt)}</span>
         {updatedAt !== createdAt && <span>改于 {fmtDate(updatedAt)}</span>}
         <span data-views={viewCount}>阅 {viewCount}</span>
       </div>
-      {tags.length > 0 && (
-        <div class="facts tag-row">
-          {tags.map((t) => (
-            <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>{t.name}</a>
-          ))}
-        </div>
-      )}
+      {
+        tags.length > 0 && (
+          <div class="facts tag-row">
+            {tags.map((t) => (
+              <a class="tag-chip" href={`/tags/${encodeURIComponent(t.name)}/`}>
+                {t.name}
+              </a>
+            ))}
+          </div>
+        )
+      }
     </div>
   </div>
 
   <article class="article">
     <div class="article-toolbar" role="group" aria-label={t('post.font_scale')}>
       <span class="article-toolbar-label">{t('post.font_scale')}</span>
-      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="-1" aria-label={t('post.font_smaller')}>A−</button>
-      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="0" aria-label={t('post.font_default')}>A</button>
-      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="1" aria-label={t('post.font_larger')}>A+</button>
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="-1" aria-label={t('post.font_smaller')}
+        >A−</button
+      >
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="0" aria-label={t('post.font_default')}
+        >A</button
+      >
+      <button type="button" class="btn btn-ghost mini font-scale-btn" data-fs="1" aria-label={t('post.font_larger')}
+        >A+</button
+      >
     </div>
-    <div class="reading-progress-pill" id="readingProgressPill" role="progressbar" aria-label={t('post.read_progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-prefix={t('post.read_progress')}>0%</div>
+    <div
+      class="reading-progress-pill"
+      id="readingProgressPill"
+      role="progressbar"
+      aria-label={t('post.read_progress')}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+      data-prefix={t('post.read_progress')}
+    >
+      0%
+    </div>
     {coverUrl && <img class="article-cover" src={coverUrl} alt="" loading="eager" decoding="async" />}
     <div class={bodyClass} set:html={html} />
 
-    {toc.length > 1 && (
-      <nav class="article-toc" aria-label="目录">
-        <p class="toc-title">目 录</p>
-        <ol>
-          {toc.map((t) => (
-            <li class={`toc-lv${t.level}`}>
-              <a href={`#${t.id}`}>{t.text}</a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    )}
+    {
+      toc.length > 1 && (
+        <nav class="article-toc" aria-label="目录">
+          <p class="toc-title">目 录</p>
+          <ol>
+            {toc.map((t) => (
+              <li class={`toc-lv${t.level}`}>
+                <a href={`#${t.id}`}>{t.text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )
+    }
 
     <nav class="article-pagination">
-      {prev && <a class="btn btn-ghost" href={postHref(prev.slug, prev.collection_slug)}>← {prev.title}</a>}
-      {next && <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>{next.title} →</a>}
-      {publishedHref && <a class="btn btn-ghost" href={publishedHref}>查看正式页面 →</a>}
+      {
+        prev && (
+          <a class="btn btn-ghost" href={postHref(prev.slug, prev.collection_slug)}>
+            ← {prev.title}
+          </a>
+        )
+      }
+      {
+        next && (
+          <a class="btn btn-ghost" href={postHref(next.slug, next.collection_slug)}>
+            {next.title} →
+          </a>
+        )
+      }
+      {
+        publishedHref && (
+          <a class="btn btn-ghost" href={publishedHref}>
+            查看正式页面 →
+          </a>
+        )
+      }
     </nav>
   </article>
   {typeof likes === 'number' && <PostLike postId={postId} likes={likes} liked={liked} />}
@@ -257,7 +309,9 @@ const t = classicT(ctx.locale);
     box-shadow: var(--shadow-card);
     opacity: 0;
     transform: translateY(8px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
     pointer-events: none;
   }
   .reading-progress-pill.is-visible {

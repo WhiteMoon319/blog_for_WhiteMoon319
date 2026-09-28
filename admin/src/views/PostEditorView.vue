@@ -33,7 +33,14 @@ import { createTurndown, checkContentRisk } from '../lib/editor';
 import { PrBlock } from '../lib/tiptap-blocks.ts';
 import { findBlock } from '../lib/blocks.ts';
 import { parseId } from '../lib/format';
-import { clearDraft, loadDraft, markTabActivity, saveDraft, listenTabActivity, type DraftSnapshot } from '../lib/drafts';
+import {
+  clearDraft,
+  loadDraft,
+  markTabActivity,
+  saveDraft,
+  listenTabActivity,
+  type DraftSnapshot,
+} from '../lib/drafts';
 
 const emit = defineEmits<{ notify: [msg: string, err?: boolean] }>();
 const route = useRoute();
@@ -75,13 +82,18 @@ const form = reactive({
 
 // 文集切换时跟随该文集的默认 AI 提示词。必须放在 form 声明之后：
 // watch 会立刻执行 getter，提前引用 form 会抛 TDZ（静默失效且控制台报错）。
-watch(() => form.collection_id, async (colId) => {
-  if (colId == null) return;
-  try {
-    const { collection } = await api.collection(colId);
-    selectedPromptId.value = (collection as any).ai_prompt_id ?? 'overview';
-  } catch { /* ignore */ }
-});
+watch(
+  () => form.collection_id,
+  async (colId) => {
+    if (colId == null) return;
+    try {
+      const { collection } = await api.collection(colId);
+      selectedPromptId.value = (collection as any).ai_prompt_id ?? 'overview';
+    } catch {
+      /* ignore */
+    }
+  },
+);
 
 // 可选作者名单：作者与管理员都可读，含各自已发布篇数
 const authorOptions = ref<AuthorOption[]>([]);
@@ -115,11 +127,17 @@ function insertBlk(name: string): void {
   if (!def || !ed) return;
   const variant = def.variants[0]?.value ?? '';
   // 一次性把块与占位段落插入（分两步会让文字落到块外）
-  ed.chain().focus().insertPrBlock({ block: name, variant }, def.empty ? '' : BLK_PLACEHOLDER).run();
+  ed.chain()
+    .focus()
+    .insertPrBlock({ block: name, variant }, def.empty ? '' : BLK_PLACEHOLDER)
+    .run();
   if (!def.empty) {
     // 选中占位文字：新手点一下就插入，直接打字即可覆盖
     const end = ed.state.selection.from;
-    ed.chain().focus().setTextSelection({ from: end - BLK_PLACEHOLDER.length, to: end }).run();
+    ed.chain()
+      .focus()
+      .setTextSelection({ from: end - BLK_PLACEHOLDER.length, to: end })
+      .run();
   }
   // 插入后收起抽屉：避免浮层盖住属性浮条，也让新手看清刚插入的块
   showBlockDrawer.value = false;
@@ -173,7 +191,6 @@ const uploadingKeys = new Set<string>();
 
 // 署名作者的选择与排序逻辑随表单一并移到 EditorMetaPanel.vue
 
-
 function fileKey(f: File): string {
   return `${f.name}:${f.size}:${f.lastModified}`;
 }
@@ -200,7 +217,10 @@ async function uploadImage(file: File) {
 
 function filesFromEvent(e: ClipboardEvent | DragEvent): File[] {
   const items = e instanceof ClipboardEvent ? Array.from(e.clipboardData?.items ?? []) : [];
-  const files = items.length > 0 ? items.filter((i) => i.kind === 'file').map((i) => i.getAsFile()) : Array.from((e as DragEvent).dataTransfer?.files ?? []);
+  const files =
+    items.length > 0
+      ? items.filter((i) => i.kind === 'file').map((i) => i.getAsFile())
+      : Array.from((e as DragEvent).dataTransfer?.files ?? []);
   return files.filter((f): f is File => f instanceof File && f.type.startsWith('image/'));
 }
 
@@ -211,7 +231,8 @@ const editor = useEditor({
     Link.configure({ openOnClick: false, autolink: true }),
     Image,
     Placeholder.configure({ placeholder: '落笔于此，墨韵自生……' }),
-    BorderedTable.configure({ resizable: true, HTMLAttributes: { class: 'tip-table' } }),    TableRow,
+    BorderedTable.configure({ resizable: true, HTMLAttributes: { class: 'tip-table' } }),
+    TableRow,
     TableHeader,
     TableCell,
     CodeBlockLowlight.configure({ lowlight }),
@@ -286,16 +307,21 @@ async function load() {
   try {
     const r = await api.authors();
     authorOptions.value = r.authors;
-  } catch { /* 待下次保存/刷新重试 */ }
+  } catch {
+    /* 待下次保存/刷新重试 */
+  }
   // 载入 prompt 模板并确定默认选择
   try {
-    const s = await api.settings() as unknown as Record<string, string>;
+    const s = (await api.settings()) as unknown as Record<string, string>;
     const raw = s.ai_prompt_templates;
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
+      if (Array.isArray(parsed))
+        promptTemplates.value = parsed.filter((t: any) => t && typeof t.id === 'string' && typeof t.name === 'string');
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const id = parseId(route.query.id);
   loadedId.value = id;
@@ -397,7 +423,7 @@ function currentSnapshot(): DraftSnapshot {
     title: form.title,
     slug: form.slug,
     collection_id: form.collection_id,
-summary: form.summary,
+    summary: form.summary,
     cover_url: form.cover_url,
     meta_keywords: form.meta_keywords,
     is_pinned: form.is_pinned,
@@ -456,7 +482,12 @@ function flushAutosave(): void {
 // - 基线相同且有未保存内容：询问恢复；
 // - 基线已过期：明确告知"服务器已更新"，由用户决定覆盖或保留服务器；
 // - 没有快照：正常打开。
-async function maybeRestoreDraft(key: string, postId: number | null, serverVersion: number, serverContent: string): Promise<void> {
+async function maybeRestoreDraft(
+  key: string,
+  postId: number | null,
+  serverVersion: number,
+  serverContent: string,
+): Promise<void> {
   draftKey.value = key;
   const snapshot = await loadDraft(key).catch(() => null);
   if (!snapshot) return;
@@ -470,11 +501,16 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
     return;
   }
 
-  const localDiffers = snapshot.content_md !== serverContent ||
-    snapshot.title !== form.title || snapshot.slug !== form.slug ||
-    snapshot.collection_id !== form.collection_id || snapshot.summary !== form.summary ||
-    snapshot.cover_url !== form.cover_url || snapshot.status !== form.status ||
-    snapshot.meta_keywords !== form.meta_keywords || snapshot.is_pinned !== form.is_pinned ||
+  const localDiffers =
+    snapshot.content_md !== serverContent ||
+    snapshot.title !== form.title ||
+    snapshot.slug !== form.slug ||
+    snapshot.collection_id !== form.collection_id ||
+    snapshot.summary !== form.summary ||
+    snapshot.cover_url !== form.cover_url ||
+    snapshot.status !== form.status ||
+    snapshot.meta_keywords !== form.meta_keywords ||
+    snapshot.is_pinned !== form.is_pinned ||
     snapshot.scheduled_at !== scheduledIso() ||
     (snapshot.author_ids ?? []).join(',') !== form.author_ids.join(',') ||
     (snapshot.layout ?? '') !== form.layout ||
@@ -485,7 +521,9 @@ async function maybeRestoreDraft(key: string, postId: number | null, serverVersi
   }
 
   if (snapshot.base_version === serverVersion) {
-    if (confirm(`检测到未保存的本地修改（保存于 ${snapshot.saved_at.slice(0, 16).replace('T', ' ')}）。恢复本地内容？`)) {
+    if (
+      confirm(`检测到未保存的本地修改（保存于 ${snapshot.saved_at.slice(0, 16).replace('T', ' ')}）。恢复本地内容？`)
+    ) {
       applySnapshot(snapshot);
     } else {
       await clearDraft(key);
@@ -582,25 +620,33 @@ watch(
   },
 );
 
-watch(() => [route.query.id, route.query.collection] as const, async ([id, collection]) => {
-  if (loading.value) return;
-  const next = parseId(id);
-  if (next !== null && next === loadedId.value) return;
-  // 切换篇目前先落一次盘，避免挂起的防抖把旧键内容写进新键
-  flushAutosave();
-  loading.value = true;
-  try {
-    await load();
-  } catch (e) {
-    emit('notify', (e as Error).message, true);
-  } finally {
-    loading.value = false;
-  }
-});
+watch(
+  () => [route.query.id, route.query.collection] as const,
+  async ([id, collection]) => {
+    if (loading.value) return;
+    const next = parseId(id);
+    if (next !== null && next === loadedId.value) return;
+    // 切换篇目前先落一次盘，避免挂起的防抖把旧键内容写进新键
+    flushAutosave();
+    loading.value = true;
+    try {
+      await load();
+    } catch (e) {
+      emit('notify', (e as Error).message, true);
+    } finally {
+      loading.value = false;
+    }
+  },
+);
 
 onMounted(() => {
-  void load().catch((e) => emit('notify', (e as Error).message, true)).finally(() => (loading.value = false));
-  api.tags().then((r) => (suggestions.value = r.tags.map((t) => t.name))).catch(() => {});
+  void load()
+    .catch((e) => emit('notify', (e as Error).message, true))
+    .finally(() => (loading.value = false));
+  api
+    .tags()
+    .then((r) => (suggestions.value = r.tags.map((t) => t.name)))
+    .catch(() => {});
 });
 
 async function save() {
@@ -737,7 +783,12 @@ async function generateAiSummary() {
   }
   generatingSummary.value = true;
   try {
-    const res = await api.aiSummary(md, form.collection_id ?? undefined, loadedId.value ?? undefined, selectedPromptId.value);
+    const res = await api.aiSummary(
+      md,
+      form.collection_id ?? undefined,
+      loadedId.value ?? undefined,
+      selectedPromptId.value,
+    );
     if (res.summaries && res.summaries.length > 0) {
       if (res.summaries.length === 1) {
         form.summary = res.summaries[0];
@@ -810,11 +861,7 @@ async function generateAiSummary() {
                 @toggle="toggleBorder"
                 @close="showBorderMenu = false"
               />
-              <EditorBlockDrawer
-                v-if="showBlockDrawer"
-                @insert="insertBlk"
-                @close="showBlockDrawer = false"
-              />
+              <EditorBlockDrawer v-if="showBlockDrawer" @insert="insertBlk" @close="showBlockDrawer = false" />
             </div>
             <div class="wysiwyg-body">
               <div v-if="activeBlk" class="blk-bar">
@@ -832,16 +879,19 @@ async function generateAiSummary() {
                   </button>
                 </template>
                 <span class="sep"></span>
-                <button type="button" class="blk-chip" title="拆掉外壳，保留文字" @click="editor?.chain().focus().unwrapPrBlock().run()">拆壳</button>
+                <button
+                  type="button"
+                  class="blk-chip"
+                  title="拆掉外壳，保留文字"
+                  @click="editor?.chain().focus().unwrapPrBlock().run()"
+                >
+                  拆壳
+                </button>
               </div>
               <EditorContent :editor="editor" />
             </div>
           </div>
-          <EditorSourcePane
-            v-if="mode === 'source'"
-            ref="sourcePane"
-            v-model="sourceMarkdown"
-          />
+          <EditorSourcePane v-if="mode === 'source'" ref="sourcePane" v-model="sourceMarkdown" />
         </div>
       </div>
 
@@ -854,17 +904,17 @@ async function generateAiSummary() {
           class="input input-version"
           placeholder="本次修改说明（可选，写入版本记录）"
         />
-        <a
-          v-if="loadedId !== null"
-          class="btn btn-ghost"
-          :href="`/preview/${loadedId}`"
-          target="_blank"
-          rel="noopener"
-        >
+        <a v-if="loadedId !== null" class="btn btn-ghost" :href="`/preview/${loadedId}`" target="_blank" rel="noopener">
           预览
         </a>
         <button v-if="loadedId !== null" class="btn btn-ghost" type="button" @click="openVersions">版本</button>
-        <button v-if="loadedId !== null" class="btn btn-ghost" type="button" :disabled="exporting" @click="exportMarkdown">
+        <button
+          v-if="loadedId !== null"
+          class="btn btn-ghost"
+          type="button"
+          :disabled="exporting"
+          @click="exportMarkdown"
+        >
           {{ exporting ? '导出中…' : '导出 Markdown' }}
         </button>
         <router-link class="btn btn-ghost" to="/posts">回篇目</router-link>

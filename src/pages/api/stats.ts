@@ -33,9 +33,6 @@ export async function GET(ctx: APIContext): Promise<Response> {
     collectionScope = Number.isInteger(n) && n > 0 ? n : undefined;
   }
 
-  const [stats, corpus] = await Promise.all([
-    getTrendStats(env.DB, days),
-    getCorpusStats(env.DB, collectionScope),
-  ]);
+  const [stats, corpus] = await Promise.all([getTrendStats(env.DB, days), getCorpusStats(env.DB, collectionScope)]);
   return json({ ...stats, corpus });
 }

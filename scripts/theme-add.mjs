@@ -97,7 +97,9 @@ async function main() {
       const repoDir = join(tmp, 'repo');
       let themeRoot = repoDir;
       if (!existsSync(join(repoDir, 'theme.json'))) {
-        const candidates = readdirSync(repoDir).filter((n) => statSync(join(repoDir, n)).isDirectory() && existsSync(join(repoDir, n, 'theme.json')));
+        const candidates = readdirSync(repoDir).filter(
+          (n) => statSync(join(repoDir, n)).isDirectory() && existsSync(join(repoDir, n, 'theme.json')),
+        );
         if (candidates.length !== 1) {
           console.error('❌ 仓库根与其子目录中未能唯一定位 theme.json');
           process.exit(1);

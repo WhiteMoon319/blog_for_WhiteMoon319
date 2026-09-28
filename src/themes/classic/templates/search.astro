@@ -83,7 +83,9 @@ const t = classicT(ctx.locale);
                       {a.avatarUrl ? (
                         <img class="author-hit-avatar" src={a.avatarUrl} alt={a.name} loading="lazy" />
                       ) : (
-                        <span class="author-hit-avatar is-initial" aria-hidden="true">{a.name.slice(0, 1)}</span>
+                        <span class="author-hit-avatar is-initial" aria-hidden="true">
+                          {a.name.slice(0, 1)}
+                        </span>
                       )}
                       <span class="author-hit-body">
                         <span class="author-hit-name">{a.name}</span>
@@ -98,8 +100,14 @@ const t = classicT(ctx.locale);
             {results.length > 0 ? (
               <div class="posts-grid" style="margin-top:32px;">
                 {results.map(({ post, collection }, i) => (
-                  <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}>
-                    <h3 class="post-title"><CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink></h3>
+                  <div
+                    class="post-card reveal"
+                    data-delay={String((i % 3) + 1)}
+                    style={`--cc: ${collection?.theme_color ?? '#c23a30'};`}
+                  >
+                    <h3 class="post-title">
+                      <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink>
+                    </h3>
                     {post.summary && <p class="post-summary">{post.summary}</p>}
                     <div class="post-meta">
                       {collection && <span class="post-tag">{collection.title}</span>}
@@ -110,14 +118,20 @@ const t = classicT(ctx.locale);
                 ))}
               </div>
             ) : (
-              <p class="section-lead reveal in" style="text-align:center;">未寻得「{q}」相关篇章。</p>
+              <p class="section-lead reveal in" style="text-align:center;">
+                未寻得「{q}」相关篇章。
+              </p>
             )}
           </>
         ) : (
-          <p class="section-lead reveal in" style="text-align:center;">未寻得「{q}」相关篇章。</p>
+          <p class="section-lead reveal in" style="text-align:center;">
+            未寻得「{q}」相关篇章。
+          </p>
         )
       ) : (
-        <p class="section-lead reveal in" style="text-align:center;">输入关键字，遍寻全卷。</p>
+        <p class="section-lead reveal in" style="text-align:center;">
+          输入关键字，遍寻全卷。
+        </p>
       )
     }
   </section>
@@ -141,7 +155,9 @@ const t = classicT(ctx.locale);
     border: 1px solid var(--hairline);
     border-radius: var(--radius-md);
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
   .search-input:focus {
     border-color: var(--cinnabar);
@@ -168,7 +184,9 @@ const t = classicT(ctx.locale);
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      transform 0.2s ease;
   }
   .author-hit:hover {
     border-color: var(--cinnabar);

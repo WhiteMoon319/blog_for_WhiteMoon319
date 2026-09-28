@@ -148,7 +148,11 @@ async function parseOne(file: File, ext: string): Promise<ImportItem> {
         error: '',
       };
     }
-    const first = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) ?? name;
+    const first =
+      text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .find((l) => l.length > 0) ?? name;
     return {
       file: file.name,
       title: first.length > 40 ? name : first,
@@ -259,10 +263,13 @@ async function submitAll() {
   }
   importing.value = false;
   // 持久化导入成功的 ID
-  const successIds = items.value.filter((it) => it.state === 'done').map((it) => {
-    // 从 items 中找 post id — 需要从 batch 结果反向映射
-    return null as number | null;
-  }).filter((id): id is number => id !== null);
+  const successIds = items.value
+    .filter((it) => it.state === 'done')
+    .map((it) => {
+      // 从 items 中找 post id — 需要从 batch 结果反向映射
+      return null as number | null;
+    })
+    .filter((id): id is number => id !== null);
   // 实际上 batch API 返回的 post id 在 results 中，需要从循环中收集
   emit('notify', `导入完成：成功 ${ok} 篇，失败 ${fail} 篇`, fail > 0);
 }
@@ -318,10 +325,18 @@ async function generateAiSummaries() {
           <span class="dropzone-icon" aria-hidden="true">⇪</span>
           <span class="dropzone-title">{{ dragActive ? '松手即加入清单' : '把文件拖到这里，或点此选择' }}</span>
           <span class="dropzone-sub">支持 .md / .markdown / .txt / .docx，可一次拖入多个</span>
-          <input ref="fileInput" class="dropzone-input" type="file" accept=".md,.markdown,.txt,.docx" multiple @change="onFiles" />
+          <input
+            ref="fileInput"
+            class="dropzone-input"
+            type="file"
+            accept=".md,.markdown,.txt,.docx"
+            multiple
+            @change="onFiles"
+          />
         </div>
         <span class="hint">
-          Markdown 与纯文本直接读取；Word 文档自动识别排版（标题、段落、列表、引用、代码块、图片），转换为 Markdown 后导入
+          Markdown 与纯文本直接读取；Word 文档自动识别排版（标题、段落、列表、引用、代码块、图片），转换为 Markdown
+          后导入
         </span>
       </div>
       <div class="field">
@@ -388,8 +403,8 @@ async function generateAiSummaries() {
         {{ generatingAi ? '生成中…' : 'AI 生成摘要' }}
       </button>
       <span v-if="Object.keys(aiResults).length" class="text-muted-xs">
-        {{ Object.values(aiResults).filter(s => s === 'generated').length }} 篇成功，
-        {{ Object.values(aiResults).filter(s => s === 'failed').length }} 篇失败
+        {{ Object.values(aiResults).filter((s) => s === 'generated').length }} 篇成功，
+        {{ Object.values(aiResults).filter((s) => s === 'failed').length }} 篇失败
       </span>
     </div>
 
@@ -418,18 +433,10 @@ async function generateAiSummaries() {
                 class="input compact is-readonly-input"
                 readonly
               />
-              <input
-                v-else
-                v-model="item.slug"
-                class="input compact"
-              />
+              <input v-else v-model="item.slug" class="input compact" />
             </td>
             <td>
-              <input
-                v-model="item.summary"
-                class="input compact"
-                :title="item.summary"
-              />
+              <input v-model="item.summary" class="input compact" :title="item.summary" />
             </td>
             <td>
               <span v-if="item.state === 'done'" class="tag tag-published">完成</span>
@@ -466,7 +473,10 @@ async function generateAiSummaries() {
   color: var(--ink-light);
   cursor: pointer;
   text-align: center;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .dropzone:hover,
 .dropzone:focus-visible {

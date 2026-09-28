@@ -57,14 +57,30 @@ test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', as
   const colA = await c.post('/api/collections', { title: '邻集', slug: 'adj-col-a' });
   assert.equal(colA.status, 201);
   const colAId = (await colA.json()).collection.id as number;
-  for (const [title, slug] of [['邻一', 'adj-a-1'], ['邻二', 'adj-a-2'], ['邻三', 'adj-a-3']]) {
-    const r = await c.post('/api/posts', { collection_id: colAId, title, slug, content_md: '正文', status: 'published' });
+  for (const [title, slug] of [
+    ['邻一', 'adj-a-1'],
+    ['邻二', 'adj-a-2'],
+    ['邻三', 'adj-a-3'],
+  ]) {
+    const r = await c.post('/api/posts', {
+      collection_id: colAId,
+      title,
+      slug,
+      content_md: '正文',
+      status: 'published',
+    });
     assert.equal(r.status, 201);
   }
   const colB = await c.post('/api/collections', { title: '别集', slug: 'adj-col-b' });
   assert.equal(colB.status, 201);
   const colBId = (await colB.json()).collection.id as number;
-  const r = await c.post('/api/posts', { collection_id: colBId, title: '别一', slug: 'adj-b-1', content_md: '正文', status: 'published' });
+  const r = await c.post('/api/posts', {
+    collection_id: colBId,
+    title: '别一',
+    slug: 'adj-b-1',
+    content_md: '正文',
+    status: 'published',
+  });
   assert.equal(r.status, 201);
 
   const html = await (await c.get('/collections/adj-col-a/adj-a-2/')).text();
@@ -86,30 +102,68 @@ test('e2e：集内文章顺序 post_order（asc 旧在前 / desc 新在前）', 
   assert.equal(novel.status, 201);
   const novelId = (await novel.json()).collection.id as number;
   for (const t of ['第一章', '第二章', '第三章']) {
-    const r = await c.post('/api/posts', { collection_id: novelId, title: t, slug: `order-novel-${t}`, content_md: '正文', status: 'published' });
+    const r = await c.post('/api/posts', {
+      collection_id: novelId,
+      title: t,
+      slug: `order-novel-${t}`,
+      content_md: '正文',
+      status: 'published',
+    });
     assert.equal(r.status, 201);
   }
   const blog = await c.post('/api/collections', { title: '随感集', slug: 'order-blog' });
   assert.equal(blog.status, 201);
   const blogId = (await blog.json()).collection.id as number;
   for (const t of ['甲帖', '乙帖']) {
-    const r = await c.post('/api/posts', { collection_id: blogId, title: t, slug: `order-blog-${t}`, content_md: '正文', status: 'published' });
+    const r = await c.post('/api/posts', {
+      collection_id: blogId,
+      title: t,
+      slug: `order-blog-${t}`,
+      content_md: '正文',
+      status: 'published',
+    });
     assert.equal(r.status, 201);
   }
 
   const novelHtml = await (await c.get('/collections/order-novel/')).text();
-  const novelLinks = [...novelHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
-  assert.deepEqual(novelLinks, ['/collections/order-novel/order-novel-第一章/', '/collections/order-novel/order-novel-第二章/', '/collections/order-novel/order-novel-第三章/'], '连载集应第一章在前');
+  const novelLinks = [...novelHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) =>
+    decodeURIComponent(m[1]),
+  );
+  assert.deepEqual(
+    novelLinks,
+    [
+      '/collections/order-novel/order-novel-第一章/',
+      '/collections/order-novel/order-novel-第二章/',
+      '/collections/order-novel/order-novel-第三章/',
+    ],
+    '连载集应第一章在前',
+  );
 
   const blogHtml = await (await c.get('/collections/order-blog/')).text();
-  const blogLinks = [...blogHtml.matchAll(/href="(\/collections\/order-blog\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
-  assert.deepEqual(blogLinks, ['/collections/order-blog/order-blog-乙帖/', '/collections/order-blog/order-blog-甲帖/'], '博客集应最新在前');
+  const blogLinks = [...blogHtml.matchAll(/href="(\/collections\/order-blog\/[^"]+)"/g)].map((m) =>
+    decodeURIComponent(m[1]),
+  );
+  assert.deepEqual(
+    blogLinks,
+    ['/collections/order-blog/order-blog-乙帖/', '/collections/order-blog/order-blog-甲帖/'],
+    '博客集应最新在前',
+  );
 
   const flipped = await c.put(`/api/collections/${novelId}`, { post_order: 'desc' });
   assert.equal(flipped.status, 200);
   const flippedHtml = await (await c.get('/collections/order-novel/')).text();
-  const flippedLinks = [...flippedHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
-  assert.deepEqual(flippedLinks, ['/collections/order-novel/order-novel-第三章/', '/collections/order-novel/order-novel-第二章/', '/collections/order-novel/order-novel-第一章/'], '改 desc 后应最新在前');
+  const flippedLinks = [...flippedHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) =>
+    decodeURIComponent(m[1]),
+  );
+  assert.deepEqual(
+    flippedLinks,
+    [
+      '/collections/order-novel/order-novel-第三章/',
+      '/collections/order-novel/order-novel-第二章/',
+      '/collections/order-novel/order-novel-第一章/',
+    ],
+    '改 desc 后应最新在前',
+  );
 });
 
 test('e2e：slug 校验与重复 slug', async () => {
@@ -410,7 +464,10 @@ test('e2e：批量创建——一次导入多篇、slug 自动避让、逐条报
   const dup = await c.post('/api/posts/batch', {
     action: 'create',
     collection_id: 1,
-    posts: [{ title: '重名甲', slug: 'dup-slug' }, { title: '重名乙', slug: 'dup-slug' }],
+    posts: [
+      { title: '重名甲', slug: 'dup-slug' },
+      { title: '重名乙', slug: 'dup-slug' },
+    ],
   });
   assert.equal(dup.status, 200);
   const dupBody = await dup.json();
@@ -522,7 +579,10 @@ test('e2e：批量 API——一次请求刊发/移动/删除多篇', async () =>
   const body = await list.json();
   const published = (body.posts as Array<{ id: number; status: string }>).filter((p) => ids.includes(p.id));
   assert.equal(published.length, 3);
-  assert.ok(published.every((p) => p.status === 'published'), '三篇应全部刊发');
+  assert.ok(
+    published.every((p) => p.status === 'published'),
+    '三篇应全部刊发',
+  );
 
   const move = await c.post('/api/posts/batch', { action: 'move', ids, collection_id: 1 });
   assert.equal(move.status, 200);
@@ -632,13 +692,18 @@ test('e2e：删除文集后冲突文章确定性改 slug 并保持可访问', as
   await c.login();
   const col = await c.post('/api/collections', { title: '散集', slug: 'scatter-col' });
   assert.equal(col.status, 201);
-  const colId = ((await col.json()).collection).id as number;
-  const inCol = await c.post('/api/posts', { title: '入集篇', slug: 'shared-x', collection_id: colId, status: 'published' });
+  const colId = (await col.json()).collection.id as number;
+  const inCol = await c.post('/api/posts', {
+    title: '入集篇',
+    slug: 'shared-x',
+    collection_id: colId,
+    status: 'published',
+  });
   assert.equal(inCol.status, 201);
-  const inColId = ((await inCol.json()).post).id as number;
+  const inColId = (await inCol.json()).post.id as number;
   const uncat = await c.post('/api/posts', { title: '散落篇', slug: 'shared-x', status: 'published' });
   assert.equal(uncat.status, 201);
-  const uncatId = ((await uncat.json()).post).id as number;
+  const uncatId = (await uncat.json()).post.id as number;
 
   const delCol = await c.del(`/api/collections/${colId}`);
   assert.equal(delCol.status, 200, '删除文集不应因冲突而 500');
@@ -801,7 +866,10 @@ test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼�
   assert.equal(rel.status, 201);
   const page2 = await c.get('/collections/og-col/og-rel/');
   const html2 = await page2.text();
-  assert.ok(html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'), '相对 URL 应拼上站点基址');
+  assert.ok(
+    html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'),
+    '相对 URL 应拼上站点基址',
+  );
   await c.del(`/api/posts/${(await rel.json()).post.id}`);
   await c.del(`/api/collections/${colId}`);
 });
@@ -844,7 +912,11 @@ test('e2e：批量删除/刊发/草稿单事务——含不存在 id 时原子�
   if (!HAS_BUILD) return;
   await c.login();
   const mk = async (title: string) => {
-    const r = await c.post('/api/posts', { title, slug: `batx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, status: 'draft' });
+    const r = await c.post('/api/posts', {
+      title,
+      slug: `batx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      status: 'draft',
+    });
     assert.equal(r.status, 201);
     return (await r.json()).post.id as number;
   };
@@ -951,7 +1023,10 @@ test('e2e：批量超过 50 篇整体拒绝且零变更', async () => {
   const body = await list.json();
   const rows = (body.posts as Array<{ id: number; status: string }>).filter((p) => ids.includes(p.id));
   assert.equal(rows.length, 51);
-  assert.ok(rows.every((p) => p.status === 'draft'), '拒绝后不得有任何一篇被刊发或删除');
+  assert.ok(
+    rows.every((p) => p.status === 'draft'),
+    '拒绝后不得有任何一篇被刊发或删除',
+  );
 
   const clean1 = await c.post('/api/posts/batch', { action: 'delete', ids: ids.slice(0, 50) });
   assert.equal(clean1.status, 200);
@@ -1018,7 +1093,10 @@ test('e2e：回收站全生命周期——删除即软删、仅管理视图可�
   const trashList = await c.get('/api/posts?status=all&trash=1');
   assert.equal(trashList.status, 200);
   const trashRows = (await trashList.json()).posts as Array<{ id: number; slug: string; deleted_at: string }>;
-  assert.ok(trashRows.some((p) => p.id === id), '回收站视图应含该篇');
+  assert.ok(
+    trashRows.some((p) => p.id === id),
+    '回收站视图应含该篇',
+  );
 
   // 恢复：回到公开可见，状态与 slug 不变
   const restore = await c.post('/api/posts/batch', { action: 'restore', ids: [id] });
@@ -1036,7 +1114,12 @@ test('e2e：回收站全生命周期——删除即软删、仅管理视图可�
   assert.ok(!JSON.stringify(await after.json()).includes('trash-journey'), '焚毁后回收站视图应清空该篇');
 
   // 未回收的文章不能 purge
-  const live = await c.post('/api/posts', { title: '未焚之篇', slug: 'trash-live-no', content_md: '正文。', status: 'published' });
+  const live = await c.post('/api/posts', {
+    title: '未焚之篇',
+    slug: 'trash-live-no',
+    content_md: '正文。',
+    status: 'published',
+  });
   assert.equal(live.status, 201);
   const liveId = (await live.json()).post.id as number;
   const noPurge = await c.post('/api/posts/batch', { action: 'purge', ids: [liveId] });
@@ -1070,8 +1153,14 @@ test('e2e：导出——未登录 401，登录后可取全量快照与单篇 Mar
   const body = await snap.json();
   assert.equal(body.schema_version, 3, 'schema_version 随快照结构递增');
   assert.ok(body.migration_version.length > 0, '应标注迁移版本');
-  assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'export-e2e'), '快照含新文章');
-  assert.ok(body.posts.some((p: { slug: string }) => p.slug === 'astro-on-cloudflare'), '快照含种子文章');
+  assert.ok(
+    body.posts.some((p: { slug: string }) => p.slug === 'export-e2e'),
+    '快照含新文章',
+  );
+  assert.ok(
+    body.posts.some((p: { slug: string }) => p.slug === 'astro-on-cloudflare'),
+    '快照含种子文章',
+  );
   const raw = JSON.stringify(body);
   assert.ok(!raw.includes('BLOG_SESSION_SECRET') && !raw.includes('admin123'), '导出不得含密钥或口令');
   assert.ok(!('login_attempts' in body), '快照不含敏感表');

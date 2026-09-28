@@ -61,13 +61,22 @@ test('迁移 0034：post_authors 表与 created_by / bio / authors 列齐备', a
   assert.ok(table, 'post_authors 表应存在');
 
   const postCols = await db.prepare(`SELECT name FROM pragma_table_info('posts')`).all<{ name: string }>();
-  assert.ok(postCols.results?.some((c) => c.name === 'created_by'), 'posts.created_by 应存在');
+  assert.ok(
+    postCols.results?.some((c) => c.name === 'created_by'),
+    'posts.created_by 应存在',
+  );
 
   const userCols = await db.prepare(`SELECT name FROM pragma_table_info('users')`).all<{ name: string }>();
-  assert.ok(userCols.results?.some((c) => c.name === 'bio'), 'users.bio 应存在');
+  assert.ok(
+    userCols.results?.some((c) => c.name === 'bio'),
+    'users.bio 应存在',
+  );
 
   const versionCols = await db.prepare(`SELECT name FROM pragma_table_info('post_versions')`).all<{ name: string }>();
-  assert.ok(versionCols.results?.some((c) => c.name === 'authors'), 'post_versions.authors 应存在');
+  assert.ok(
+    versionCols.results?.some((c) => c.name === 'authors'),
+    'post_versions.authors 应存在',
+  );
 });
 
 test('迁移回填：历史文章补归属到管理员并生成署名（可重复执行）', async () => {
@@ -81,13 +90,19 @@ test('迁移回填：历史文章补归属到管理员并生成署名（可重�
 
   // 与 0034 迁移内完全一致的回填语句
   await db
-    .prepare(`UPDATE posts SET created_by = (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) WHERE created_by IS NULL`)
+    .prepare(
+      `UPDATE posts SET created_by = (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) WHERE created_by IS NULL`,
+    )
     .run();
   await db
-    .prepare(`INSERT OR IGNORE INTO post_authors (post_id, user_id, sort_order) SELECT id, created_by, 0 FROM posts WHERE created_by IS NOT NULL`)
+    .prepare(
+      `INSERT OR IGNORE INTO post_authors (post_id, user_id, sort_order) SELECT id, created_by, 0 FROM posts WHERE created_by IS NOT NULL`,
+    )
     .run();
 
-  const row = await db.prepare(`SELECT id, created_by FROM posts WHERE slug = 'legacy-1'`).first<{ id: number; created_by: number }>();
+  const row = await db
+    .prepare(`SELECT id, created_by FROM posts WHERE slug = 'legacy-1'`)
+    .first<{ id: number; created_by: number }>();
   assert.equal(row?.created_by, admin.id, '历史文章应归到管理员名下');
   assert.deepEqual(await getPostAuthorIds(db, row!.id), [admin.id], '历史文章应生成管理员署名');
 });
@@ -102,7 +117,11 @@ test('署名：多作者按传入顺序持久化，重复 id 去重', async () =
   assert.deepEqual(await getPostAuthorIds(db, post.id), [b.id, a.id], '去重且保持传入顺序');
 
   const authors = await listPostAuthors(db, post.id);
-  assert.deepEqual(authors.map((x) => x.username), ['writerb', 'writera'], '第一位即主作者');
+  assert.deepEqual(
+    authors.map((x) => x.username),
+    ['writerb', 'writera'],
+    '第一位即主作者',
+  );
   assert.equal(authors[0].display_name, '乙', '带出笔名');
 
   await setPostAuthors(db, post.id, []);
@@ -168,7 +187,11 @@ test('搜索作者：命中用户名 / 笔名 / 简介，并统计已发布篇�
 
   const all = await listAuthors(db);
   const counts = all.map((a) => a.post_count);
-  assert.deepEqual(counts, [...counts].sort((x, y) => y - x), '按篇数降序');
+  assert.deepEqual(
+    counts,
+    [...counts].sort((x, y) => y - x),
+    '按篇数降序',
+  );
   assert.equal(all.find((a) => a.id === u.id)?.post_count, 1, '列表带出该作者篇数');
 });
 
@@ -223,7 +246,9 @@ test('批量署名查询：超过单查询绑定上限时分块取回（>100 篇
   await db.batch(stmts.slice(0, 90));
   await db.batch(stmts.slice(90));
   await db
-    .prepare(`INSERT INTO post_authors (post_id, user_id, sort_order) SELECT id, ?, 0 FROM posts WHERE slug LIKE 'chunk-post-%'`)
+    .prepare(
+      `INSERT INTO post_authors (post_id, user_id, sort_order) SELECT id, ?, 0 FROM posts WHERE slug LIKE 'chunk-post-%'`,
+    )
     .bind(a.id)
     .run();
 

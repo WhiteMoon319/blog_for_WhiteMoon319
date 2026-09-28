@@ -100,7 +100,10 @@ test('趋势：getTrendStats 汇总序列与热文 TOP', async () => {
   assert.ok(s.total_views >= 4);
   assert.equal(s.top_posts[0]?.id, a.post.id, '热文甲居首（3 次，无人超越）');
   assert.equal(s.top_posts[0]?.views, 3);
-  assert.ok(s.top_posts.some((t) => t.id === b.post.id), '热文乙应进入 TOP');
+  assert.ok(
+    s.top_posts.some((t) => t.id === b.post.id),
+    '热文乙应进入 TOP',
+  );
   assert.equal(s.daily[0].day, lastNDays(30)[0], '序列从区间首日补齐');
 });
 
@@ -110,15 +113,22 @@ test('趋势：软删除文章统计保留且标题标注', async () => {
   await recordDailyView(h.db, created.post.id, req({ 'CF-Connecting-IP': '10.0.0.9' }));
   await h.db.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?").bind(created.post.id).run();
   const s = await getTrendStats(h.db, 30);
-  assert.ok(s.top_posts.some((t) => t.id === created.post.id), '回收站文章仍保留在热文统计');
+  assert.ok(
+    s.top_posts.some((t) => t.id === created.post.id),
+    '回收站文章仍保留在热文统计',
+  );
 });
 
 test('字数：全站与文集维度统计', async () => {
   const colA = await h.db
-    .prepare("INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集甲', 'stats-col-a', '', '#888888', 1, 'asc')")
+    .prepare(
+      "INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集甲', 'stats-col-a', '', '#888888', 1, 'asc')",
+    )
     .run();
   const colB = await h.db
-    .prepare("INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集乙', 'stats-col-b', '', '#888888', 2, 'asc')")
+    .prepare(
+      "INSERT INTO collections (title, slug, summary, theme_color, sort_order, post_order) VALUES ('文集乙', 'stats-col-b', '', '#888888', 2, 'asc')",
+    )
     .run();
   const colIdA = colA.meta.last_row_id;
   const colIdB = colB.meta.last_row_id;
@@ -131,20 +141,30 @@ test('字数：全站与文集维度统计', async () => {
   const inBBefore = await getCorpusStats(h.db, colIdB);
 
   const [a, b, c, d] = await Promise.all([
-    createPostWithTags(h.db, { title: '字数甲', slug: 'stats-char-a', status: 'published', content_md: '甲'.repeat(100) }, []),
-    createPostWithTags(h.db, { title: '字数乙', slug: 'stats-char-b', status: 'draft', content_md: '乙'.repeat(50) }, []),
-    createPostWithTags(h.db, { title: '字数丙', slug: 'stats-char-c', status: 'published', content_md: '丙'.repeat(30) }, []),
-    createPostWithTags(h.db, { title: '字数丁', slug: 'stats-char-d', status: 'published', content_md: '丁'.repeat(10) }, []),
+    createPostWithTags(
+      h.db,
+      { title: '字数甲', slug: 'stats-char-a', status: 'published', content_md: '甲'.repeat(100) },
+      [],
+    ),
+    createPostWithTags(
+      h.db,
+      { title: '字数乙', slug: 'stats-char-b', status: 'draft', content_md: '乙'.repeat(50) },
+      [],
+    ),
+    createPostWithTags(
+      h.db,
+      { title: '字数丙', slug: 'stats-char-c', status: 'published', content_md: '丙'.repeat(30) },
+      [],
+    ),
+    createPostWithTags(
+      h.db,
+      { title: '字数丁', slug: 'stats-char-d', status: 'published', content_md: '丁'.repeat(10) },
+      [],
+    ),
   ]);
   assert.ok(a && b && c && d);
-  await h.db
-    .prepare('UPDATE posts SET collection_id = ? WHERE id IN (?, ?)')
-    .bind(colIdA, a.post.id, b.post.id)
-    .run();
-  await h.db
-    .prepare('UPDATE posts SET collection_id = ? WHERE id = ?')
-    .bind(colIdB, c.post.id)
-    .run();
+  await h.db.prepare('UPDATE posts SET collection_id = ? WHERE id IN (?, ?)').bind(colIdA, a.post.id, b.post.id).run();
+  await h.db.prepare('UPDATE posts SET collection_id = ? WHERE id = ?').bind(colIdB, c.post.id).run();
 
   const whole = await getCorpusStats(h.db);
   assert.equal(whole.total_chars - wholeBefore.total_chars, 190, '全站增量 100+50+30+10');
@@ -163,7 +183,11 @@ test('字数：全站与文集维度统计', async () => {
   assert.equal(unassigned.total_chars - unassignedBefore.total_chars, 10, '未分类仅 丁');
   assert.equal(unassigned.post_count - unassignedBefore.post_count, 1);
 
-  const deleted = await createPostWithTags(h.db, { title: '字数废', slug: 'stats-char-x', status: 'published', content_md: 'x'.repeat(99) }, []);
+  const deleted = await createPostWithTags(
+    h.db,
+    { title: '字数废', slug: 'stats-char-x', status: 'published', content_md: 'x'.repeat(99) },
+    [],
+  );
   assert.ok(deleted);
   await h.db.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?").bind(deleted.post.id).run();
   const after = await getCorpusStats(h.db);

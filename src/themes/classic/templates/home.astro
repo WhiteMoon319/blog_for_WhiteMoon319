@@ -94,7 +94,9 @@ const t = classicT(ctx.locale);
           {collections.map((c, i) => (
             <div class="portal-card reveal" data-delay={String(i + 1)} style={`--pc: ${c.theme_color};`}>
               <div class="portal-seal">{Array.from(c.title)[0]}</div>
-              <h3><CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink></h3>
+              <h3>
+                <CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
+              </h3>
               <p class="portal-sub">{c.summary}</p>
               {collectionOwners[String(c.id)] && (
                 <AuthorByline authors={[collectionOwners[String(c.id)]]} variant="card" />
@@ -121,9 +123,15 @@ const t = classicT(ctx.locale);
           {pinnedPosts.map((p, i) => {
             const col = collections.find((c) => c.id === p.collection_id);
             return (
-              <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+              <div
+                class="post-card reveal"
+                data-delay={String((i % 3) + 1)}
+                style={`--cc: ${col?.theme_color ?? '#c23a30'};`}
+              >
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
+                <h3 class="post-title">
+                  <CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink>
+                </h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
@@ -151,9 +159,15 @@ const t = classicT(ctx.locale);
           {latestPosts.map((p, i) => {
             const col = collections.find((c) => c.id === p.collection_id);
             return (
-              <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+              <div
+                class="post-card reveal"
+                data-delay={String((i % 3) + 1)}
+                style={`--cc: ${col?.theme_color ?? '#c23a30'};`}
+              >
                 {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title"><CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink></h3>
+                <h3 class="post-title">
+                  <CardLink href={postHref(p.slug, col?.slug)}>{p.title}</CardLink>
+                </h3>
                 {p.summary && <p class="post-summary">{p.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}
@@ -183,9 +197,15 @@ const t = classicT(ctx.locale);
           {recentReadings.map((r, i) => {
             const col = collections.find((c) => c.id === r.collectionId);
             return (
-              <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${col?.theme_color ?? '#c23a30'};`}>
+              <div
+                class="post-card reveal"
+                data-delay={String((i % 3) + 1)}
+                style={`--cc: ${col?.theme_color ?? '#c23a30'};`}
+              >
                 {r.coverUrl && <img class="post-cover" src={r.coverUrl} alt="" loading="lazy" decoding="async" />}
-                <h3 class="post-title"><CardLink href={postHref(r.slug, r.collectionSlug)}>{r.title}</CardLink></h3>
+                <h3 class="post-title">
+                  <CardLink href={postHref(r.slug, r.collectionSlug)}>{r.title}</CardLink>
+                </h3>
                 {r.summary && <p class="post-summary">{r.summary}</p>}
                 <div class="post-meta">
                   {col && <span class="post-tag">{col.title}</span>}

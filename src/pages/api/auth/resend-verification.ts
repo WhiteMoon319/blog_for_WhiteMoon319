@@ -19,7 +19,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   let body: { email?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
   if (typeof body.email !== 'string' || !body.email.trim()) return json({ error: 'email required' }, 400);
 
   const email = body.email.trim().toLowerCase();
@@ -28,18 +32,24 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const coolOk = await consumeLoginAttempt(env.DB, `resend:${email}`, { max: 1, windowSec: 60 });
   if (!coolOk.ok) return json({ error: '请 60 秒后重试' }, 429);
 
-  const user = await env.DB.prepare('SELECT id, email, email_verified FROM users WHERE email = ?').bind(email).first<{ id: number; email: string; email_verified: number }>();
+  const user = await env.DB.prepare('SELECT id, email, email_verified FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: number; email: string; email_verified: number }>();
   if (!user || user.email_verified) return json({ error: '邮箱未注册或已验证' }, 400);
 
   // 作废旧码
-  await env.DB.prepare('UPDATE email_verifications SET consumed = 1 WHERE user_id = ? AND consumed = 0').bind(user.id).run();
+  await env.DB.prepare('UPDATE email_verifications SET consumed = 1 WHERE user_id = ? AND consumed = 0')
+    .bind(user.id)
+    .run();
 
   const code = await generateVerificationCode();
   const codeHash = await hashVerificationCode(code);
   await env.DB.prepare(
     `INSERT INTO email_verifications (user_id, code_hash, expires_at)
      VALUES (?, ?, datetime('now', '+5 minutes'))`,
-  ).bind(user.id, codeHash).run();
+  )
+    .bind(user.id, codeHash)
+    .run();
 
   try {
     const mail = verificationEmail(code);

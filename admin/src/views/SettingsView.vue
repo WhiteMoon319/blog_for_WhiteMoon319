@@ -75,14 +75,23 @@ const modelList = ref<string[]>([]);
 const fetchingModels = ref(false);
 const testingAi = ref(false);
 
-interface PromptTemplate { id: string; name: string; prompt: string; }
+interface PromptTemplate {
+  id: string;
+  name: string;
+  prompt: string;
+}
 const promptTemplates = ref<PromptTemplate[]>([]);
 
 function parseTemplates(raw: string | undefined): PromptTemplate[] {
   try {
     const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed)) return parsed.filter((t) => t && typeof t.id === 'string' && typeof t.name === 'string' && typeof t.prompt === 'string');
-  } catch { /* ignore */ }
+    if (Array.isArray(parsed))
+      return parsed.filter(
+        (t) => t && typeof t.id === 'string' && typeof t.name === 'string' && typeof t.prompt === 'string',
+      );
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
@@ -101,7 +110,7 @@ const pwdState = reactive({ oldPassword: '', newPassword: '', confirmPassword: '
 const pwdSaving = ref(false);
 
 function applyToForm(s: SiteSettings) {
-  for (const k of [...('SITE_NAME SITE_SLOGAN SITE_POEM SITE_URL'.split(' ')), ...COPY_KEYS] as (keyof SiteSettings)[]) {
+  for (const k of [...'SITE_NAME SITE_SLOGAN SITE_POEM SITE_URL'.split(' '), ...COPY_KEYS] as (keyof SiteSettings)[]) {
     form[k] = s[k];
     original[k] = s[k];
   }
@@ -148,7 +157,7 @@ function jumpTo(id: string): void {
 
 // ---- 未保存判定：整页一个保存，但各区各算自己的「脏」 ----
 const siteDirty = computed(() =>
-  ([...('SITE_NAME SITE_SLOGAN SITE_POEM SITE_URL'.split(' ')), ...COPY_KEYS] as (keyof SiteSettings)[]).some(
+  ([...'SITE_NAME SITE_SLOGAN SITE_POEM SITE_URL'.split(' '), ...COPY_KEYS] as (keyof SiteSettings)[]).some(
     (k) => form[k] !== original[k],
   ),
 );
@@ -181,9 +190,9 @@ const emailDirty = computed(() => {
   );
 });
 const dirtyCount = computed(
-  () => [siteDirty.value, commentDirty.value, templatesDirty.value, aiDirty.value, emailDirty.value].filter(Boolean).length,
+  () =>
+    [siteDirty.value, commentDirty.value, templatesDirty.value, aiDirty.value, emailDirty.value].filter(Boolean).length,
 );
-
 
 // ---- 邮件（SMTP）配置 ----
 const emailForm = reactive({
@@ -210,7 +219,9 @@ async function loadEmailStatus() {
       emailForm.smtp_username = emailMasked.username;
       emailForm.from_email = emailMasked.from;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 async function clearEmail() {
@@ -250,7 +261,7 @@ function applyAiSettings(s: AiSettings) {
 
 onMounted(async () => {
   try {
-    const s = await api.settings() as unknown as SiteSettings & AiSettings;
+    const s = (await api.settings()) as unknown as SiteSettings & AiSettings;
     applyToForm(s);
     applyAiSettings(s);
     promptTemplates.value = parseTemplates((s as unknown as Record<string, string>).ai_prompt_templates);
@@ -290,7 +301,8 @@ async function save() {
   }
 }
 
-async function changePassword() {  if (pwdState.newPassword !== pwdState.confirmPassword) {
+async function changePassword() {
+  if (pwdState.newPassword !== pwdState.confirmPassword) {
     emit('notify', '两次输入的新密码不一致', true);
     return;
   }
@@ -469,226 +481,234 @@ async function deleteAiKey() {
       </button>
     </nav>
     <div class="settings-body">
-
-  <div id="site" class="card pad settings-section">
-    <h3 class="section-title">站点信息</h3>
-    <div class="field">
-      <label>站点名称</label>
-      <input v-model="form.SITE_NAME" maxlength="200" class="input" />
-    </div>
-    <div class="field">
-      <label>副标题 / 宣传语（Slogan）</label>
-      <input v-model="form.SITE_SLOGAN" maxlength="200" class="input" />
-    </div>
-    <div class="field">
-      <label>扉页诗句（Poem）</label>
-      <textarea v-model="form.SITE_POEM" maxlength="500" class="textarea" rows="3" />
-    </div>
-    <div class="field">
-      <label>站点 URL（含协议、不含尾斜杠）</label>
-      <input v-model="form.SITE_URL" maxlength="500" class="input" placeholder="https://example.com" />
-    </div>
-    <div class="field">
-      <label>界面语言</label>
-      <select v-model="form.site_locale" class="select">
-        <option value="zh-CN">简体中文</option>
-        <option value="en">English</option>
-      </select>
-      <div class="hint">影响主题界面词汇（后台文案不随此项变化）</div>
-    </div>
-    <div class="field">
-      <label>默认描述</label>
-      <input v-model="form.site_tagline" maxlength="200" class="input" placeholder="一座写在 Cloudflare 上的小书斋。" />
-      <div class="hint">用于搜索引擎摘要与主题副标题</div>
-    </div>
-    <div class="field">
-      <label>页脚文案行</label>
-      <input v-model="form.footer_line" maxlength="200" class="input" />
-      <div class="hint">留空则回退为扉页诗句</div>
-    </div>
-    <div class="field">
-      <label>搜索框占位文案（search_placeholder）</label>
-      <input v-model="form.search_placeholder" maxlength="100" class="input" />
-    </div>
-    <div class="field">
-      <label>首页题记位（留空不显示）</label>
-      <input v-model="form.hero_note" maxlength="200" class="input" />
-      <div class="hint">显示在首页首屏的一句短文案</div>
-    </div>
-    <p v-if="siteDirty" class="section-dirty">本区有未保存的修改</p>
-  </div>
-
-  <div id="ai" class="card pad settings-section" v-if="!loading">
-    <h3 class="section-title">AI 摘要</h3>
-
-    <div class="field">
-      <label>服务商</label>
-      <select v-model="aiForm.provider" class="select">
-        <option value="deepseek">DeepSeek</option>
-        <option value="openai_compatible">OpenAI Compatible</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>API 地址</label>
-      <input v-model="aiForm.baseUrl" class="input" placeholder="https://api.deepseek.com" />
-    </div>
-    <div class="field">
-      <label>API Key</label>
-      <div class="row">
-        <input v-model="aiForm.apiKey" type="password" class="input grow" placeholder="留空则不修改" />
-        <span v-if="aiKeyConfigured" class="text-muted-xs">{{ aiKeyMasked }}</span>
-        <span v-else class="text-xs text-danger">未配置</span>
+      <div id="site" class="card pad settings-section">
+        <h3 class="section-title">站点信息</h3>
+        <div class="field">
+          <label>站点名称</label>
+          <input v-model="form.SITE_NAME" maxlength="200" class="input" />
+        </div>
+        <div class="field">
+          <label>副标题 / 宣传语（Slogan）</label>
+          <input v-model="form.SITE_SLOGAN" maxlength="200" class="input" />
+        </div>
+        <div class="field">
+          <label>扉页诗句（Poem）</label>
+          <textarea v-model="form.SITE_POEM" maxlength="500" class="textarea" rows="3" />
+        </div>
+        <div class="field">
+          <label>站点 URL（含协议、不含尾斜杠）</label>
+          <input v-model="form.SITE_URL" maxlength="500" class="input" placeholder="https://example.com" />
+        </div>
+        <div class="field">
+          <label>界面语言</label>
+          <select v-model="form.site_locale" class="select">
+            <option value="zh-CN">简体中文</option>
+            <option value="en">English</option>
+          </select>
+          <div class="hint">影响主题界面词汇（后台文案不随此项变化）</div>
+        </div>
+        <div class="field">
+          <label>默认描述</label>
+          <input
+            v-model="form.site_tagline"
+            maxlength="200"
+            class="input"
+            placeholder="一座写在 Cloudflare 上的小书斋。"
+          />
+          <div class="hint">用于搜索引擎摘要与主题副标题</div>
+        </div>
+        <div class="field">
+          <label>页脚文案行</label>
+          <input v-model="form.footer_line" maxlength="200" class="input" />
+          <div class="hint">留空则回退为扉页诗句</div>
+        </div>
+        <div class="field">
+          <label>搜索框占位文案（search_placeholder）</label>
+          <input v-model="form.search_placeholder" maxlength="100" class="input" />
+        </div>
+        <div class="field">
+          <label>首页题记位（留空不显示）</label>
+          <input v-model="form.hero_note" maxlength="200" class="input" />
+          <div class="hint">显示在首页首屏的一句短文案</div>
+        </div>
+        <p v-if="siteDirty" class="section-dirty">本区有未保存的修改</p>
       </div>
-      <div class="hint mt-4">
-        填写后随「测试并保存」落库，不会明文返回前端。
-        <button class="btn btn-danger mini ml-8" @click="deleteAiKey" :disabled="!aiKeyConfigured">清除 Key</button>
+
+      <div id="ai" class="card pad settings-section" v-if="!loading">
+        <h3 class="section-title">AI 摘要</h3>
+
+        <div class="field">
+          <label>服务商</label>
+          <select v-model="aiForm.provider" class="select">
+            <option value="deepseek">DeepSeek</option>
+            <option value="openai_compatible">OpenAI Compatible</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>API 地址</label>
+          <input v-model="aiForm.baseUrl" class="input" placeholder="https://api.deepseek.com" />
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <div class="row">
+            <input v-model="aiForm.apiKey" type="password" class="input grow" placeholder="留空则不修改" />
+            <span v-if="aiKeyConfigured" class="text-muted-xs">{{ aiKeyMasked }}</span>
+            <span v-else class="text-xs text-danger">未配置</span>
+          </div>
+          <div class="hint mt-4">
+            填写后随「测试并保存」落库，不会明文返回前端。
+            <button class="btn btn-danger mini ml-8" @click="deleteAiKey" :disabled="!aiKeyConfigured">清除 Key</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>模型</label>
+          <div class="row">
+            <input v-model="aiForm.model" class="input grow" list="model-list" placeholder="deepseek-v4-flash" />
+            <datalist id="model-list">
+              <option v-for="m in modelList" :key="m" :value="m" />
+            </datalist>
+            <button class="btn btn-ghost" :disabled="fetchingModels" @click="fetchModels">
+              {{ fetchingModels ? '获取中…' : '获取模型列表' }}
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>思考强度</label>
+          <input v-model="aiForm.reasoningEffort" class="input" placeholder="留空不传，如 low / medium / high" />
+          <div class="hint">部分服务商支持；留空则用服务商默认</div>
+        </div>
+        <div class="field">
+          <label class="checkbox-row">
+            <input v-model="aiForm.multiSummary" type="checkbox" />
+            生成多条摘要供选择
+          </label>
+        </div>
+        <div class="field" v-if="aiForm.multiSummary">
+          <label>候选条数（2～5）</label>
+          <input v-model.number="aiForm.candidateCount" type="number" min="2" max="5" class="input input-xs" />
+        </div>
+        <div class="hint my-12">
+          文章内容会发送到您配置的第三方 AI 服务商。请确认服务商的数据保留、训练使用和合规策略。
+        </div>
+        <div class="row-wrap mt-16">
+          <button class="btn btn-ghost" :disabled="testingAi" @click="testAiOnly">
+            {{ testingAi ? '测试中…' : '测试连接' }}
+          </button>
+          <span class="section-note"> 未配置 Key 时无法保存：页头「保存」会先测试连接，通过后才落库 </span>
+          <span v-if="aiDirty" class="section-dirty">本区有未保存的修改</span>
+        </div>
       </div>
-    </div>
-    <div class="field">
-      <label>模型</label>
-      <div class="row">
-        <input v-model="aiForm.model" class="input grow" list="model-list" placeholder="deepseek-v4-flash" />
-        <datalist id="model-list">
-          <option v-for="m in modelList" :key="m" :value="m" />
-        </datalist>
-        <button class="btn btn-ghost" :disabled="fetchingModels" @click="fetchModels">
-          {{ fetchingModels ? '获取中…' : '获取模型列表' }}
-        </button>
+
+      <div id="prompts" class="card pad settings-section" v-if="!loading">
+        <div class="row-between">
+          <h3 class="m-0">Prompt 模板</h3>
+          <div class="row">
+            <button class="btn btn-ghost mini" @click="addPromptTemplate">＋ 新增模板</button>
+          </div>
+        </div>
+        <div class="field mt-10">
+          <label>模板说明</label>
+          <div class="hint">
+            每套模板定义一组 AI 提示词。文集可指定使用哪套；编辑器生成时默认跟随文集，也可临时切换。
+            <code>overview</code> 为默认博客摘要，<code>teaser</code> 为章节导读（适合小说/连载，不剧透）。
+          </div>
+        </div>
+        <div v-for="(t, i) in promptTemplates" :key="i" class="prompt-card">
+          <div class="row-wrap-sm">
+            <input v-model="t.id" class="input input-mono" placeholder="标识(如 overview)" />
+            <input v-model="t.name" class="input input-sm" placeholder="名称" />
+            <button class="btn btn-danger mini" @click="removePromptTemplate(i)">删</button>
+          </div>
+          <textarea v-model="t.prompt" class="textarea mt-8" rows="6" placeholder="提示词内容…" />
+        </div>
+        <div class="hint mt-8">
+          注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
+        </div>
       </div>
-    </div>
-    <div class="field">
-      <label>思考强度</label>
-      <input v-model="aiForm.reasoningEffort" class="input" placeholder="留空不传，如 low / medium / high" />
-      <div class="hint">部分服务商支持；留空则用服务商默认</div>
-    </div>
-    <div class="field">
-      <label class="checkbox-row">
-        <input v-model="aiForm.multiSummary" type="checkbox" />
-        生成多条摘要供选择
-      </label>
-    </div>
-    <div class="field" v-if="aiForm.multiSummary">
-      <label>候选条数（2～5）</label>
-      <input v-model.number="aiForm.candidateCount" type="number" min="2" max="5" class="input input-xs" />
-    </div>
-    <div class="hint my-12">
-      文章内容会发送到您配置的第三方 AI 服务商。请确认服务商的数据保留、训练使用和合规策略。
-    </div>
-    <div class="row-wrap mt-16">
-      <button class="btn btn-ghost" :disabled="testingAi" @click="testAiOnly">
-        {{ testingAi ? '测试中…' : '测试连接' }}
-      </button>
-      <span class="section-note">
-        未配置 Key 时无法保存：页头「保存」会先测试连接，通过后才落库
-      </span>
-      <span v-if="aiDirty" class="section-dirty">本区有未保存的修改</span>
+
+      <div id="email" class="card pad settings-section" v-if="!loading">
+        <h3 class="section-title">邮件（SMTP）</h3>
+        <div class="field">
+          <label>SMTP 服务器</label>
+          <input v-model="emailForm.smtp_host" class="input" placeholder="smtp.qq.com" />
+        </div>
+        <div class="field">
+          <label>端口</label>
+          <input v-model.number="emailForm.smtp_port" type="number" class="input input-xs" />
+        </div>
+        <div class="field">
+          <label>用户名</label>
+          <input v-model="emailForm.smtp_username" class="input" placeholder="邮箱地址或授权码用户名" />
+        </div>
+        <div class="field">
+          <label>授权码 / 密码</label>
+          <input
+            v-model="emailForm.smtp_password"
+            type="password"
+            class="input"
+            placeholder="QQ 邮箱授权码（非 QQ 密码）"
+          />
+          <div class="hint mt-4">
+            <span v-if="emailConfigured" class="text-muted"
+              >已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span
+            >
+            <span v-else class="text-danger">未配置</span>
+            <button class="btn btn-danger mini ml-8" :disabled="!emailConfigured" @click="clearEmail">清除配置</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>发件邮箱</label>
+          <input v-model="emailForm.from_email" class="input" placeholder="noreply@example.com" />
+        </div>
+        <div class="hint my-8">用于发送注册验证码、回复通知等邮件。测试成功后自动保存配置（授权码加密存储）。</div>
+        <div class="row-wrap mt-12">
+          <button class="btn btn-ghost" :disabled="emailTesting" @click="testEmailOnly">
+            {{ emailTesting ? '测试中…' : '测试连接' }}
+          </button>
+          <span class="section-note">页头「保存」会在落库前先测试 SMTP；测试失败则不会保存</span>
+          <span v-if="emailDirty" class="section-dirty">本区有未保存的修改</span>
+        </div>
+      </div>
+
+      <div id="comments" class="card pad settings-section" v-if="!loading">
+        <h3 class="section-title">评论设置</h3>
+        <div class="field">
+          <label>需人工审核的关键词</label>
+          <input
+            v-model="commentAutoApprove"
+            class="input"
+            placeholder="如：广告，联系方式（逗号分隔；留空则全部直接展示）"
+          />
+          <div class="hint">命中任一关键词的评论将保持待审核状态；未命中关键词的评论默认直接展示。</div>
+        </div>
+        <p v-if="commentDirty" class="section-dirty">本区有未保存的修改</p>
+      </div>
+
+      <div id="security" class="card pad settings-section" v-if="!loading">
+        <h3 class="section-title">修改管理员密码</h3>
+        <div class="field">
+          <label>原密码</label>
+          <input v-model="pwdState.oldPassword" type="password" class="input" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label>新密码（至少 8 位，含字母+数字/特殊字符）</label>
+          <input v-model="pwdState.newPassword" type="password" class="input" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label>确认新密码</label>
+          <input v-model="pwdState.confirmPassword" type="password" class="input" autocomplete="new-password" />
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-primary" :disabled="pwdSaving" @click="changePassword">
+            {{ pwdSaving ? '更新中…' : '更新密码' }}
+          </button>
+          <span class="section-note">密码属于安全操作：单独提交，更新后旧会话立即失效、需重新登录</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div id="prompts" class="card pad settings-section" v-if="!loading">
-    <div class="row-between">
-      <h3 class="m-0">Prompt 模板</h3>
-      <div class="row">
-        <button class="btn btn-ghost mini" @click="addPromptTemplate">＋ 新增模板</button>
-      </div>
-    </div>
-    <div class="field mt-10">
-      <label>模板说明</label>
-      <div class="hint">
-        每套模板定义一组 AI 提示词。文集可指定使用哪套；编辑器生成时默认跟随文集，也可临时切换。
-        <code>overview</code> 为默认博客摘要，<code>teaser</code> 为章节导读（适合小说/连载，不剧透）。
-      </div>
-    </div>
-    <div v-for="(t, i) in promptTemplates" :key="i" class="prompt-card">
-      <div class="row-wrap-sm">
-        <input v-model="t.id" class="input input-mono" placeholder="标识(如 overview)" />
-        <input v-model="t.name" class="input input-sm" placeholder="名称" />
-        <button class="btn btn-danger mini" @click="removePromptTemplate(i)">删</button>
-      </div>
-      <textarea v-model="t.prompt" class="textarea mt-8" rows="6" placeholder="提示词内容…" />
-    </div>
-    <div class="hint mt-8">
-      注意：<code>id</code> 是内部标识，改动后文集与历史生成的引用不再对应，建议保持稳定。
-    </div>
-  </div>
-
-  <div id="email" class="card pad settings-section" v-if="!loading">
-    <h3 class="section-title">邮件（SMTP）</h3>
-    <div class="field">
-      <label>SMTP 服务器</label>
-      <input v-model="emailForm.smtp_host" class="input" placeholder="smtp.qq.com" />
-    </div>
-    <div class="field">
-      <label>端口</label>
-      <input v-model.number="emailForm.smtp_port" type="number" class="input input-xs" />
-    </div>
-    <div class="field">
-      <label>用户名</label>
-      <input v-model="emailForm.smtp_username" class="input" placeholder="邮箱地址或授权码用户名" />
-    </div>
-    <div class="field">
-      <label>授权码 / 密码</label>
-      <input v-model="emailForm.smtp_password" type="password" class="input" placeholder="QQ 邮箱授权码（非 QQ 密码）" />
-      <div class="hint mt-4">
-        <span v-if="emailConfigured" class="text-muted">已配置：{{ emailMasked.host }} → {{ emailMasked.username }}</span>
-        <span v-else class="text-danger">未配置</span>
-        <button class="btn btn-danger mini ml-8" :disabled="!emailConfigured" @click="clearEmail">清除配置</button>
-      </div>
-    </div>
-    <div class="field">
-      <label>发件邮箱</label>
-      <input v-model="emailForm.from_email" class="input" placeholder="noreply@example.com" />
-    </div>
-    <div class="hint my-8">
-      用于发送注册验证码、回复通知等邮件。测试成功后自动保存配置（授权码加密存储）。
-    </div>
-    <div class="row-wrap mt-12">
-      <button class="btn btn-ghost" :disabled="emailTesting" @click="testEmailOnly">
-        {{ emailTesting ? '测试中…' : '测试连接' }}
-      </button>
-      <span class="section-note">页头「保存」会在落库前先测试 SMTP；测试失败则不会保存</span>
-      <span v-if="emailDirty" class="section-dirty">本区有未保存的修改</span>
-    </div>
-  </div>
-
-  <div id="comments" class="card pad settings-section" v-if="!loading">
-    <h3 class="section-title">评论设置</h3>
-    <div class="field">
-      <label>需人工审核的关键词</label>
-      <input v-model="commentAutoApprove" class="input" placeholder="如：广告，联系方式（逗号分隔；留空则全部直接展示）" />
-      <div class="hint">命中任一关键词的评论将保持待审核状态；未命中关键词的评论默认直接展示。</div>
-    </div>
-    <p v-if="commentDirty" class="section-dirty">本区有未保存的修改</p>
-  </div>
-
-  <div id="security" class="card pad settings-section" v-if="!loading">
-    <h3 class="section-title">修改管理员密码</h3>
-    <div class="field">
-      <label>原密码</label>
-      <input v-model="pwdState.oldPassword" type="password" class="input" autocomplete="current-password" />
-    </div>
-    <div class="field">
-      <label>新密码（至少 8 位，含字母+数字/特殊字符）</label>
-      <input v-model="pwdState.newPassword" type="password" class="input" autocomplete="new-password" />
-    </div>
-    <div class="field">
-      <label>确认新密码</label>
-      <input v-model="pwdState.confirmPassword" type="password" class="input" autocomplete="new-password" />
-    </div>
-    <div class="card-actions">
-      <button class="btn btn-primary" :disabled="pwdSaving" @click="changePassword">
-        {{ pwdSaving ? '更新中…' : '更新密码' }}
-      </button>
-      <span class="section-note">密码属于安全操作：单独提交，更新后旧会话立即失效、需重新登录</span>
-    </div>
-  </div>
-
-    </div>
-  </div>
-
-  <div v-if="loading" class="settings-loading">
-    加载中…
-  </div>
+  <div v-if="loading" class="settings-loading">加载中…</div>
 </template>
 
 <style scoped>

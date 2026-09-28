@@ -24,7 +24,9 @@ const { ctx, title, description, hero, html, fallbackHtml } = Astro.props;
   {
     hero && (
       <div class="page-hero">
-        <a class="page-back reveal in" href="/">← 回到卷首</a>
+        <a class="page-back reveal in" href="/">
+          ← 回到卷首
+        </a>
         <div class="page-hero-card reveal in">
           <p class="character-kicker">{hero.kicker}</p>
           <h1>{title}</h1>

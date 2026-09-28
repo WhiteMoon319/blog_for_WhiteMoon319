@@ -91,7 +91,9 @@ const blockMeta = (count: number): string =>
       <div class="posts-grid">
         {posts.map((p) => (
           <div class="post-card">
-            <h3 class="post-title"><CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink></h3>
+            <h3 class="post-title">
+              <CardLink href={postHref(p.slug, p.collection_slug)}>{p.title}</CardLink>
+            </h3>
             {p.summary && <p class="post-summary">{p.summary}</p>}
             <div class="post-meta">
               <AuthorByline authors={authorsByPost[String(p.id)] ?? []} variant="card" />

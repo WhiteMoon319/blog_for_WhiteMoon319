@@ -35,7 +35,10 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   });
   assert.equal(created.status, 201);
   const colBody = await created.json();
-  assert.ok(Array.isArray(colBody.tags) && colBody.tags.some((t: { name: string }) => t.name === tagName), '创建响应带 tags');
+  assert.ok(
+    Array.isArray(colBody.tags) && colBody.tags.some((t: { name: string }) => t.name === tagName),
+    '创建响应带 tags',
+  );
   const colId = colBody.collection.id as number;
 
   const chRes = await c.post('/api/posts', {
@@ -73,7 +76,10 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   const cloudHtml = await cloud.text();
   assert.ok(cloudHtml.includes(tagName), '标签云出现该标签');
   // 主题无关计数格式：classic「文集 1 · 文章 1」/ modern「1 个文集 · 1 篇文章」
-  assert.ok(/文集\s*1|1\s*个文集/.test(cloudHtml) && /文章\s*1|1\s*篇文章/.test(cloudHtml), '标签云计数分单位显示（文集/文章）');
+  assert.ok(
+    /文集\s*1|1\s*个文集/.test(cloudHtml) && /文章\s*1|1\s*篇文章/.test(cloudHtml),
+    '标签云计数分单位显示（文集/文章）',
+  );
 
   const tagPage = await c.get(tagPath);
   assert.equal(tagPage.status, 200);
@@ -112,7 +118,9 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   const multiSearch = await c.get(`/search/?q=${encodeURIComponent(`#${tagName} #番外试`)}`);
   assert.equal(multiSearch.status, 302, '「#标签1 #标签2」多标签应转标签页');
   assert.ok(
-    String(multiSearch.headers.get('location')).includes(`/tags/?t=${encodeURIComponent(tagName)}&t=${encodeURIComponent('番外试')}`),
+    String(multiSearch.headers.get('location')).includes(
+      `/tags/?t=${encodeURIComponent(tagName)}&t=${encodeURIComponent('番外试')}`,
+    ),
     '多标签参数依次携带',
   );
 
@@ -144,7 +152,9 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   const inTagSearch = await c.get(`/search/?q=${encodeURIComponent(`#${tagName} 章甲`)}`);
   assert.equal(inTagSearch.status, 302, '「#标签 关键词」应转标签内联页');
   assert.ok(
-    String(inTagSearch.headers.get('location')).includes(`/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('章甲')}`),
+    String(inTagSearch.headers.get('location')).includes(
+      `/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('章甲')}`,
+    ),
     '转跳地址携带标签内关键词',
   );
   const inTagInline = await c.get(`/tags/?t=${encodeURIComponent(tagName)}&q=${encodeURIComponent('章甲')}`);
@@ -225,9 +235,7 @@ test('e2e：标签严格校验——超限/非法 400 且不落库，恰好 20 �
   const got = await c.get(`/api/posts/${id}`);
   const gotBody = await got.json();
   assert.deepEqual(
-    (gotBody.tags as Array<{ name: string }>)
-      .map((t) => t.name)
-      .sort(),
+    (gotBody.tags as Array<{ name: string }>).map((t) => t.name).sort(),
     Array.from({ length: 20 }, (_, i) => `恰好标${i}`).sort(),
     '数据库 tags 与响应一致',
   );

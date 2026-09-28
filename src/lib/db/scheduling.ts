@@ -23,8 +23,7 @@ export interface PublishDueResult {
   ids: number[];
 }
 
-const DUE_GUARD =
-  `scheduled_at IS NOT NULL AND scheduled_at <= ? AND status = 'draft' AND deleted_at IS NULL`;
+const DUE_GUARD = `scheduled_at IS NOT NULL AND scheduled_at <= ? AND status = 'draft' AND deleted_at IS NULL`;
 
 export async function publishDuePosts(
   db: D1Database,
@@ -33,9 +32,7 @@ export async function publishDuePosts(
 ): Promise<PublishDueResult> {
   const nowIso = now.toISOString();
   const due = await db
-    .prepare(
-      `SELECT id FROM posts WHERE ${DUE_GUARD} ORDER BY scheduled_at ASC LIMIT ?`,
-    )
+    .prepare(`SELECT id FROM posts WHERE ${DUE_GUARD} ORDER BY scheduled_at ASC LIMIT ?`)
     .bind(nowIso, limit)
     .all<{ id: number }>();
   const ids = (due.results ?? []).map((r) => r.id);

@@ -14,7 +14,7 @@ const page = await getPageBySlug(env.DB, Astro.params.slug!);
 if (!page || page.published !== 1) return new Response(null, { status: 404 });
 
 const { html } = renderMarkdown(page.content_md);
-import { getSiteContext } from "../../lib/theme-context";
+import { getSiteContext } from '../../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 ---
 

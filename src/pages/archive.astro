@@ -16,16 +16,22 @@ const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 const page = Math.min(safeRaw, totalPages);
 const posts = await listArchivedPosts(env.DB, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
 // 列表卡署名：本页文章一次性取回
-const authorsByPost = await badgesByPostId(env.DB, posts.map((p) => p.id));
+const authorsByPost = await badgesByPostId(
+  env.DB,
+  posts.map((p) => p.id),
+);
 
 const groups: {
   year: string;
-  posts: { post: typeof posts[number]; collection: { slug: string; title: string } | null }[];
+  posts: { post: (typeof posts)[number]; collection: { slug: string; title: string } | null }[];
 }[] = [];
-const collections = await getCollectionsByIds(env.DB, posts.map((p) => p.collection_id ?? 0));
+const collections = await getCollectionsByIds(
+  env.DB,
+  posts.map((p) => p.collection_id ?? 0),
+);
 for (const post of posts) {
   const year = yearOf(post.created_at);
-  const collection = post.collection_id ? collections.get(post.collection_id) ?? null : null;
+  const collection = post.collection_id ? (collections.get(post.collection_id) ?? null) : null;
   const last = groups[groups.length - 1];
   if (last && last.year === year) {
     last.posts.push({ post, collection });
@@ -33,8 +39,15 @@ for (const post of posts) {
     groups.push({ year, posts: [{ post, collection }] });
   }
 }
-import { getSiteContext } from "../lib/theme-context";
+import { getSiteContext } from '../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 ---
 
-<ArchiveTemplate ctx={siteCtx} total={total} page={page} totalPages={totalPages} groups={groups} authorsByPost={authorsByPost} />
+<ArchiveTemplate
+  ctx={siteCtx}
+  total={total}
+  page={page}
+  totalPages={totalPages}
+  groups={groups}
+  authorsByPost={authorsByPost}
+/>

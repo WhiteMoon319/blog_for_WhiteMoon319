@@ -24,11 +24,19 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!attempt.ok) return json({ error: 'too many attempts, try again later' }, 429);
 
   let body: { old_password?: unknown; new_password?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
-  if (typeof body.old_password !== 'string' || typeof body.new_password !== 'string') return json({ error: 'old_password and new_password required' }, 400);
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
+  if (typeof body.old_password !== 'string' || typeof body.new_password !== 'string')
+    return json({ error: 'old_password and new_password required' }, 400);
   if (body.old_password === body.new_password) return json({ error: '新旧密码不能相同' }, 400);
   if (body.new_password.length < 8) return json({ error: '密码至少 8 位' }, 400);
-  if (!/[a-zA-Z]/.test(body.new_password) || (!/\d/.test(body.new_password) && !/[^a-zA-Z0-9]/.test(body.new_password))) {
+  if (
+    !/[a-zA-Z]/.test(body.new_password) ||
+    (!/\d/.test(body.new_password) && !/[^a-zA-Z0-9]/.test(body.new_password))
+  ) {
     return json({ error: '密码至少包含字母和数字/特殊字符' }, 400);
   }
 

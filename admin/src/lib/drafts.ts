@@ -67,7 +67,13 @@ export async function saveDraft(snapshot: DraftSnapshot): Promise<DraftSaveResul
     return { ok: true };
   } catch (e) {
     // 空间不足、隐私模式禁用等：只提示用户，绝不阻断服务器保存
-    return { ok: false, error: e instanceof DOMException && e.name === 'QuotaExceededError' ? '本地空间不足，自动保存未生效' : '本地自动保存不可用' };
+    return {
+      ok: false,
+      error:
+        e instanceof DOMException && e.name === 'QuotaExceededError'
+          ? '本地空间不足，自动保存未生效'
+          : '本地自动保存不可用',
+    };
   }
 }
 

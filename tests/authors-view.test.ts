@@ -10,13 +10,7 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  createUser,
-  banUser,
-  createPost,
-  setPostAuthors,
-  createCollection,
-} from '../src/lib/db/index.ts';
+import { createUser, banUser, createPost, setPostAuthors, createCollection } from '../src/lib/db/index.ts';
 import {
   toAuthorBadge,
   toAuthorBadges,
@@ -33,7 +27,12 @@ const handle = await makeTestDb();
 after(() => handle.dispose());
 const db = handle.db;
 
-async function mkUser(username: string, role: 'reader' | 'author' | 'admin' = 'author', displayName = username, bio = '') {
+async function mkUser(
+  username: string,
+  role: 'reader' | 'author' | 'admin' = 'author',
+  displayName = username,
+  bio = '',
+) {
   const u = await createUser(db, {
     username,
     email: `${username}@example.com`,
@@ -47,7 +46,15 @@ async function mkUser(username: string, role: 'reader' | 'author' | 'admin' = 'a
 }
 
 test('作者徽标：笔名优先，封禁或身份不符时降级为纯文本（href=null）', () => {
-  const base = { id: 1, username: 'someone', display_name: '', avatar_url: '', bio: '', role: 'author', status: 'active' };
+  const base = {
+    id: 1,
+    username: 'someone',
+    display_name: '',
+    avatar_url: '',
+    bio: '',
+    role: 'author',
+    status: 'active',
+  };
 
   const plain = toAuthorBadge(base);
   assert.equal(plain.name, 'someone', '无笔名回退用户名');
@@ -59,11 +66,7 @@ test('作者徽标：笔名优先，封禁或身份不符时降级为纯文本�
   assert.equal(toAuthorBadge({ ...base, status: 'banned' }).href, null, '封禁作者无作者页（署名降级纯文本）');
   assert.equal(toAuthorBadge({ ...base, role: 'reader' }).href, null, '读者身份不产生作者页');
   assert.equal(toAuthorBadge({ ...base, role: 'admin' }).href, '/authors/someone/', '管理员也有作者页');
-  assert.equal(
-    toAuthorBadge({ ...base, username: 'a b/c' }).href,
-    '/authors/a%20b%2Fc/',
-    '用户名需 URL 编码',
-  );
+  assert.equal(toAuthorBadge({ ...base, username: 'a b/c' }).href, '/authors/a%20b%2Fc/', '用户名需 URL 编码');
   assert.equal(toAuthorBadges([]).length, 0);
 });
 
@@ -75,7 +78,11 @@ test('单篇署名徽标：带简介与头像，按 sort_order 保序', async ()
   await setPostAuthors(db, post!.id, [b.id, a.id]);
 
   const badges = await listPostAuthorBadges(db, post!.id);
-  assert.deepEqual(badges.map((x) => x.name), ['乙作者', '甲作者'], '顺序即署名顺序（第一位主作者）');
+  assert.deepEqual(
+    badges.map((x) => x.name),
+    ['乙作者', '甲作者'],
+    '顺序即署名顺序（第一位主作者）',
+  );
   assert.equal(badges[1].bio, '写小说的人', '简介随徽标带出');
   assert.equal(badges[0].href, '/authors/av-b/', '作者页路径正确');
 });
@@ -89,7 +96,9 @@ test('批量署名：按文章 id 索引返回普通对象，分块不丢数据'
   );
   await db.batch(stmts);
   await db
-    .prepare(`INSERT INTO post_authors (post_id, user_id, sort_order) SELECT id, ?, 0 FROM posts WHERE slug LIKE 'av-batch-%'`)
+    .prepare(
+      `INSERT INTO post_authors (post_id, user_id, sort_order) SELECT id, ?, 0 FROM posts WHERE slug LIKE 'av-batch-%'`,
+    )
     .bind(a.id)
     .run();
   const rows = await db.prepare(`SELECT id FROM posts WHERE slug LIKE 'av-batch-%'`).all<{ id: number }>();
@@ -139,7 +148,12 @@ test('搜索作者：命中用户名/笔名/简介，排除读者与封禁，附
   const banned = await mkUser('av-search-banned', 'author', '寻章封禁');
   const reader = await mkUser('av-search-reader', 'reader', '寻章读者');
   await banUser(db, banned.id);
-  const post = await createPost(db, { title: '游记一', slug: 'av-search-post', status: 'published', created_by: writer.id });
+  const post = await createPost(db, {
+    title: '游记一',
+    slug: 'av-search-post',
+    status: 'published',
+    created_by: writer.id,
+  });
   assert.ok(post);
   await setPostAuthors(db, post!.id, [writer.id]);
 
@@ -150,7 +164,11 @@ test('搜索作者：命中用户名/笔名/简介，排除读者与封禁，附
   assert.equal(byUsername[0].href, '/authors/av-search-hit/');
 
   const byDisplayName = await searchAuthorHits(db, '寻章');
-  assert.deepEqual(byDisplayName.map((x) => x.username), ['av-search-hit'], '封禁与读者不出现在结果里');
+  assert.deepEqual(
+    byDisplayName.map((x) => x.username),
+    ['av-search-hit'],
+    '封禁与读者不出现在结果里',
+  );
 
   const byBio = await searchAuthorHits(db, '山水游记');
   assert.equal(byBio.length, 1, '简介命中');

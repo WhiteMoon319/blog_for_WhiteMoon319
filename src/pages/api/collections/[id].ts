@@ -111,10 +111,7 @@ export async function DELETE(ctx: APIContext): Promise<Response> {
   if (access.user.role !== 'admin') {
     const foreign = await countForeignPostsInCollection(env.DB, id, access.user.id);
     if (foreign > 0) {
-      return json(
-        { error: `文集内还有 ${foreign} 篇他人文章，不能删除；请先移出或联系管理员` },
-        403,
-      );
+      return json({ error: `文集内还有 ${foreign} 篇他人文章，不能删除；请先移出或联系管理员` }, 403);
     }
   }
 

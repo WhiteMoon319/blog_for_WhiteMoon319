@@ -46,7 +46,12 @@ export function titleFromMarkdown(md: string, fallback: string): string {
 export function summaryFromMarkdown(md: string): string {
   const para = md
     .split(/\n{2,}/)
-    .map((p) => p.replace(/^[#>\-*+\d.\s`]+/m, '').replace(/[*_`[\]]/g, '').trim())
+    .map((p) =>
+      p
+        .replace(/^[#>\-*+\d.\s`]+/m, '')
+        .replace(/[*_`[\]]/g, '')
+        .trim(),
+    )
     .find((t) => t.length > 0);
   return (para ?? '').slice(0, 120);
 }

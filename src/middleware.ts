@@ -9,12 +9,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import { envOf } from './lib/db';
 import { verifyTokenShape } from './lib/auth';
-import {
-  EDGE_CACHE_MAX_AGE,
-  isEdgeCacheDisabled,
-  isStorableHtmlResponse,
-  shouldUseEdgeCache,
-} from './lib/edge-cache';
+import { EDGE_CACHE_MAX_AGE, isEdgeCacheDisabled, isStorableHtmlResponse, shouldUseEdgeCache } from './lib/edge-cache';
 import { isHttpsRedirectDisabled, isHttpsRequest, needsHttpsRedirect, securityHeaders } from './lib/http-security';
 
 function withSecurityHeaders(response: Response, isHttps: boolean): Response {
@@ -87,7 +82,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
     })
   ) {
     try {
-      const cache = (caches as unknown as { default: { match(k: Request): Promise<Response | undefined>; put(k: Request, r: Response): Promise<void> } }).default;
+      const cache = (
+        caches as unknown as {
+          default: { match(k: Request): Promise<Response | undefined>; put(k: Request, r: Response): Promise<void> };
+        }
+      ).default;
       const cached = await cache.match(context.request);
       if (cached) {
         const headers = new Headers(cached.headers);

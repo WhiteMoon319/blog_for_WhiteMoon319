@@ -68,7 +68,15 @@ export function parsePromptTemplates(raw: string | undefined): PromptTemplate[] 
     if (Array.isArray(parsed)) {
       const valid = parsed.filter(
         (t): t is PromptTemplate =>
-          typeof t === 'object' && t !== null && typeof t.id === 'string' && typeof t.name === 'string' && typeof t.prompt === 'string' && t.id.length > 0 && t.id.length <= 64 && (t.prompt.length || 0) > 0 && (t.prompt.length || 0) <= 4000,
+          typeof t === 'object' &&
+          t !== null &&
+          typeof t.id === 'string' &&
+          typeof t.name === 'string' &&
+          typeof t.prompt === 'string' &&
+          t.id.length > 0 &&
+          t.id.length <= 64 &&
+          (t.prompt.length || 0) > 0 &&
+          (t.prompt.length || 0) <= 4000,
       );
       if (valid.length > 0) return valid;
     }
@@ -100,7 +108,8 @@ function isInternalUrl(url: string): boolean {
       // 域名直接放行（解析交给 DNS，无法在 Worker 内逐一解析）
     }
     // IPv4 私网/回环
-    if (/^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/.test(lower)) return true;
+    if (/^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/.test(lower))
+      return true;
     const v4 = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
     if (v4) {
       const [a, b] = [Number(v4[1]), Number(v4[2])];
@@ -113,11 +122,18 @@ function isInternalUrl(url: string): boolean {
         const v4m = ipv6Part.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
         if (v4m) {
           const a = Number(v4m[1]);
-          if (a === 127 || a === 10 || a === 192 || (a === 172 && Number(v4m[2]) >= 16 && Number(v4m[2]) <= 31)) return true;
+          if (a === 127 || a === 10 || a === 192 || (a === 172 && Number(v4m[2]) >= 16 && Number(v4m[2]) <= 31))
+            return true;
         }
         return true; // ::ffff: 非公网可解析为内网风险，一律拦截
       }
-      if (/^fd[0-9a-f]{2}:/.test(lower) || /^fe[89ab]:/.test(lower) || /^fec0:/.test(lower) || /^fc0[0-9a-f]:/.test(lower)) return true;
+      if (
+        /^fd[0-9a-f]{2}:/.test(lower) ||
+        /^fe[89ab]:/.test(lower) ||
+        /^fec0:/.test(lower) ||
+        /^fc0[0-9a-f]:/.test(lower)
+      )
+        return true;
     }
     return false;
   } catch {
@@ -135,7 +151,12 @@ export function sanitizeError(err: unknown): string {
   return String(err).slice(0, 100);
 }
 
-export async function callAi(messages: Array<{ role: string; content: string }>, config: AiConfig, timeoutMs = SUMMARY_TIMEOUT_MS, n?: number): Promise<string[]> {
+export async function callAi(
+  messages: Array<{ role: string; content: string }>,
+  config: AiConfig,
+  timeoutMs = SUMMARY_TIMEOUT_MS,
+  n?: number,
+): Promise<string[]> {
   const endpoint = buildEndpoint(config.baseUrl, 'chat/completions');
   if (isInternalUrl(endpoint)) throw new Error('blocked_internal_url');
 
@@ -205,7 +226,10 @@ export async function callAi(messages: Array<{ role: string; content: string }>,
 }
 
 function cleanSummary(s: string): string {
-  return s.replace(/^["'「『""''"]+|["'」』""''"]+$/g, '').replace(/^(摘要[：:])/g, '').trim();
+  return s
+    .replace(/^["'「『""''"]+|["'」』""''"]+$/g, '')
+    .replace(/^(摘要[：:])/g, '')
+    .trim();
 }
 
 const SYSTEM_PROMPT_OVERVIEW = `你是一个博客摘要助手。

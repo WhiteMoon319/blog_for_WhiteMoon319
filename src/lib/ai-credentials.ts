@@ -34,7 +34,10 @@ function fromB64url(s: string): Uint8Array {
 }
 
 async function importKey(hexKey: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', hexToBytes(hexKey) as any, { name: ALGO, length: 256 }, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', hexToBytes(hexKey) as any, { name: ALGO, length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 export async function encryptApiKey(hexKey: string, plaintext: string): Promise<string> {

@@ -8,7 +8,7 @@ import { resolveUser } from '../../lib/auth';
 import { canManagePost } from '../../lib/api/post-access.ts';
 import { listPostAuthorBadges } from '../../lib/authors-view';
 import PostTemplate from '@theme/templates/post.astro';
-import { getSiteContext } from "../../lib/theme-context";
+import { getSiteContext } from '../../lib/theme-context';
 
 export const prerender = false;
 
@@ -35,8 +35,7 @@ const theme = collection?.theme_color ?? '#8a6d3b';
 const backHref = collection ? `/collections/${encodeURI(collection.slug)}/` : '/archive/';
 const backLabel = collection ? `← ${collection.title}` : '← 归档';
 const kicker = collection?.title ?? '未分类';
-const publishedHref =
-  post.status === 'published' && collection ? postHref(post.slug, collection.slug) : undefined;
+const publishedHref = post.status === 'published' && collection ? postHref(post.slug, collection.slug) : undefined;
 
 const siteCtx = await getSiteContext(Astro);
 // 草稿预览同样展示署名，方便作者确认最终署名效果

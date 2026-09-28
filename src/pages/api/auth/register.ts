@@ -20,16 +20,22 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden: invalid origin' }, 403);
 
   const attempt = await consumeLoginAttempt(env.DB, `register:${clientIp(ctx.request)}`, {
-    max: 3, windowSec: 3600,
+    max: 3,
+    windowSec: 3600,
   });
   if (!attempt.ok) {
     return new Response(JSON.stringify({ error: 'too many attempts, try again later' }), {
-      status: 429, headers: { 'Content-Type': 'application/json' },
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 
   let body: { username?: unknown; email?: unknown; password?: unknown; display_name?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   if (typeof body.username !== 'string' || !body.username.trim()) return json({ error: 'username required' }, 400);
   if (typeof body.email !== 'string' || !body.email.trim()) return json({ error: 'email required' }, 400);
@@ -37,7 +43,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
   const username = body.username.trim().toLowerCase();
   const email = body.email.trim().toLowerCase();
-  const displayName = typeof body.display_name === 'string' && body.display_name.trim() ? body.display_name.trim() : username;
+  const displayName =
+    typeof body.display_name === 'string' && body.display_name.trim() ? body.display_name.trim() : username;
   if (displayName.length > 30) return json({ error: '昵称最长 30 字' }, 400);
 
   if (username.length < 2 || username.length > 64) return json({ error: '用户名 2-64 字符' }, 400);
@@ -53,7 +60,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (await getUserByEmail(env.DB, email)) return json({ error: '邮箱已被注册' }, 409);
 
   const passwordHash = await hashPassword(body.password);
-  const user = await createUser(env.DB, { username, email, password_hash: passwordHash, display_name: displayName, role: 'reader' });
+  const user = await createUser(env.DB, {
+    username,
+    email,
+    password_hash: passwordHash,
+    display_name: displayName,
+    role: 'reader',
+  });
   if (!user) return json({ error: '注册失败' }, 500);
 
   // 验证码发送失败不再回滚账号。
@@ -67,7 +80,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
     await env.DB.prepare(
       `INSERT INTO email_verifications (user_id, code_hash, expires_at)
        VALUES (?, ?, datetime('now', '+5 minutes'))`,
-    ).bind(user.id, codeHash).run();
+    )
+      .bind(user.id, codeHash)
+      .run();
 
     const mail = verificationEmail(code, '感谢注册「月下独酌」博客！');
     await sendEmail(email, mail.subject, mail.text);

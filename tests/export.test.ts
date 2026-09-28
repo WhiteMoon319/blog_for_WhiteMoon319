@@ -109,7 +109,10 @@ test('导出：单篇 Markdown 带 frontmatter 与标签，特殊字符安全', 
   assert.equal(out.filename, 'export-md.md');
   assert.ok(out.body.includes('title: "引号\\"与反斜杠\\\\篇"'), 'YAML 双引号转义正确');
   assert.ok(out.body.includes('status: draft'));
-  assert.ok(out.body.includes('tags: ["标一", "标\\"二"]') || out.body.includes('tags: ["标\\"二", "标一"]'), '标签按名排序后完整转义');
+  assert.ok(
+    out.body.includes('tags: ["标一", "标\\"二"]') || out.body.includes('tags: ["标\\"二", "标一"]'),
+    '标签按名排序后完整转义',
+  );
   assert.ok(out.body.trimEnd().endsWith('# 标题\n\n正文。'), '正文完整保留');
 
   assert.equal(await exportPostMarkdown(db, 999999), null, '不存在的文章返回 null');
@@ -123,11 +126,22 @@ test('导出：署名与协作者随快照导出，单篇 frontmatter 带 author
   assert.ok(col);
   await addCollectionCollaborator(db, col!.id, b.id);
   await requestCollectionInvite(db, col!.id, b.id, '想投稿');
-  await db.prepare('DELETE FROM collection_collaborators WHERE collection_id = ? AND user_id = ?').bind(col!.id, b.id).run();
+  await db
+    .prepare('DELETE FROM collection_collaborators WHERE collection_id = ? AND user_id = ?')
+    .bind(col!.id, b.id)
+    .run();
 
   const r = await createPostWithTags(
     db,
-    { collection_id: col!.id, title: '署名篇', slug: 'exp-signed', summary: 's', content_md: '正文', status: 'published', created_by: a.id },
+    {
+      collection_id: col!.id,
+      title: '署名篇',
+      slug: 'exp-signed',
+      summary: 's',
+      content_md: '正文',
+      status: 'published',
+      created_by: a.id,
+    },
     ['标一'],
   );
   assert.ok(r);

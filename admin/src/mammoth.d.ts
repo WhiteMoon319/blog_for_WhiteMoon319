@@ -21,9 +21,13 @@ declare module 'mammoth' {
     messages: unknown[];
   }
 
-  export function convertToHtml(input: { arrayBuffer: ArrayBuffer } & { convertImage?: ConvertImageOptions['convertImage'] }): Promise<ConvertResult>;
+  export function convertToHtml(
+    input: { arrayBuffer: ArrayBuffer } & { convertImage?: ConvertImageOptions['convertImage'] },
+  ): Promise<ConvertResult>;
 
   export const images: {
-    imgElement(cb: (image: DocxImage) => Promise<{ src: string } | null>): (image: DocxImage) => Promise<{ src: string } | null>;
+    imgElement(
+      cb: (image: DocxImage) => Promise<{ src: string } | null>,
+    ): (image: DocxImage) => Promise<{ src: string } | null>;
   };
 }

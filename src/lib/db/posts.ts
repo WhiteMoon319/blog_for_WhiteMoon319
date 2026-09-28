@@ -7,19 +7,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { PostInput, PostPatch, PostRow, PostWithCollection, TagRow } from './types.ts';
-import {
-  ensureTagsStmts,
-  purgeOrphanTagsStmt,
-  setPostOwnTagsStmts,
-  listPostOwnTags,
-} from './tags.ts';
+import { ensureTagsStmts, purgeOrphanTagsStmt, setPostOwnTagsStmts, listPostOwnTags } from './tags.ts';
 import { getLatestPostVersion, planForNewContent, planForPostId, type VersionContentPlan } from './versions.ts';
 import { getPostAuthorIds, setPostAuthorsStmts } from './authors.ts';
 import { isValidSlug } from '../utils.ts';
 
 export async function listPublishedPosts(
   db: D1Database,
-  opts: { collectionId?: number | null; limit?: number; offset?: number; order?: 'asc' | 'desc'; pinned?: boolean } = {},
+  opts: {
+    collectionId?: number | null;
+    limit?: number;
+    offset?: number;
+    order?: 'asc' | 'desc';
+    pinned?: boolean;
+  } = {},
 ): Promise<PostRow[]> {
   let sql = `SELECT * FROM posts WHERE status = 'published' AND deleted_at IS NULL`;
   const args: (number | string | null)[] = [];
@@ -41,7 +42,11 @@ export async function listPublishedPosts(
       args.push(opts.offset);
     }
   }
-  return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+  return db
+    .prepare(sql)
+    .bind(...args)
+    .all<PostRow>()
+    .then((r) => r.results ?? []);
 }
 
 export async function countPublishedPosts(
@@ -58,7 +63,10 @@ export async function countPublishedPosts(
       args.push(opts.collectionId);
     }
   }
-  const row = await db.prepare(sql).bind(...args).first<{ n: number }>();
+  const row = await db
+    .prepare(sql)
+    .bind(...args)
+    .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
@@ -75,7 +83,9 @@ export async function getPublishedPostBySlug(db: D1Database, slug: string): Prom
 // 跨文集查已刊同名文章：用于旧路径 /posts/{slug}/ 的 301 转正（未分类优先，已收录则跳文集路径）
 export async function getPublishedPostBySlugAny(db: D1Database, slug: string): Promise<PostRow | null> {
   return db
-    .prepare(`SELECT * FROM posts WHERE slug = ? AND status = 'published' AND deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`)
+    .prepare(
+      `SELECT * FROM posts WHERE slug = ? AND status = 'published' AND deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`,
+    )
     .bind(slug)
     .first<PostRow>();
 }
@@ -93,7 +103,14 @@ export async function getPublishedPostInCollection(
 
 export async function listPosts(
   db: D1Database,
-  opts: { collectionId?: number; status?: 'draft' | 'published' | 'all'; limit?: number; offset?: number; trashOnly?: boolean; authorId?: number } = {},
+  opts: {
+    collectionId?: number;
+    status?: 'draft' | 'published' | 'all';
+    limit?: number;
+    offset?: number;
+    trashOnly?: boolean;
+    authorId?: number;
+  } = {},
 ): Promise<PostRow[]> {
   const where: string[] = [];
   const args: (number | string)[] = [];
@@ -124,7 +141,11 @@ export async function listPosts(
     sql += opts.limit ? ' OFFSET ?' : ' LIMIT -1 OFFSET ?';
     args.push(opts.offset);
   }
-  return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+  return db
+    .prepare(sql)
+    .bind(...args)
+    .all<PostRow>()
+    .then((r) => r.results ?? []);
 }
 
 export async function getPostById(db: D1Database, id: number): Promise<PostRow | null> {
@@ -158,14 +179,13 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
         data.layout ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
-    db
-      .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
+    db.prepare(
+      `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
          SELECT id, 1, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
-      ),
+    ),
   ]);
-  return results[1].results?.[0] as PostRow | undefined ?? null;
+  return (results[1].results?.[0] as PostRow | undefined) ?? null;
 }
 
 // 创建 + 打标签原子写：主体、初始版本、标签 ensure/关联、孤儿清理放进同一个 D1 batch。
@@ -199,12 +219,11 @@ export async function createPostWithTags(
         data.layout ?? '',
       ),
     db.prepare('SELECT * FROM posts WHERE id = last_insert_rowid()'),
-    db
-      .prepare(
-        `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
+    db.prepare(
+      `INSERT INTO post_versions (post_id, version, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, message)
          SELECT id, 1, title, slug, collection_id, summary, summary_source, content_md, cover_url, status, meta_keywords, '创建'
          FROM posts WHERE id = last_insert_rowid()`,
-      ),
+    ),
   ];
   const unique = [...new Set(tagNames.map((n) => n.trim().replace(/\s+/g, ' ')).filter((n) => n.length > 0))];
   if (unique.length > 0) {
@@ -237,7 +256,7 @@ export async function createPostWithTags(
     );
   });
   const results = await db.batch(stmts);
-  const post = results[1].results?.[0] as PostRow | undefined ?? null;
+  const post = (results[1].results?.[0] as PostRow | undefined) ?? null;
   if (!post) return null;
   return { post, tags: await listPostOwnTags(db, post.id) };
 }
@@ -256,7 +275,19 @@ export async function updatePost(
     patch.scheduled_at = null;
   }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at', 'layout'].includes(k),
+    [
+      'title',
+      'slug',
+      'collection_id',
+      'summary',
+      'content_md',
+      'cover_url',
+      'status',
+      'meta_keywords',
+      'is_pinned',
+      'scheduled_at',
+      'layout',
+    ].includes(k),
   );
   if (keys.length === 0) return current;
   const changed = keys.filter((k) => {
@@ -283,9 +314,7 @@ export async function updatePost(
   // 版本写入失败时文章更新一并回滚；版本号由同一事务内 MAX(version)+1 计算，写事务串行化保证不冲突。
   // baseVersion 提供时做乐观锁：当前版本不匹配则整批不生效并返回 'conflict'。
   const versionMatch =
-    baseVersion !== undefined
-      ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
-      : '';
+    baseVersion !== undefined ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?` : '';
   const versionArgs = baseVersion !== undefined ? [id, baseVersion] : [];
   const results = await db.batch([
     db
@@ -343,7 +372,19 @@ export async function updatePostWithTags(
     authorsChanged = curIds.length !== nextAuthorIds.length || curIds.some((v, i) => v !== nextAuthorIds[i]);
   }
   const keys = Object.keys(patch).filter((k) =>
-    ['title', 'slug', 'collection_id', 'summary', 'content_md', 'cover_url', 'status', 'meta_keywords', 'is_pinned', 'scheduled_at', 'layout'].includes(k),
+    [
+      'title',
+      'slug',
+      'collection_id',
+      'summary',
+      'content_md',
+      'cover_url',
+      'status',
+      'meta_keywords',
+      'is_pinned',
+      'scheduled_at',
+      'layout',
+    ].includes(k),
   );
   const changed = keys.filter((k) => {
     const pv = patch[k as keyof PostPatch];
@@ -368,9 +409,7 @@ export async function updatePostWithTags(
   const nextContent = 'content_md' in patch ? String(patch.content_md ?? '') : current.content_md;
   const plan = await planForNewContent(db, id, nextContent);
   const versionMatch =
-    baseVersion !== undefined
-      ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?`
-      : '';
+    baseVersion !== undefined ? `AND (SELECT COALESCE(MAX(version), 0) FROM post_versions WHERE post_id = ?) = ?` : '';
   const versionArgs = baseVersion !== undefined ? [id, baseVersion] : [];
   // 顺序约定：UPDATE 在首位以便取回变更后的行；署名语句紧随其后，
   // 保证版本 INSERT 的署名子查询读到的是本次最新署名。
@@ -434,7 +473,9 @@ function trashVersionStmt(
 ): D1PreparedStatement {
   // 版本 INSERT 先于 UPDATE：guard（deleted_at 旧状态）读到的是变更前状态；
   // 并发重复执行时 guard 落空，不会重复留档。
-  return db.prepare(`${TRASH_VERSION_SQL} ${guard}`).bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, message, id, id);
+  return db
+    .prepare(`${TRASH_VERSION_SQL} ${guard}`)
+    .bind(id, id, plan.content_md, plan.content_md_patch, plan.base_version, message, id, id);
 }
 
 // trash（fromTrashed=false）/restore（fromTrashed=true）共用：预检计数 + 每篇 [版本留档, 状态更新]。
@@ -445,11 +486,13 @@ async function trashStateStmts(
   ids: number[],
   fromTrashed: boolean,
 ): Promise<{ stmts: D1PreparedStatement[]; count: number }> {
-  const sql =
-    fromTrashed
-      ? `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`
-      : `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`;
-  const pre = await db.prepare(sql).bind(...ids).first<{ n: number }>();
+  const sql = fromTrashed
+    ? `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`
+    : `SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`;
+  const pre = await db
+    .prepare(sql)
+    .bind(...ids)
+    .first<{ n: number }>();
   const stmts: D1PreparedStatement[] = [];
   const count = pre?.n ?? 0;
   if (count > 0) {
@@ -459,9 +502,7 @@ async function trashStateStmts(
     for (const id of ids) {
       const plan = await planForPostId(db, id);
       stmts.push(trashVersionStmt(db, id, message, guard, plan));
-      stmts.push(
-        db.prepare(`UPDATE posts SET ${setSql}, updated_at = datetime('now') WHERE id = ? ${guard}`).bind(id),
-      );
+      stmts.push(db.prepare(`UPDATE posts SET ${setSql}, updated_at = datetime('now') WHERE id = ? ${guard}`).bind(id));
     }
   }
   return { stmts, count };
@@ -487,9 +528,7 @@ export async function purgePosts(db: D1Database, ids: number[]): Promise<number>
     .prepare(`SELECT COUNT(*) AS n FROM posts WHERE deleted_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`)
     .bind(...ids)
     .first<{ n: number }>();
-  const stmts = ids.map((id) =>
-    db.prepare('DELETE FROM posts WHERE id = ? AND deleted_at IS NOT NULL').bind(id),
-  );
+  const stmts = ids.map((id) => db.prepare('DELETE FROM posts WHERE id = ? AND deleted_at IS NOT NULL').bind(id));
   stmts.push(purgeOrphanTagsStmt(db));
   await db.batch(stmts);
   return pre?.n ?? 0;
@@ -533,12 +572,12 @@ export async function listArchivedPosts(
     sql += ` LIMIT ?`;
     if (opts.offset) sql += ` OFFSET ?`;
   }
-  const args = opts.limit
-    ? opts.offset
-      ? [opts.limit, opts.offset]
-      : [opts.limit]
-    : [];
-  return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+  const args = opts.limit ? (opts.offset ? [opts.limit, opts.offset] : [opts.limit]) : [];
+  return db
+    .prepare(sql)
+    .bind(...args)
+    .all<PostRow>()
+    .then((r) => r.results ?? []);
 }
 
 export async function countArchivedPosts(db: D1Database): Promise<number> {
@@ -568,7 +607,12 @@ export async function getAdjacentPosts(
        SELECT * FROM ranked WHERE id = ?`,
     )
     .bind(post.id)
-    .first<{ in_prev_id: number | null; in_next_id: number | null; global_prev_id: number | null; global_next_id: number | null }>();
+    .first<{
+      in_prev_id: number | null;
+      in_next_id: number | null;
+      global_prev_id: number | null;
+      global_next_id: number | null;
+    }>();
   if (!window) return { prev: null, next: null };
   const prevId = window.in_prev_id ?? window.global_prev_id;
   const nextId = window.in_next_id ?? window.global_next_id;
@@ -581,5 +625,5 @@ export async function getAdjacentPosts(
     .bind(...ids)
     .all<PostWithCollection>();
   const byId = new Map<number, PostWithCollection>((rows.results ?? []).map((r) => [r.id, r]));
-  return { prev: prevId ? byId.get(prevId) ?? null : null, next: nextId ? byId.get(nextId) ?? null : null };
+  return { prev: prevId ? (byId.get(prevId) ?? null) : null, next: nextId ? (byId.get(nextId) ?? null) : null };
 }

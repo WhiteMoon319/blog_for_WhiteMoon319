@@ -39,14 +39,18 @@ after(() => handle.dispose());
 const db = handle.db;
 
 async function seedPublished(slug: string, title = slug) {
-  const r = await createPostWithTags(db, {
-    collection_id: null,
-    title,
-    slug,
-    summary: `${title} 摘要`,
-    content_md: `${title} 正文内容`,
-    status: 'published',
-  }, ['甲', '乙']);
+  const r = await createPostWithTags(
+    db,
+    {
+      collection_id: null,
+      title,
+      slug,
+      summary: `${title} 摘要`,
+      content_md: `${title} 正文内容`,
+      status: 'published',
+    },
+    ['甲', '乙'],
+  );
   assert.ok(r, `seed ${slug} 创建失败`);
   return r;
 }
@@ -129,7 +133,11 @@ test('回收站：恢复保留阅读量与标签', async () => {
 
 test('回收站：purge 仅作用于回收站文章，且彻底清除', async () => {
   const leftovers = await listPosts(db, { trashOnly: true });
-  if (leftovers.length > 0) await purgePosts(db, leftovers.map((p) => p.id));
+  if (leftovers.length > 0)
+    await purgePosts(
+      db,
+      leftovers.map((p) => p.id),
+    );
   const live = await seedPublished('trash-purge-live');
   const dead = await seedPublished('trash-purge-dead');
   await trashPosts(db, [dead.post.id]);
@@ -149,7 +157,11 @@ test('回收站：purge 仅作用于回收站文章，且彻底清除', async ()
 
 test('回收站：批量按 50 上限分块，计数正确', async () => {
   const leftovers = await listPosts(db, { trashOnly: true });
-  if (leftovers.length > 0) await purgePosts(db, leftovers.map((p) => p.id));
+  if (leftovers.length > 0)
+    await purgePosts(
+      db,
+      leftovers.map((p) => p.id),
+    );
   const ids: number[] = [];
   for (let i = 0; i < 50; i++) {
     const { post } = await seedPublished(`trash-batch-${i}`);

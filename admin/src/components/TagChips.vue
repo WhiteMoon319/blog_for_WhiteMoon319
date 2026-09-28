@@ -34,7 +34,10 @@ function add() {
 }
 
 function remove(name: string) {
-  emit('update:modelValue', props.modelValue.filter((n) => n !== name));
+  emit(
+    'update:modelValue',
+    props.modelValue.filter((n) => n !== name),
+  );
 }
 
 function onKeydown(e: KeyboardEvent) {

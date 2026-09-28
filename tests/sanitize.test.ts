@@ -41,8 +41,14 @@ test('renderMarkdown：标题 id 稳定且重复去重', () => {
   assert.ok(html.includes('id="甲"'));
   assert.ok(html.includes('id="乙"'));
   assert.ok(html.includes('id="甲-2"'));
-  assert.deepEqual(toc.map((t) => t.id), ['甲', '乙', '甲-2']);
-  assert.deepEqual(toc.map((t) => t.level), [2, 3, 2]);
+  assert.deepEqual(
+    toc.map((t) => t.id),
+    ['甲', '乙', '甲-2'],
+  );
+  assert.deepEqual(
+    toc.map((t) => t.level),
+    [2, 3, 2],
+  );
 });
 
 test('renderMarkdown：纯符号标题回退 section 且去重', () => {
@@ -59,5 +65,8 @@ test('renderMarkdown：图片获得懒加载属性', () => {
 
 test('renderMarkdown：TOC 仅收录 h1-h3', () => {
   const { toc } = renderMarkdown('## 二\n\n#### 四\n\n### 三');
-  assert.deepEqual(toc.map((t) => t.level), [2, 3]);
+  assert.deepEqual(
+    toc.map((t) => t.level),
+    [2, 3],
+  );
 });

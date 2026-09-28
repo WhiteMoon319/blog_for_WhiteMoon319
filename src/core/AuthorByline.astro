@@ -21,50 +21,60 @@ const { authors = [], prefix = '', variant = 'post', class: extraClass = '' } = 
 const visible = authors.filter((a) => a && (a.name || a.username));
 ---
 
-{visible.length > 0 && (
-  <span class:list={['byline', `byline-${variant}`, extraClass]}>
-    {prefix && <span class="byline-prefix">{prefix}</span>}
-    {visible.map((a, i) => (
-      <>
-        {i > 0 && <span class="byline-sep" aria-hidden="true">、</span>}
-        {a.href ? (
-          <a class="byline-name" href={a.href} title={a.name} rel="author">{a.name}</a>
-        ) : (
-          <span class="byline-name is-plain" title={a.name}>{a.name}</span>
-        )}
-      </>
-    ))}
-  </span>
-)}
+{
+  visible.length > 0 && (
+    <span class:list={['byline', `byline-${variant}`, extraClass]}>
+      {prefix && <span class="byline-prefix">{prefix}</span>}
+      {visible.map((a, i) => (
+        <>
+          {i > 0 && (
+            <span class="byline-sep" aria-hidden="true">
+              、
+            </span>
+          )}
+          {a.href ? (
+            <a class="byline-name" href={a.href} title={a.name} rel="author">
+              {a.name}
+            </a>
+          ) : (
+            <span class="byline-name is-plain" title={a.name}>
+              {a.name}
+            </span>
+          )}
+        </>
+      ))}
+    </span>
+  )
+}
 
 <style>
-.byline {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.15em;
-  flex-wrap: wrap;
-  /* 卡片主链接的 ::after 覆盖层 z-index:1；署名整体浮在其上才能被点到。
+  .byline {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.15em;
+    flex-wrap: wrap;
+    /* 卡片主链接的 ::after 覆盖层 z-index:1；署名整体浮在其上才能被点到。
      注意 .byline-card 的 opacity 会形成独立层叠上下文，故 z-index 必须加在这里。 */
-  position: relative;
-  z-index: 2;
-}
-.byline-prefix {
-  opacity: 0.72;
-  margin-right: 0.15em;
-}
-.byline-sep {
-  opacity: 0.5;
-}
-.byline-name {
-  text-decoration: none;
-  border-bottom: 1px dotted currentColor;
-}
-.byline-name.is-plain {
-  border-bottom: none;
-  opacity: 0.85;
-}
-.byline-card {
-  font-size: 0.82em;
-  opacity: 0.85;
-}
+    position: relative;
+    z-index: 2;
+  }
+  .byline-prefix {
+    opacity: 0.72;
+    margin-right: 0.15em;
+  }
+  .byline-sep {
+    opacity: 0.5;
+  }
+  .byline-name {
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+  }
+  .byline-name.is-plain {
+    border-bottom: none;
+    opacity: 0.85;
+  }
+  .byline-card {
+    font-size: 0.82em;
+    opacity: 0.85;
+  }
 </style>

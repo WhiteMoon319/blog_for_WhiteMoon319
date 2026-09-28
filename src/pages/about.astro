@@ -11,9 +11,7 @@ const dbPage = await getPageBySlug(env.DB, 'about');
 
 const pageTitle = dbPage?.title || '关于';
 const pageDesc = `关于「${env.SITE_NAME}」`;
-const bodyHtml = dbPage?.published === 1
-  ? renderMarkdown(dbPage.content_md).html
-  : null;
+const bodyHtml = dbPage?.published === 1 ? renderMarkdown(dbPage.content_md).html : null;
 // 缺页兜底文案（原 about 页内置区块，经 props 下传模板）
 const fallbackHtml = `<p>
             吾名江逐月，亦可称吾江榫。闲散时，多提笔勾勒三两闲言，望各位客官看个尽兴。
@@ -22,7 +20,7 @@ const fallbackHtml = `<p>
           <p>
             如若相谈，可联系 <a href="mailto:3287047638@qq.com">3287047638@qq.com</a>。
           </p>`;
-import { getSiteContext } from "../lib/theme-context";
+import { getSiteContext } from '../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 ---
 

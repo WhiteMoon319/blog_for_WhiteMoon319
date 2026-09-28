@@ -52,7 +52,11 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
     if (!ciphertext) throw new Error('email_not_configured');
 
     let password: string;
-    try { password = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, ciphertext); } catch { throw new Error('email_decrypt_failed'); }
+    try {
+      password = await decryptApiKey(env.AI_SETTINGS_ENCRYPTION_KEY, ciphertext);
+    } catch {
+      throw new Error('email_decrypt_failed');
+    }
 
     transporter = nodemailer.createTransport({
       host: cred.smtp_host || 'smtp.qq.com',
@@ -66,9 +70,18 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
   await transporter.sendMail({ from: `"月下独酌" <${from}>`, to, subject, text });
 }
 
-export async function testSmtpCreds(host: string, port: number, user: string, pass: string, from: string, to: string): Promise<void> {
+export async function testSmtpCreds(
+  host: string,
+  port: number,
+  user: string,
+  pass: string,
+  from: string,
+  to: string,
+): Promise<void> {
   const transporter = nodemailer.createTransport({
-    host, port, secure: port === 465,
+    host,
+    port,
+    secure: port === 465,
     auth: { user, pass },
   });
   await transporter.sendMail({
@@ -97,7 +110,9 @@ export function verificationEmail(code: string, greeting?: string): { subject: s
 export async function hashVerificationCode(code: string): Promise<string> {
   const data = new TextEncoder().encode(code);
   const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export async function verifyCodeHash(code: string, hash: string): Promise<boolean> {

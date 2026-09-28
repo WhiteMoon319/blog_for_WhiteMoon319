@@ -71,7 +71,9 @@ const t = classicT(ctx.locale);
           {posts.map((p, i) => (
             <div class="post-card reveal" data-delay={String((i % 3) + 1)} style={`--cc: ${collection.theme_color};`}>
               {p.cover_url && <img class="post-cover" src={p.cover_url} alt="" loading="lazy" decoding="async" />}
-              <h3 class="post-title"><CardLink href={postHref(p.slug, collection.slug)}>{p.title}</CardLink></h3>
+              <h3 class="post-title">
+                <CardLink href={postHref(p.slug, collection.slug)}>{p.title}</CardLink>
+              </h3>
               {p.summary && <p class="post-summary">{p.summary}</p>}
               <div class="post-meta">
                 <span class="post-tag">{collection.title}</span>
@@ -82,7 +84,9 @@ const t = classicT(ctx.locale);
           ))}
         </div>
       ) : (
-        <p class="section-lead reveal in" style="text-align:center;">此集尚空，静候主人落笔。</p>
+        <p class="section-lead reveal in" style="text-align:center;">
+          此集尚空，静候主人落笔。
+        </p>
       )
     }
     <Pagination current={page} totalPages={totalPages} base={`/collections/${collection.slug}/`} query="" />

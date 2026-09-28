@@ -35,7 +35,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   let body: { slug?: unknown; title?: unknown; content_md?: unknown; published?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   const slug = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '';
   const title = typeof body.title === 'string' ? body.title.trim() : '';

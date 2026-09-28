@@ -12,12 +12,7 @@
 
 import { Table, TableView } from '@tiptap/extension-table';
 import { mergeAttributes } from '@tiptap/core';
-import {
-  bordersFromSpec,
-  serializeTableBorders,
-  tableBordersFromClass,
-  tableBorderClasses,
-} from './table-borders.ts';
+import { bordersFromSpec, serializeTableBorders, tableBordersFromClass, tableBorderClasses } from './table-borders.ts';
 
 /** 所有由框线配置产生的类名（更新时先清掉再加，避免残留） */
 const BORDER_CLASS_RE = /^bd-(reset|top|bottom|left|right|innerH|innerV)$/;
@@ -33,7 +28,12 @@ function applyBorderClasses(table: HTMLTableElement, spec: unknown): void {
  * 导致编辑器里的预览不跟手；这里重写 update，把 bd-* 类同步上去。
  */
 class BorderedTableView extends TableView {
-  constructor(node: Parameters<TableView['update']>[0], cellMinWidth: number, view: never, HTMLAttributes: Record<string, unknown>) {
+  constructor(
+    node: Parameters<TableView['update']>[0],
+    cellMinWidth: number,
+    view: never,
+    HTMLAttributes: Record<string, unknown>,
+  ) {
     super(node, cellMinWidth, view, HTMLAttributes);
     applyBorderClasses(this.table, node.attrs.borders);
   }

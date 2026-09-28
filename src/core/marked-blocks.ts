@@ -64,7 +64,10 @@ export function parseTableBorders(attrs: string | undefined): TableBorder[] {
     const lower = rawValue.toLowerCase();
     if (lower in BORDER_PRESETS) return [...BORDER_PRESETS[lower]];
     const picked = new Set<TableBorder>();
-    for (const tok of rawValue.split(/[|,]/).map((s) => s.trim()).filter(Boolean)) {
+    for (const tok of rawValue
+      .split(/[|,]/)
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       const canon = BORDER_BY_LOWER.get(tok.toLowerCase());
       if (canon) picked.add(canon);
     }
@@ -103,7 +106,8 @@ export function tableBorderClasses(borders: readonly TableBorder[]): string[] {
 }
 
 // 对齐段落的原始 HTML：`<p style="text-align:center">…</p>`（标题同理）
-const ALIGNED_BLOCK_RE = /<(p|h[1-6])(\s[^>]*\bstyle="[^"]*text-align\s*:\s*(?:left|center|right)[^"]*"[^>]*)>([\s\S]*?)<\/\1>/gi;
+const ALIGNED_BLOCK_RE =
+  /<(p|h[1-6])(\s[^>]*\bstyle="[^"]*text-align\s*:\s*(?:left|center|right)[^"]*"[^>]*)>([\s\S]*?)<\/\1>/gi;
 
 /**
  * 对齐段落是以原始 HTML 块存储的，而 Markdown 规范不会解析 HTML 块内部的 Markdown，
@@ -159,7 +163,10 @@ export const prBlockExtension = {
     const idx = src.search(/^:::/m);
     return idx === -1 ? undefined : idx;
   },
-  tokenizer(this: { lexer: { blockTokens: (src: string, tokens: Tokens.Generic[]) => Tokens.Generic[] } }, src: string) {
+  tokenizer(
+    this: { lexer: { blockTokens: (src: string, tokens: Tokens.Generic[]) => Tokens.Generic[] } },
+    src: string,
+  ) {
     const open = BLOCK_OPEN_RE.exec(src);
     if (!open) return undefined;
     const name = open[1].toLowerCase();

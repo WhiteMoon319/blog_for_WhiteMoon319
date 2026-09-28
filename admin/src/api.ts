@@ -6,7 +6,16 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { AuthorOption, Collection, CollectionWriteView, MediaFile, Post, PostVersion, PostWritePayload, Tag } from './types';
+import type {
+  AuthorOption,
+  Collection,
+  CollectionWriteView,
+  MediaFile,
+  Post,
+  PostVersion,
+  PostWritePayload,
+  Tag,
+} from './types';
 
 export interface CorpusStats {
   total_chars: number;
@@ -43,7 +52,11 @@ export const api = {
   me: () => request<{ authenticated: boolean; sub?: string }>('/api/auth/me'),
 
   login: (password: string, username = 'admin') =>
-    request<{ ok: boolean; role?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }, true),
+    request<{ ok: boolean; role?: string }>(
+      '/api/auth/login',
+      { method: 'POST', body: JSON.stringify({ username, password }) },
+      true,
+    ),
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
@@ -57,8 +70,7 @@ export const api = {
 
   tags: () => request<{ tags: Tag[] }>('/api/tags'),
 
-  collection: (id: number) =>
-    request<{ collection: Collection; tags: Tag[] }>(`/api/collections/${id}`),
+  collection: (id: number) => request<{ collection: Collection; tags: Tag[] }>(`/api/collections/${id}`),
 
   createCollection: (data: Partial<Collection>) =>
     request<{ collection: Collection }>('/api/collections', {
@@ -72,8 +84,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  deleteCollection: (id: number) =>
-    request<{ ok: boolean }>(`/api/collections/${id}`, { method: 'DELETE' }),
+  deleteCollection: (id: number) => request<{ ok: boolean }>(`/api/collections/${id}`, { method: 'DELETE' }),
 
   posts: (query = '') => request<{ posts: Post[] }>(`/api/posts?status=all${query}`),
 
@@ -86,28 +97,33 @@ export const api = {
     }),
 
   updatePost: (id: number, data: PostWritePayload) =>
-    request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
   deletePost: (id: number) => request<{ ok: boolean }>(`/api/posts/${id}`, { method: 'DELETE' }),
 
-  batchPosts: (payload:
-    | {
-        action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'pin' | 'unpin';
-        ids: number[];
-        collection_id?: number | null;
-      }
-    | {
-        action: 'create';
-        collection_id?: number | null;
-        posts: Array<{
-          title: string;
-          slug?: string;
-          summary?: string;
-          content_md?: string;
+  batchPosts: (
+    payload:
+      | {
+          action: 'publish' | 'draft' | 'delete' | 'trash' | 'restore' | 'purge' | 'move' | 'pin' | 'unpin';
+          ids: number[];
           collection_id?: number | null;
-          status?: 'draft' | 'published';
-        }>;
-      }) =>
+        }
+      | {
+          action: 'create';
+          collection_id?: number | null;
+          posts: Array<{
+            title: string;
+            slug?: string;
+            summary?: string;
+            content_md?: string;
+            collection_id?: number | null;
+            status?: 'draft' | 'published';
+          }>;
+        },
+  ) =>
     request<{ ok: boolean; count?: number; results?: Array<{ ok: boolean; error?: string; post?: Post }> }>(
       '/api/posts/batch',
       {
@@ -160,14 +176,21 @@ export const api = {
     }),
 
   pages: (all = false) =>
-    request<{ pages: Array<{ id: number; slug: string; title: string; content_md: string; published: number; updated_at: string }> }>(
-      `/api/pages${all ? '?all=1' : ''}`,
-    ),
+    request<{
+      pages: Array<{
+        id: number;
+        slug: string;
+        title: string;
+        content_md: string;
+        published: number;
+        updated_at: string;
+      }>;
+    }>(`/api/pages${all ? '?all=1' : ''}`),
 
   page: (id: number) =>
-    request<{ page: { id: number; slug: string; title: string; content_md: string; published: number; updated_at: string } }>(
-      `/api/pages/${id}`,
-    ),
+    request<{
+      page: { id: number; slug: string; title: string; content_md: string; published: number; updated_at: string };
+    }>(`/api/pages/${id}`),
 
   createPage: (data: { slug: string; title: string; content_md?: string; published?: number }) =>
     request<{ page: { id: number } }>('/api/pages', { method: 'POST', body: JSON.stringify(data) }),
@@ -175,8 +198,7 @@ export const api = {
   updatePage: (id: number, data: { slug?: string; title?: string; content_md?: string; published?: number }) =>
     request<{ page: { id: number } }>(`/api/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
-  deletePage: (id: number) =>
-    request<{ ok: boolean }>(`/api/pages/${id}`, { method: 'DELETE' }),
+  deletePage: (id: number) => request<{ ok: boolean }>(`/api/pages/${id}`, { method: 'DELETE' }),
 
   stats: (days = 30, collection?: number | 'none') =>
     request<{
@@ -189,9 +211,7 @@ export const api = {
       corpus: CorpusStats;
     }>(`/api/stats?days=${days}${collection !== undefined ? `&collection=${collection}` : ''}`),
   statsCorpus: (collection?: number | 'none') =>
-    request<CorpusStats>(
-      `/api/stats/corpus${collection !== undefined ? `?collection=${collection}` : ''}`,
-    ),
+    request<CorpusStats>(`/api/stats/corpus${collection !== undefined ? `?collection=${collection}` : ''}`),
 
   aiModels: () => request<{ models: string[] }>('/api/ai/models'),
 
@@ -207,10 +227,17 @@ export const api = {
     model?: string;
     reasoning_effort?: string;
     api_key?: string;
-  }) => request<{ ok: boolean; saved?: boolean; error?: string; api_key_configured?: boolean; api_key_masked?: string | boolean }>('/api/ai/test', {
-    method: 'POST',
-    body: JSON.stringify(config),
-  }),
+  }) =>
+    request<{
+      ok: boolean;
+      saved?: boolean;
+      error?: string;
+      api_key_configured?: boolean;
+      api_key_masked?: string | boolean;
+    }>('/api/ai/test', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
 
   aiBatchSummary: (ids: number[], force = false) =>
     request<{ results: Array<{ id: number; status: string; error?: string }> }>('/api/ai/batch-summary', {
@@ -221,13 +248,40 @@ export const api = {
   deleteAiKey: () => request<{ ok: boolean }>('/api/settings/ai-key', { method: 'DELETE' }),
 
   // ---- 邮件配置 ----
-  emailSettings: () => request<{ configured: boolean; smtp_host?: string; smtp_port?: number; smtp_username?: string; from_email?: string }>('/api/settings/email'),
-  emailTestAndSave: (data: { smtp_host: string; smtp_port: number; smtp_username: string; smtp_password: string; from_email: string; test_email?: string }) =>
+  emailSettings: () =>
+    request<{
+      configured: boolean;
+      smtp_host?: string;
+      smtp_port?: number;
+      smtp_username?: string;
+      from_email?: string;
+    }>('/api/settings/email'),
+  emailTestAndSave: (data: {
+    smtp_host: string;
+    smtp_port: number;
+    smtp_username: string;
+    smtp_password: string;
+    from_email: string;
+    test_email?: string;
+  }) =>
     request<{ ok?: boolean; error?: string }>('/api/settings/email', { method: 'POST', body: JSON.stringify(data) }),
   emailClear: () => request<{ ok: boolean }>('/api/settings/email', { method: 'DELETE' }),
 
   // ---- 用户管理 ----
-  users: () => request<{ users: Array<{ id: number; username: string; display_name: string; email: string; role: string; status: string; bio: string; avatar_url: string; created_at: string }> }>('/api/users'),
+  users: () =>
+    request<{
+      users: Array<{
+        id: number;
+        username: string;
+        display_name: string;
+        email: string;
+        role: string;
+        status: string;
+        bio: string;
+        avatar_url: string;
+        created_at: string;
+      }>;
+    }>('/api/users'),
   userBan: (id: number) => request<{ ok: boolean }>(`/api/users/${id}/ban`, { method: 'POST' }),
   userRole: (id: number, role: 'reader' | 'author') =>
     request<{ ok: boolean; id: number; role: string }>(`/api/users/${id}/role`, {
@@ -250,7 +304,14 @@ export const api = {
   collectionMembers: (id: number) =>
     request<{
       members: Array<{ user_id: number; username: string; display_name: string; created_at: string }>;
-      invites: Array<{ id: number; user_id: number; username: string; display_name: string; message: string; created_at: string }>;
+      invites: Array<{
+        id: number;
+        user_id: number;
+        username: string;
+        display_name: string;
+        message: string;
+        created_at: string;
+      }>;
     }>(`/api/collections/${id}/members`),
   collectionAddMember: (id: number, userId: number) =>
     request<{ ok: boolean; user_id: number }>(`/api/collections/${id}/members`, {
@@ -274,12 +335,25 @@ export const api = {
   adminComments: (status = 'pending', page = 1, postId?: number) => {
     let url = `/api/admin/comments?status=${status}&page=${page}`;
     if (postId) url += `&post_id=${postId}`;
-    return request<{ comments: Array<{ id: number; post_id: number; body: string; attachments: string; status: string; created_at: string; username: string; display_name: string; post_title: string }>; total: number; page: number }>(url);
+    return request<{
+      comments: Array<{
+        id: number;
+        post_id: number;
+        body: string;
+        attachments: string;
+        status: string;
+        created_at: string;
+        username: string;
+        display_name: string;
+        post_title: string;
+      }>;
+      total: number;
+      page: number;
+    }>(url);
   },
   adminCommentUpdate: (id: number, status: 'approved' | 'rejected') =>
     request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
-  adminCommentDelete: (id: number) =>
-    request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'DELETE' }),
+  adminCommentDelete: (id: number) => request<{ ok: boolean }>(`/api/admin/comments/${id}`, { method: 'DELETE' }),
 };
 
 // 带下载语义的受保护导出：以 blob 形式拉取并触发浏览器下载，401 时照常跳登录。

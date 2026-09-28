@@ -29,7 +29,9 @@ function fromB64url(s: string): Uint8Array {
 }
 
 async function hmacSign(secret: string, data: string): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+  ]);
   return new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(data)));
 }
 
@@ -45,7 +47,11 @@ export function json(data: unknown, status = 200): Response {
 }
 
 export async function signToken(secret: string, sub: string, sessionVersion: number): Promise<string> {
-  const payload = b64url(encoder.encode(JSON.stringify({ sub, ver: sessionVersion, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS })));
+  const payload = b64url(
+    encoder.encode(
+      JSON.stringify({ sub, ver: sessionVersion, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS }),
+    ),
+  );
   const sig = b64url(await hmacSign(secret, payload));
   return `${payload}.${sig}`;
 }
@@ -60,7 +66,9 @@ export async function verifyToken(secret: string, token: string, sessionVersion:
     if (typeof parsed.exp !== 'number' || parsed.exp < Math.floor(Date.now() / 1000)) return null;
     if (typeof parsed.ver !== 'number' || parsed.ver !== sessionVersion) return null;
     return parsed;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -83,7 +91,9 @@ export async function verifyTokenShape(secret: string | undefined, token: string
     if (typeof parsed.exp !== 'number' || parsed.exp < Math.floor(Date.now() / 1000)) return null;
     if (typeof parsed.sub !== 'string' || typeof parsed.ver !== 'number') return null;
     return parsed;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export async function setSessionCookie(ctx: APIContext, sub: string, sessionVersion: number): Promise<void> {
@@ -92,7 +102,11 @@ export async function setSessionCookie(ctx: APIContext, sub: string, sessionVers
   // Secure 判定不能只看 ctx.url.protocol：Cloudflare 边缘终结 TLS 时协议可能落在 x-forwarded-proto
   const secure = isHttpsRequest(ctx.url.protocol, ctx.request.headers.get('x-forwarded-proto'));
   ctx.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: TOKEN_TTL_SECONDS,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge: TOKEN_TTL_SECONDS,
   });
 }
 
@@ -110,7 +124,11 @@ async function loadSessionUser(ctx: APIContext): Promise<{ session: Session; use
   const [payload] = token.split('.');
   if (!payload) return null;
   let parsed: Session;
-  try { parsed = JSON.parse(new TextDecoder().decode(fromB64url(payload))); } catch { return null; }
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(fromB64url(payload)));
+  } catch {
+    return null;
+  }
   const m = parsed.sub?.match(/^user:(\d+)$/);
   if (!m) return null;
   const user = await getUserById(env.DB, Number(m[1]));

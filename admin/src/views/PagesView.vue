@@ -1,6 +1,7 @@
 <!-- 月下独酌 · blog（blog_for_WhiteMoon319） -->
 <!-- Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319 -->
-﻿<script setup lang="ts">
+﻿
+<script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { api } from '../api';
 import PageHead from '../components/PageHead.vue';
@@ -35,7 +36,9 @@ async function load() {
     loaded.value = true;
   }
 }
-onMounted(() => { load(); });
+onMounted(() => {
+  load();
+});
 
 function openNew() {
   editId.value = null;
@@ -61,8 +64,14 @@ function cancel() {
 }
 
 async function save() {
-  if (!form.value.title.trim()) { emit('notify', '标题不可为空', true); return; }
-  if (!form.value.slug.trim()) { emit('notify', 'slug 不可为空', true); return; }
+  if (!form.value.title.trim()) {
+    emit('notify', '标题不可为空', true);
+    return;
+  }
+  if (!form.value.slug.trim()) {
+    emit('notify', 'slug 不可为空', true);
+    return;
+  }
   saving.value = true;
   try {
     if (editId.value) {
@@ -97,7 +106,8 @@ function openPage(slug: string): void {
   window.open(`/pages/${slug}`, '_blank', 'noopener');
 }
 
-async function deleteOne(id: number) {  if (!confirm('确认删除此页面？不可恢复。')) return;
+async function deleteOne(id: number) {
+  if (!confirm('确认删除此页面？不可恢复。')) return;
   try {
     await api.deletePage(id);
     emit('notify', '已删除');
@@ -147,9 +157,7 @@ async function deleteOne(id: number) {  if (!confirm('确认删除此页面？�
                 <RowActions
                   :primary="{ label: '编辑', run: () => openEdit(p.id) }"
                   :items="[
-                    ...(p.published
-                      ? [{ label: '查看页面', run: () => openPage(p.slug) }]
-                      : []),
+                    ...(p.published ? [{ label: '查看页面', run: () => openPage(p.slug) }] : []),
                     { label: p.published ? '下线' : '发布', run: () => togglePublish(p) },
                     { label: '删除页面', danger: true, run: () => deleteOne(p.id) },
                   ]"

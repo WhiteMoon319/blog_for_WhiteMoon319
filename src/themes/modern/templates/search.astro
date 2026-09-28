@@ -84,7 +84,9 @@ const t = modernT(ctx.locale);
                       {a.avatarUrl ? (
                         <img class="author-hit-avatar" src={a.avatarUrl} alt={a.name} loading="lazy" />
                       ) : (
-                        <span class="author-hit-avatar is-initial" aria-hidden="true">{a.name.slice(0, 1)}</span>
+                        <span class="author-hit-avatar is-initial" aria-hidden="true">
+                          {a.name.slice(0, 1)}
+                        </span>
                       )}
                       <span class="author-hit-body">
                         <span class="author-hit-name">{a.name}</span>
@@ -100,7 +102,9 @@ const t = modernT(ctx.locale);
               <div class="posts-grid" style="margin-top:32px;">
                 {results.map(({ post, collection }) => (
                   <div class="post-card reveal" style={`--cc: ${collection?.theme_color ?? '#2563eb'};`}>
-                    <h3 class="post-title"><CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink></h3>
+                    <h3 class="post-title">
+                      <CardLink href={postHref(post.slug, collection?.slug)}>{post.title}</CardLink>
+                    </h3>
                     {post.summary && <p class="post-summary">{post.summary}</p>}
                     <div class="post-meta">
                       {collection && <span class="post-tag">{collection.title}</span>}
@@ -111,14 +115,20 @@ const t = modernT(ctx.locale);
                 ))}
               </div>
             ) : (
-              <p class="section-lead" style="text-align:center;">{t('search.no_results', { q })}</p>
+              <p class="section-lead" style="text-align:center;">
+                {t('search.no_results', { q })}
+              </p>
             )}
           </>
         ) : (
-          <p class="section-lead" style="text-align:center;">{t('search.no_results', { q })}</p>
+          <p class="section-lead" style="text-align:center;">
+            {t('search.no_results', { q })}
+          </p>
         )
       ) : (
-        <p class="section-lead" style="text-align:center;">{t('search.empty_prompt')}</p>
+        <p class="section-lead" style="text-align:center;">
+          {t('search.empty_prompt')}
+        </p>
       )
     }
   </section>
@@ -142,7 +152,9 @@ const t = modernT(ctx.locale);
     border: 1px solid var(--hairline);
     border-radius: var(--radius-md);
     outline: none;
-    transition: border-color var(--transition), box-shadow var(--transition);
+    transition:
+      border-color var(--transition),
+      box-shadow var(--transition);
   }
   .search-input:focus {
     border-color: var(--cinnabar);
@@ -178,7 +190,9 @@ const t = modernT(ctx.locale);
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
-    transition: border-color var(--transition), transform var(--transition);
+    transition:
+      border-color var(--transition),
+      transform var(--transition);
   }
   .author-hit:hover {
     border-color: var(--cinnabar);

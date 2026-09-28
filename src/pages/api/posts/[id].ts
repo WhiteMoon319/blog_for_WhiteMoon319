@@ -7,7 +7,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, getPostById, getLatestPostVersion, updatePostWithTags, listPostAuthors, filterSignableAuthorIds, getPostAuthorIds, trashPosts, listPostOwnTags, isSlugConflict, parseTagsStrict } from '../../../lib/db';
+import {
+  envOf,
+  getPostById,
+  getLatestPostVersion,
+  updatePostWithTags,
+  listPostAuthors,
+  filterSignableAuthorIds,
+  getPostAuthorIds,
+  trashPosts,
+  listPostOwnTags,
+  isSlugConflict,
+  parseTagsStrict,
+} from '../../../lib/db';
 import { resolveUser, json, checkCsrf } from '../../../lib/auth';
 import { canManagePost, requirePostAccess } from '../../../lib/api/post-access.ts';
 import { collectionWriteDenied } from '../../../lib/api/collection-access.ts';
@@ -61,9 +73,7 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   }
   if ('collection_id' in body) {
     patch.collection_id =
-      typeof body.collection_id === 'number' && Number.isInteger(body.collection_id)
-        ? body.collection_id
-        : null;
+      typeof body.collection_id === 'number' && Number.isInteger(body.collection_id) ? body.collection_id : null;
   }
   if (typeof body.summary === 'string') patch.summary = body.summary;
   if (typeof body.content_md === 'string') patch.content_md = body.content_md;

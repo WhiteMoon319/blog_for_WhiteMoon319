@@ -38,15 +38,26 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!checkCsrf(ctx, env.SITE_URL)) return json({ error: 'forbidden' }, 403);
   if (!env.AI_SETTINGS_ENCRYPTION_KEY) return json({ error: 'encryption_key_not_configured' }, 500);
 
-  let body: { smtp_host?: unknown; smtp_port?: unknown; smtp_username?: unknown; smtp_password?: unknown; from_email?: unknown; test_email?: unknown };
-  try { body = await ctx.request.json(); } catch { return json({ error: 'bad request' }, 400); }
+  let body: {
+    smtp_host?: unknown;
+    smtp_port?: unknown;
+    smtp_username?: unknown;
+    smtp_password?: unknown;
+    from_email?: unknown;
+    test_email?: unknown;
+  };
+  try {
+    body = await ctx.request.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
 
   const host = typeof body.smtp_host === 'string' ? body.smtp_host.trim() : '';
   const port = Number(body.smtp_port) || 465;
   const username = typeof body.smtp_username === 'string' ? body.smtp_username.trim() : '';
   const password = typeof body.smtp_password === 'string' ? body.smtp_password.trim() : '';
   const fromEmail = typeof body.from_email === 'string' ? body.from_email.trim() : '';
-  const testEmail = (typeof body.test_email === 'string' && body.test_email.trim()) ? body.test_email.trim() : fromEmail;
+  const testEmail = typeof body.test_email === 'string' && body.test_email.trim() ? body.test_email.trim() : fromEmail;
 
   if (!host) return json({ error: 'SMTP 服务器必填' }, 400);
   if (!username || !password) return json({ error: '用户名与授权码必填' }, 400);
@@ -68,7 +79,13 @@ export async function POST(ctx: APIContext): Promise<Response> {
   } catch {
     return json({ error: '加密失败' }, 500);
   }
-  await saveEmailCredential(env.DB, { smtp_host: host, smtp_port: port, smtp_username: username, ciphertext, from_email: fromEmail });
+  await saveEmailCredential(env.DB, {
+    smtp_host: host,
+    smtp_port: port,
+    smtp_username: username,
+    ciphertext,
+    from_email: fromEmail,
+  });
 
   return json({ ok: true, configured: true });
 }

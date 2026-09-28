@@ -28,7 +28,16 @@ const FAVICON =
 <!doctype html>
 <html lang={ctx.locale}>
   <head>
-    <SiteHead ctx={ctx} title={title} description={description} keywords={keywords} noindex={noindex} image={image} faviconHref={FAVICON} rssTitle={t('rss.title')} />
+    <SiteHead
+      ctx={ctx}
+      title={title}
+      description={description}
+      keywords={keywords}
+      noindex={noindex}
+      image={image}
+      faviconHref={FAVICON}
+      rssTitle={t('rss.title')}
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -46,7 +55,13 @@ const FAVICON =
           <span class="site-logo-text">{ctx.siteName}</span>
         </a>
 
-        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label={t('a11y.open_menu')}>
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="navLinks"
+          aria-label={t('a11y.open_menu')}
+        >
           <span></span><span></span><span></span>
         </button>
 
@@ -54,7 +69,15 @@ const FAVICON =
           {
             ctx.nav.map((l) => (
               <li>
-                <a class="nav-link" href={l.href} aria-current={Astro.url.pathname === l.href || (l.href !== '/' && Astro.url.pathname.startsWith(l.href)) ? 'page' : undefined}>
+                <a
+                  class="nav-link"
+                  href={l.href}
+                  aria-current={
+                    Astro.url.pathname === l.href || (l.href !== '/' && Astro.url.pathname.startsWith(l.href))
+                      ? 'page'
+                      : undefined
+                  }
+                >
                   {t(`nav.${l.key}`)}
                 </a>
               </li>
@@ -63,7 +86,13 @@ const FAVICON =
         </ul>
 
         <form class="nav-search" action="/search/" method="get" role="search">
-          <input class="nav-search-input" type="search" name="q" placeholder={ctx.searchPlaceholder || `${t('nav.search')}……`} aria-label={t('a11y.site_search')} />
+          <input
+            class="nav-search-input"
+            type="search"
+            name="q"
+            placeholder={ctx.searchPlaceholder || `${t('nav.search')}……`}
+            aria-label={t('a11y.site_search')}
+          />
         </form>
       </div>
     </nav>
@@ -79,25 +108,54 @@ const FAVICON =
       <h3>{ctx.siteName}</h3>
       <p>© {new Date().getFullYear()} · {ctx.footerLine}</p>
       <p class="footer-user">
-        {ctx.user.loggedIn ? (
-          <>
-            <a href="/account/" class="footer-src">@{ctx.user.name}</a>
-            {ctx.user.writeHref && <a href={ctx.user.writeHref} class="footer-src">{t('footer.write')}</a>}
-            {ctx.user.isAdmin && <a href="/admin/" class="footer-src">{t('footer.admin')}</a>}
-            <a href="/logout/" class="footer-src">{t('footer.logout')}</a>
-          </>
-        ) : (
-          <a href="/login/" class="footer-src">{t('footer.login')}</a>
-        )}
+        {
+          ctx.user.loggedIn ? (
+            <>
+              <a href="/account/" class="footer-src">
+                @{ctx.user.name}
+              </a>
+              {ctx.user.writeHref && (
+                <a href={ctx.user.writeHref} class="footer-src">
+                  {t('footer.write')}
+                </a>
+              )}
+              {ctx.user.isAdmin && (
+                <a href="/admin/" class="footer-src">
+                  {t('footer.admin')}
+                </a>
+              )}
+              <a href="/logout/" class="footer-src">
+                {t('footer.logout')}
+              </a>
+            </>
+          ) : (
+            <a href="/login/" class="footer-src">
+              {t('footer.login')}
+            </a>
+          )
+        }
       </p>
       <p class="footer-license">
         本站由
-        <a href="https://github.com/WhiteMoon319/blog_for_WhiteMoon319" target="_blank" rel="noopener" class="footer-src" aria-label="本站源代码（GitHub）">
-          <svg class="footer-github" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <a
+          href="https://github.com/WhiteMoon319/blog_for_WhiteMoon319"
+          target="_blank"
+          rel="noopener"
+          class="footer-src"
+          aria-label="本站源代码（GitHub）"
+        >
+          <svg class="footer-github" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"
+            ><path
+              fill="currentColor"
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+            ></path></svg
+          >
           开源软件
         </a>
         ·
-        <a href="https://www.gnu.org/licenses/agpl-3.0.zh-cn.html" target="_blank" rel="noopener" class="footer-src">AGPL-3.0</a>
+        <a href="https://www.gnu.org/licenses/agpl-3.0.zh-cn.html" target="_blank" rel="noopener" class="footer-src"
+          >AGPL-3.0</a
+        >
       </p>
     </footer>
 

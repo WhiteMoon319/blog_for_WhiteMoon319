@@ -12,11 +12,14 @@ const env = await envOf();
 const selected = Astro.url.searchParams.getAll('t').filter(Boolean);
 const keyword = Astro.url.searchParams.get('q') ?? '';
 const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
-import { getSiteContext } from "../../lib/theme-context";
+import { getSiteContext } from '../../lib/theme-context';
 const siteCtx = await getSiteContext(Astro);
 const union = await getTagsUnion(env.DB, selected, keyword);
 // 列表卡署名：标签页结果一次性取回
-const authorsByPost = await badgesByPostId(env.DB, union.posts.map((p) => p.id));
+const authorsByPost = await badgesByPostId(
+  env.DB,
+  union.posts.map((p) => p.id),
+);
 ---
 
 <TagIndexTemplate

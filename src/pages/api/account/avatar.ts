@@ -36,7 +36,8 @@ export async function POST(ctx: APIContext): Promise<Response> {
   if (!detected) return json({ error: '仅支持 png/jpeg/webp/gif 图片' }, 400);
   if (detected === 'image/gif' && buf.length > 500 * 1024) return json({ error: 'GIF 头像请小于 500KB' }, 400);
 
-  const ext = detected === 'image/png' ? 'png' : detected === 'image/jpeg' ? 'jpg' : detected === 'image/webp' ? 'webp' : 'gif';
+  const ext =
+    detected === 'image/png' ? 'png' : detected === 'image/jpeg' ? 'jpg' : detected === 'image/webp' ? 'webp' : 'gif';
   const key = `avatar/${auth.user.id}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   await env.IMAGES.put(key, buf, { httpMetadata: { contentType: detected } });
   const url = `${publicBase(env.R2_PUBLIC_URL)}/${key}`;

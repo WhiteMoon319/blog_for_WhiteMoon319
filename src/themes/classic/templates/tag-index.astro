@@ -62,7 +62,11 @@ function toggleHref(name: string): string {
       <p class="character-kicker">标 引</p>
       <h1>标签</h1>
       <p class="lead">
-        {selected.length > 0 ? `已选 ${selected.join(' · ')}${keyword ? `，寻「${keyword}」` : ''}` : '按题材寻览，一标即得。'}
+        {
+          selected.length > 0
+            ? `已选 ${selected.join(' · ')}${keyword ? `，寻「${keyword}」` : ''}`
+            : '按题材寻览，一标即得。'
+        }
       </p>
     </div>
   </div>
@@ -72,12 +76,11 @@ function toggleHref(name: string): string {
       tags.length > 0 && (
         <div class="tag-cloud">
           {tags.map((t) => (
-            <a
-              class={`tag-chip${selected.includes(t.name) ? ' is-active' : ''}`}
-              href={toggleHref(t.name)}
-            >
+            <a class={`tag-chip${selected.includes(t.name) ? ' is-active' : ''}`} href={toggleHref(t.name)}>
               {t.name}
-              <span class="tag-count">文集 {t.collections} · 文章 {t.posts}</span>
+              <span class="tag-count">
+                文集 {t.collections} · 文章 {t.posts}
+              </span>
             </a>
           ))}
         </div>
@@ -98,13 +101,22 @@ function toggleHref(name: string): string {
             placeholder={`在所选标签内寻章……`}
             aria-label="标签内搜索"
           />
-          <button class="btn btn-ghost" type="submit">寻</button>
+          <button class="btn btn-ghost" type="submit">
+            寻
+          </button>
         </form>
       )
     }
 
     <div style="margin-top:36px;">
-      <TagResults names={selected} keyword={keyword} collections={collections} posts={posts} collectionPosts={collectionPosts} authorsByPost={authorsByPost} />
+      <TagResults
+        names={selected}
+        keyword={keyword}
+        collections={collections}
+        posts={posts}
+        collectionPosts={collectionPosts}
+        authorsByPost={authorsByPost}
+      />
     </div>
   </section>
 </BaseLayout>
@@ -127,7 +139,9 @@ function toggleHref(name: string): string {
     border: 1px solid var(--hairline);
     border-radius: var(--radius-md);
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
   .tag-search-input:focus {
     border-color: var(--cinnabar);

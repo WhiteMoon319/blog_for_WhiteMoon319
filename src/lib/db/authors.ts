@@ -86,7 +86,9 @@ export function setPostAuthorsStmts(db: D1Database, postId: number, userIds: num
   const unique = [...new Set(userIds.filter((n) => Number.isInteger(n) && n > 0))];
   const stmts: D1PreparedStatement[] = [db.prepare('DELETE FROM post_authors WHERE post_id = ?').bind(postId)];
   unique.forEach((userId, idx) => {
-    stmts.push(db.prepare('INSERT INTO post_authors (post_id, user_id, sort_order) VALUES (?, ?, ?)').bind(postId, userId, idx));
+    stmts.push(
+      db.prepare('INSERT INTO post_authors (post_id, user_id, sort_order) VALUES (?, ?, ?)').bind(postId, userId, idx),
+    );
   });
   return stmts;
 }
@@ -153,7 +155,10 @@ export async function searchAuthors(db: D1Database, q: string, limit = 20): Prom
   return rows.results ?? [];
 }
 
-/** 作者名下已发布文章数（归属人或署名者皆计入） */export async function countPublishedPostsByAuthor(db: D1Database, userId: number): Promise<number> {
+/** 作者名下已发布文章数（归属人或署名者皆计入） */ export async function countPublishedPostsByAuthor(
+  db: D1Database,
+  userId: number,
+): Promise<number> {
   const row = await db
     .prepare(`SELECT COUNT(*) AS n FROM posts p WHERE ${AUTHOR_POST_SCOPE}`)
     .bind(...authorPostArgs(userId))
@@ -177,7 +182,11 @@ export async function listPublishedPostsByAuthor(
       args.push(opts.offset);
     }
   }
-  return db.prepare(sql).bind(...args).all<PostRow>().then((r) => r.results ?? []);
+  return db
+    .prepare(sql)
+    .bind(...args)
+    .all<PostRow>()
+    .then((r) => r.results ?? []);
 }
 
 /** 文集归属作者字段（含封禁状态：前台据此把封禁作者的署名降级为纯文本） */

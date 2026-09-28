@@ -8,7 +8,9 @@ defineEmits<{ clear: [] }>();
 
 <template>
   <div v-if="count > 0" class="batch-bar">
-    <span class="batch-count">已选 <b>{{ count }}</b> 项</span>
+    <span class="batch-count"
+      >已选 <b>{{ count }}</b> 项</span
+    >
     <button type="button" class="batch-clear" @click="$emit('clear')">取消选择</button>
     <span class="batch-spacer"></span>
     <slot />

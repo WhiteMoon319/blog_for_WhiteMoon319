@@ -54,7 +54,8 @@ test('后台默认入口：工作台整合了数据页，旧路径保留重定�
   assert.match(dash, /StatsPanels/, '工作台应内嵌阅读数据面板');
 });
 
-test('导入视图：拖入文件与选择文件共用同一条解析入口', () => {  const src = readFileSync(resolve('admin/src/views/ImportView.vue'), 'utf8');
+test('导入视图：拖入文件与选择文件共用同一条解析入口', () => {
+  const src = readFileSync(resolve('admin/src/views/ImportView.vue'), 'utf8');
   assert.match(src, /@drop="onDrop"/, '拖拽区必须处理 drop');
   assert.match(src, /@dragover="onDragOver"/, '必须处理 dragover 才能接收放下');
   assert.match(src, /async function addFiles\(/, '解析入口必须是共用的 addFiles');
@@ -65,7 +66,7 @@ test('导入视图：拖入文件与选择文件共用同一条解析入口', ()
 
 test('站点布局：字体样式表为普通 link（无被 CSP 拦截的内联 onload）', () => {
   const src = readFileSync(resolve('src/themes/classic/layouts/BaseLayout.astro'), 'utf8');
-  assert.ok(src.includes("https://fonts.googleapis.com/css2?"), '应保留 Google Fonts 样式表');
+  assert.ok(src.includes('https://fonts.googleapis.com/css2?'), '应保留 Google Fonts 样式表');
   assert.ok(!src.includes('onload='), '不得再使用内联 onload（CSP script-src 拦截）');
   assert.ok(!src.includes('media="print"'), '不得残留 print 媒体占位');
   const head = readFileSync(resolve('src/core/SiteHead.astro'), 'utf8');
@@ -129,7 +130,15 @@ test('后台样式治理：模板里不再写内联样式（间距/排布走工�
 
 test('后台样式治理：工具类层存在（内联样式收敛的落点）', () => {
   const css = readFileSync(resolve('admin/src/assets/admin.css'), 'utf8');
-  for (const cls of ['.row {', '.row-wrap {', '.card-actions {', '.section-title {', '.ta-right {', '.text-muted {', '.state-block {']) {
+  for (const cls of [
+    '.row {',
+    '.row-wrap {',
+    '.card-actions {',
+    '.section-title {',
+    '.ta-right {',
+    '.text-muted {',
+    '.state-block {',
+  ]) {
     assert.ok(css.includes(cls), `admin.css 缺少工具类 ${cls}`);
   }
   // 深色模式下工具类也必须可跟随：除「朱砂底上的白字」外不得写死色值

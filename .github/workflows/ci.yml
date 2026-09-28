@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   verify:
-    name: 校验（typecheck / build / test）
+    name: verify: typecheck / build / test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

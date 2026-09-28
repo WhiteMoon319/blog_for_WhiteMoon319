@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    name: 构建 dist
+    name: build dist
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
           if-no-files-found: error
 
   pack:
-    name: 打包 ${{ matrix.platform }}
+    name: pack ${{ matrix.platform }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -107,7 +107,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: 发布 Release
+    name: publish release
     needs: pack
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest

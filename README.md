@@ -102,7 +102,8 @@ worker/                   worker.ts 自定义 Worker 入口（包装 Astro 入�
 setup.bat / setup.sh      一键部署向导入口（优先用包内 runtime/，否则检查/安装 Node + pnpm）
 deploy.bat / deploy.sh    日常更新入口（构建 → 迁移 → 部署，自带环境包会自动接入 runtime/）
 cliff.toml                git-cliff 的 changelog 配置（发布流程用）
-.github/workflows/        CI：release.yml 打 tag 时构建并发布两种发布包
+.github/workflows/        ci.yml（push / PR：格式检查 → typecheck → 构建 → 测试）、
+                          release.yml（打 v* tag：打包 5 个平台产物并发布 Release）
 wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
 r2-cors.json              R2 桶的 CORS 策略（字体/媒体跨域取用，wrangler r2 bucket cors set 用）
 .env.example              真实资源 ID 的填法示例
@@ -352,7 +353,14 @@ node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrenc
 pnpm run build          # cf-config → vendor css → admin 构建 → astro build → 合并 → worker 包装
 pnpm run typecheck      # astro check + vue-tsc + tsc（含 worker/tests）
 pnpm test               # 单测 + e2e（需先 pnpm run build）
+pnpm run format         # prettier 全量格式化（singleQuote + printWidth 120）
+pnpm run format:check   # CI 用这条卡格式，提交前先跑
 ```
+
+两点注意：
+
+- **e2e 有 dist 新鲜度门禁**：`pnpm test` 会比对 `dist` 与源码时间戳，源码一改就得重新 `pnpm run build` 再跑测试，否则 e2e 会整批失败（也别在 build 之后跑 `format`）。
+- **CI 用 `BLOG_THEME=classic` 构建与测试**（默认主题是 modern，本地与 CI 主题不同属正常）。
 
 ## 部署（从零开始）
 

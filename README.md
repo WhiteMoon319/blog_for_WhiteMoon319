@@ -284,6 +284,7 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 | 变量 | 说明 | 获取方式 |
 | --- | --- | --- |
 | `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
+| `FONTS_BASE` | 字体切片外链前缀（可选，构建期变量） | 见「字体自托管」 |
 
 ### 绑定一览
 
@@ -295,6 +296,32 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 | vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
 | secret | `AI_SETTINGS_ENCRYPTION_KEY` | API Key 加密主密钥 |
 | cron | `*/5 * * * *` | 定时刊发到期文章 |
+
+### 字体自托管（可选）
+
+字体切片**不从 Google Fonts 拉**：`src/themes/*/styles/fonts.css` 是 879 条 `@font-face`（按 unicode-range 细切，与 Google 同粒度；CJK 必须切片，否则每页要下全量），`src` 写的是同源相对路径 `/api/files/fonts/...`，由 Worker 的 `/api/files` 路由从 R2 分发。
+
+要把这部分流量从 Worker 挪到 CDN（每页约 50 次请求），两步：
+
+```bash
+# 1. 从 fontsource 包解出细切 woff2 并生成 @font-face（tarball 自行下载，如 npmmirror）
+node scripts/fonts-prepare.mjs <fontsource-*.tgz...> --out .pai/temp/fonts-out --prefix fonts/v2
+
+# 2. 给桶配 CORS，再批量上传（Windows 上并发别超 3；失败名单写 failed.txt，可用 --from-file 补传）
+node node_modules/wrangler/bin/wrangler.js r2 bucket cors set blog-images --file r2-cors.json
+node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrency 3
+```
+
+| 变量 | 位置 | 作用 |
+| --- | --- | --- |
+| `R2_PUBLIC_URL` | Worker secret（`wrangler secret put`） | 上传媒体返回的公网前缀；空则走本站 `/api/files` 路由 |
+| `FONTS_BASE` | `.env`（**构建期**，不是 Worker 变量） | 字体切片外链前缀；空则走本站路由，设为 R2 自定义域则直取 CDN |
+
+三点必须知道：
+
+- **切片路径前缀就是缓存版本号**：R2 对象带 `Cache-Control: immutable`，会被 CF 边缘缓存一年，**重传同 key 不会让缓存失效**（实测）。要换内容或事后补 CORS，就把 `--prefix` 推一版（`fonts/v1` → `fonts/v2`），不要复用旧路径。
+- **自定义域必须配 CORS**：跨域 webfont 要求响应带 `Access-Control-Allow-Origin`，R2 自定义域默认不给，缺了浏览器会静默拦下全部字体、页面回退系统字体。策略见 `r2-cors.json`；`pnpm run deploy` 在 `FONTS_BASE` 非空时会自动预检该域（不可达或缺 CORS 就中止，可用 `pnpm run deploy -- --skip-font-check` 跳过）。
+- **`FONTS_BASE` 是构建期注入**：`astro.config.mjs` 改写 `fonts.css` 的切片前缀，并同步放宽 CSP 的 `font-src`；改完必须重新构建，且要与部署时 `.env` 里的值一致。仓库里的 `fonts.css` 始终是相对路径，不设它的 fork 不会指向别人的桶。
 
 ## 构建与测试
 

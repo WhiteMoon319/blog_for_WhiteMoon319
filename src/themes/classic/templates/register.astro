@@ -87,7 +87,7 @@ const { ctx } = Astro.props;
           display_name: fd.get('display_name'),
         }),
       });
-      const data = await res.json() as { error?: string; user_id?: number };
+      const data = await res.json() as { error?: string; user_id?: number; email_sent?: boolean };
       if (!res.ok) {
         regErr.textContent = res.status === 429 ? '尝试过于频繁，请稍后再试。' : (data.error ?? '注册失败');
         regErr.style.display = 'block';
@@ -98,6 +98,11 @@ const { ctx } = Astro.props;
       verifyEmail.textContent = email;
       verifyStage.style.display = 'block';
       registerForm.style.display = 'none';
+      // 账号已建但验证邮件没发出去：如实提示，让用户点「重新发送」而不是白等
+      if (data.email_sent === false) {
+        verifyErr.textContent = '账号已创建，但验证邮件暂时发不出去（可能是邮件服务未配置）。请稍后点「重新发送」。';
+        verifyErr.style.display = 'block';
+      }
     } catch {
       regErr.textContent = '网络错误，请重试。';
       regErr.style.display = 'block';

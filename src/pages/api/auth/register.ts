@@ -56,7 +56,11 @@ export async function POST(ctx: APIContext): Promise<Response> {
   const user = await createUser(env.DB, { username, email, password_hash: passwordHash, display_name: displayName, role: 'reader' });
   if (!user) return json({ error: '注册失败' }, 500);
 
-  // 发送验证码
+  // 验证码发送失败不再回滚账号。
+  // 原实现是失败即 DELETE FROM users：于是「SMTP 没配好」等于注册整体不可用，
+  // 而且重试会直接撞「邮箱已被注册」，用户被永久锁在门外。
+  // 现在保留账号、如实告知前端「邮件没发出去」，由注册页引导点「重新发送」。
+  let emailSent = true;
   try {
     const code = await generateVerificationCode();
     const codeHash = await hashVerificationCode(code);
@@ -67,10 +71,17 @@ export async function POST(ctx: APIContext): Promise<Response> {
 
     const mail = verificationEmail(code, '感谢注册「月下独酌」博客！');
     await sendEmail(email, mail.subject, mail.text);
-  } catch (e) {
-    await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
-    return json({ error: '注册失败，请稍后重试' }, 500);
+  } catch {
+    emailSent = false;
   }
 
-  return json({ ok: true, user_id: user.id, message: '注册成功，请查看邮箱验证码' }, 201);
+  return json(
+    {
+      ok: true,
+      user_id: user.id,
+      email_sent: emailSent,
+      message: emailSent ? '注册成功，请查看邮箱验证码' : '账号已创建，但验证邮件暂时发不出，请稍后点「重新发送」',
+    },
+    201,
+  );
 }

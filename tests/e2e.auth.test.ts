@@ -43,3 +43,34 @@ test('e2e：登录流程与限流', async () => {
   assert.equal(blocked.status, 429);
   assert.ok(blocked.headers.get('retry-after'));
 });
+
+test('e2e：注册不因验证邮件发不出去而回滚账号（P1）', async () => {
+  if (!HAS_BUILD) return;
+  // e2e 环境未配置 SMTP → sendEmail 必然失败，正好覆盖「邮件服务故障」这条路径
+  // （旧实现在这里 DELETE FROM users 回滚并返回 500，等于「SMTP 没配好 = 注册整体不可用」，
+  //  且重试会撞「邮箱已被注册」，用户被永久锁在门外）
+  const email = 'mailerdown@example.com';
+  const origin = { Origin: 'http://e2e.test', 'Sec-Fetch-Site': 'same-origin' };
+  const res = await c.anon('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...origin },
+    body: JSON.stringify({ username: 'mailerdown', email, password: 'passw0rd!' }),
+  });
+  assert.equal(res.status, 201, '账号仍应创建成功，即使验证邮件失败');
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.email_sent, false, '必须如实告知邮件没发出去');
+
+  // 账号必须留在库里（不得回滚）
+  const rows = await c.sql('SELECT id, email_verified FROM users WHERE username = ?', 'mailerdown');
+  assert.equal(rows.results.length, 1, '账号不得被回滚删除');
+  assert.equal(rows.results[0].email_verified, 0);
+
+  // 自救路径：重发接口能查到该账号（此时它会因 SMTP 不可用返回 500，但不能是「未注册」）
+  const resend = await c.anon('/api/auth/resend-verification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...origin },
+    body: JSON.stringify({ email }),
+  });
+  assert.notEqual(resend.status, 400, '重发应能找到刚创建的账号，而不是「邮箱未注册」');
+});

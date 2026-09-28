@@ -66,6 +66,36 @@ function toId(p) {
   return p.split(path.sep).join('/');
 }
 
+/** 读取 .env 里的某个键（与 resolveActiveTheme 同一套约定：环境变量 > .env） */
+function envValue(key) {
+  if (process.env[key]) return process.env[key].trim();
+  const envFile = path.join(ROOT, '.env');
+  if (!existsSync(envFile)) return '';
+  const m = new RegExp(`^${key}=(.+)$`, 'm').exec(readFileSync(envFile, 'utf8'));
+  return m ? m[1].trim().replace(/^["']|["']$/g, '') : '';
+}
+
+/**
+ * 字体切片的外链前缀（构建期变量）：
+ *   FONTS_BASE 未设 ← 主题 CSS 里保持根路径 /api/files（可移植，本地开发与 fork 都成立）
+ *   FONTS_BASE=https://static.example.com ← 切片改从 R2 自定义域直取，不再消耗 Worker 请求
+ * 只做构建期改写，仓库里的 fonts.css 始终是相对路径（主题对外发布时不绑死任何人的域名）。
+ */
+const FONTS_BASE = envValue('FONTS_BASE').replace(/\/+$/, '');
+
+function fontsBasePlugin() {
+  return {
+    name: 'fonts-base',
+    enforce: 'pre',
+    /** @param {string} code @param {string} id */
+    transform(code, id) {
+      if (!FONTS_BASE) return null;
+      if (!toId(id).endsWith('/styles/fonts.css')) return null;
+      return code.replaceAll("url('/api/files/fonts/", `url('${FONTS_BASE}/fonts/`);
+    },
+  };
+}
+
 export default defineConfig({
   output: 'server',
   adapter: cloudflare({
@@ -73,6 +103,10 @@ export default defineConfig({
     imageService: 'passthrough',
   }),
   vite: {
-    plugins: [themeResolver()],
+    plugins: [themeResolver(), fontsBasePlugin()],
+    // 把字体外链前缀也交给服务端代码（SiteHead 用它决定 CSP 的 font-src）
+    define: {
+      'import.meta.env.FONTS_BASE': JSON.stringify(FONTS_BASE),
+    },
   },
 });

@@ -38,8 +38,17 @@ const fullTitle = title ? `${title}｜${ctx.siteName}` : ctx.siteName;
 // 2) 响应头还允许 # 之外的部分指令（report-uri / sandbox）生效。
 // 站点全部为 SSR（无 prerender 页），因此每次渲染都能下发。
 // 注：script-src 仍是 'unsafe-inline'——页面上确有内联脚本，去掉需要构建期 hash/nonce，另立任务。
-const CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+// 字体切片若配了外链前缀（FONTS_BASE，构建期注入），font-src 需放行该来源。
+const FONTS_ORIGIN = (() => {
+  const base = import.meta.env.FONTS_BASE;
+  if (!base) return '';
+  try {
+    return new URL(base).origin;
+  } catch {
+    return '';
+  }
+})();
+const CSP = `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'${FONTS_ORIGIN ? ` ${FONTS_ORIGIN}` : ''}; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`;
 Astro.response.headers.set('Content-Security-Policy', CSP);
 ---
 

@@ -131,13 +131,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git-cliff --current --strip header --github-repo WhiteMoon319/blog_for_WhiteMoon319 -o RELEASE_NOTES.md || true
-          # 兜底：git-cliff 没产出内容时退回 git log（例如首个 tag 之前没有可比对的上一版本）
+          # 区间显式算：预发布 tag（alpha/beta/rc）不算版本，从「上一个正式版」开始；
+          # 之前没有任何正式版时（首个正式发布）整段历史都算进这一版。
+          # 不用 --current：它只能看最近的 tag，会把正式版算成上一个 rc 的区间。
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude '*-*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          if [[ -n "$PREV_TAG" ]]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE=""
+          fi
+          git-cliff --tag "$GITHUB_REF_NAME" $RANGE --strip header --github-repo WhiteMoon319/blog_for_WhiteMoon319 -o RELEASE_NOTES.md || true
+          # 兜底：git-cliff 没产出内容时退回 git log（同上口径，同样排除预发布 tag）
           if [[ ! -s RELEASE_NOTES.md ]]; then
             echo "## 更新内容" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
-            # 用 <tag>^ 找上一版本；仓库只有这一个 tag 时 describe 会失败，此时退化为列全部提交
-            PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
             if [[ -z "$PREV_TAG" ]]; then
               git log --pretty=format:"- %s" --reverse >> RELEASE_NOTES.md
             else

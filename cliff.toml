@@ -77,7 +77,10 @@ commit_parsers = [
 ]
 protect_breaking_commits = false
 filter_commits = false
-tag_pattern = "v[0-9].*"
+# 只认三段正式版号（v0.1.0）：alpha/beta/rc 预发布不参与「上一版」计算。
+# 效果：正式版的 changelog 从上一个正式版算起（首个正式版则是全量历史）；
+# 预发布版本自己的 notes 也从上一个正式版算起（不看测试版的人不会漏内容）。
+tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
 sort_commits = "newest"
 
 # 启用 GitHub remote 解析 commit → GitHub username（供 @ 引用）

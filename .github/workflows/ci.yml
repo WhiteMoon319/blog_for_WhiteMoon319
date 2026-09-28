@@ -39,21 +39,27 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        # astro check 依赖 .astro/types.d.ts，先 sync 生成类型
+        # 不指定主题：走默认解析（modern），顺带覆盖默认主题的类型检查
         env:
           BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
         run: |
           pnpm exec astro sync
           pnpm run typecheck
 
+      # 构建与测试固定用 classic：测试套件里「阅读历史」等期望是按 classic 写的
+      # （首页 #history 区块、文章页续读脚本），而默认主题 modern 目前没有这些实现。
+      # 也就是说：默认主题缺功能 + 被 tsconfig 排除在类型检查外，是当前的结构性缺口，
+      # 不能靠「碰巧跑在哪个主题」来掩盖，因此这里显式钉住，缺口另立任务。
       - name: Build
         env:
           # CI 没有真实 D1 资源 ID；给一个合法占位 UUID，避免 wrangler.jsonc 残留 ${...} 占位符
           BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+          BLOG_THEME: classic
         run: pnpm run build
 
       - name: Test
         # e2e 用例通过 miniflare 跑 dist 产物，因此必须在 Build 之后执行
         env:
           BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+          BLOG_THEME: classic
         run: pnpm test

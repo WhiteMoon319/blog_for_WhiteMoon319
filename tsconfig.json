@@ -7,10 +7,7 @@
   "exclude": [
     "dist",
     "admin",
-    "node_modules",
-    "src/themes/modern",
-    "src/themes/starter",
-    "src/themes/wildfire"
+    "node_modules"
   ],
   "compilerOptions": {
     "allowImportingTsExtensions": true,

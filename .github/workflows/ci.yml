@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Format check
+        run: pnpm run format:check
+
       - name: Typecheck
         # 不指定主题：走默认解析（modern），顺带覆盖默认主题的类型检查
         env:

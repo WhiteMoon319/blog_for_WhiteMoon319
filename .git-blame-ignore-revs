@@ -1,0 +1,6 @@
+# 让 git blame / GitHub blame 跳过纯格式化提交
+# 本地启用：git config blame.ignoreRevsFile .git-blame-ignore-revs
+# （GitHub 会自动读取仓库根目录的此文件）
+
+# style: 全量 prettier 格式化（singleQuote + printWidth 120，225 文件）
+c9ac2de

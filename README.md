@@ -422,8 +422,10 @@ chmod +x setup.sh
 5. ✅ 自动创建 R2 存储桶（blog-images）
 6. ✅ 生成 `.env` 配置文件
 7. ✅ 设置生产密钥（管理员密码、会话密钥、AI 加密密钥、SMTP 凭据等）
-8. ✅ 应用数据库迁移
-9. ✅ 构建并部署到 Cloudflare Workers
+8. ✅ 生成部署配置（wrangler.jsonc）
+9. ✅ 应用数据库迁移
+10. ✅ 上传自托管字体切片（可选，约十几分钟；跳过则前台用系统字体，事后可 `pnpm fonts:sync` 补）
+11. ✅ 构建并部署到 Cloudflare Workers
 
 部署完成后，用浏览器访问你的域名即可看到博客。
 

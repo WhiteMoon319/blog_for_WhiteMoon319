@@ -13,10 +13,14 @@ import { escapeXml } from '../lib/seo';
 import { postHref } from '../lib/utils';
 import { renderMarkdown } from '../lib/markdown';
 
-// RSS 订阅源：最近 50 篇已发布文章（不含草稿/回收站），按发布时间倒序。
+// RSS 订阅源：最近若干篇已发布文章（不含草稿/回收站），按发布时间倒序。
+// 条目含全文（content:encoded），因此单文件体积随「条数 × 平均篇幅」增长：
+// 早期取 50 篇时线上已到 178KB（gzip 请求），随归档持续变大。
+// 收窄到 20 篇：订阅端仍能拿到全文，但文件不再随年数无限膨胀。
+// 若日后还要更小，下一档是截断 content:encoded 并附「阅读全文」链接。
 export const prerender = false;
 
-const MAX_ITEMS = 50;
+const MAX_ITEMS = 20;
 
 // 模块级内存缓存：代际 key 为全部条目的 id+时间戳指纹，内容无变化时复用上次渲染的 XML，
 // 避免每次请求重渲染 50 篇 markdown。Worker 单实例隔离缓存，多实例下各自独立（可接受）。

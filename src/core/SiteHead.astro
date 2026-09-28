@@ -28,14 +28,19 @@ const ABSOLUTE_URL_RE = /^(https?:|data:|blob:)/i;
 const rawImage = Astro.props.image;
 const ogImage = rawImage ? (ABSOLUTE_URL_RE.test(rawImage) ? rawImage : `${siteUrl}/${rawImage.replace(/^\//, '')}`) : `${siteUrl}/og-default.png`;
 const fullTitle = title ? `${title}｜${ctx.siteName}` : ctx.siteName;
+
+// CSP 走响应头而非 <meta>：
+// 1) meta 形式下 frame-ancestors 会被浏览器直接忽略（控制台长期报错），禁止嵌入形同虚设；
+// 2) 响应头还允许 # 之外的部分指令（report-uri / sandbox）生效。
+// 站点全部为 SSR（无 prerender 页），因此每次渲染都能下发。
+// 注：script-src 仍是 'unsafe-inline'——页面上确有内联脚本，去掉需要构建期 hash/nonce，另立任务。
+const CSP =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https: fonts.gstatic.com; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+Astro.response.headers.set('Content-Security-Policy', CSP);
 ---
 
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta
-  http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https: fonts.gstatic.com; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-/>
 <title>{fullTitle}</title>
 <meta name="description" content={description} />
 {keywords && <meta name="keywords" content={keywords} />}

@@ -23,7 +23,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const args = process.argv.slice(2);
-const OPTS = ['from', 'prefix', 'bucket', 'concurrency', 'limit', 'dir'];
+const OPTS = ['from', 'prefix', 'bucket', 'concurrency', 'limit', 'dir', 'from-file'];
 const getOpt = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
@@ -41,6 +41,7 @@ const bucket = getOpt('bucket', 'blog-images');
 const concurrency = Number(getOpt('concurrency', '3'));
 const limit = Number(getOpt('limit', '0'));
 const dir = resolve(getOpt('dir', '.pai/temp/fonts-cache'));
+const fromFile = getOpt('from-file', '');
 const dryRun = args.includes('--dry-run');
 
 const wranglerEntry = resolve('node_modules/wrangler/bin/wrangler.js');
@@ -64,6 +65,21 @@ let files = sliceNames();
 if (files.length === 0) {
   console.error('没有在 src/themes/*/styles/fonts.css 里找到切片名单（先确认主题文件存在）');
   process.exit(1);
+}
+if (fromFile) {
+  // 补传：只处理名单里的项（失败时会写 failed.txt，直接喂回来即可，不必再跑一遍全量）
+  const want = readFileSync(resolve(fromFile), 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (want.length === 0) {
+    console.error(`--from-file ${fromFile} 里没有条目（没有失败项时不会写这个文件）`);
+    process.exit(1);
+  }
+  files = want;
+  const unknown = want.filter((n) => !sliceNames().includes(n));
+  if (unknown.length > 0)
+    console.warn(`⚠️ 名单里 ${unknown.length} 个文件不在主题 CSS 的切片清单里，仍会尝试：${unknown[0]}`);
 }
 if (limit > 0) files = files.slice(0, limit);
 
@@ -155,7 +171,9 @@ await Promise.all(Array.from({ length: concurrency }, worker));
 console.log(`\n✅ 同步完成：成功 ${done - failed}，失败 ${failed}`);
 if (failed > 0) {
   writeFileSync(join(dir, 'failed.txt'), failedNames.join('\n'));
-  console.log(`失败名单：${join(dir, 'failed.txt')}`);
-  console.log(`补跑：node scripts/fonts-sync.mjs --from ${from} --prefix ${prefix}（已下载的会跳过，只补失败项）`);
+  console.log(`失败名单（${failedNames.length}）：${join(dir, 'failed.txt')}`);
+  console.log(
+    `补跑（只处理名单，不重跑全量）：node scripts/fonts-sync.mjs --from ${from} --prefix ${prefix} --from-file "${join(dir, 'failed.txt')}"`,
+  );
   process.exit(1);
 }

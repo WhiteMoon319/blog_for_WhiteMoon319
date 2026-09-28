@@ -62,6 +62,29 @@ export async function verifyToken(secret: string, token: string, sessionVersion:
   } catch { return null; }
 }
 
+/**
+ * 只验签名与过期，不查库、不比对 session_version。
+ *
+ * 用途限定：给「非鉴权」决策用（例如中间件判断是否绕过边缘缓存）。
+ * 不能替代 verifyToken —— 它不落地用户、不校验封禁与版本号，
+ * 因此不可用于任何鉴权分支。之所以需要它：拿 cookie 是否存在来决策会让
+ * 伪造 cookie 的请求把缓存层整个绕掉（每请求全量 SSR + 打 D1）；
+ * 而在这里命中 D1 又会吃掉缓存本身的意义。
+ */
+export async function verifyTokenShape(secret: string | undefined, token: string): Promise<Session | null> {
+  if (!secret || secret.length < 16) return null;
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return null;
+  const expected = b64url(await hmacSign(secret, payload));
+  if (!constantTimeEqual(sig, expected)) return null;
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as Session;
+    if (typeof parsed.exp !== 'number' || parsed.exp < Math.floor(Date.now() / 1000)) return null;
+    if (typeof parsed.sub !== 'string' || typeof parsed.ver !== 'number') return null;
+    return parsed;
+  } catch { return null; }
+}
+
 export async function setSessionCookie(ctx: APIContext, sub: string, sessionVersion: number): Promise<void> {
   const env = await envOf();
   const token = await signToken(env.BLOG_SESSION_SECRET, sub, sessionVersion);

@@ -48,7 +48,7 @@ const FONTS_ORIGIN = (() => {
     return '';
   }
 })();
-const CSP = `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'${FONTS_ORIGIN ? ` ${FONTS_ORIGIN}` : ''}; connect-src 'self'; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`;
+const CSP = `default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'${FONTS_ORIGIN ? ` ${FONTS_ORIGIN}` : ''}; connect-src 'self' https://cloudflareinsights.com; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`;
 Astro.response.headers.set('Content-Security-Policy', CSP);
 ---
 

@@ -7,7 +7,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // 字体自托管流水线（第一步：从 fontsource 包解出细切 woff2 并生成 @font-face CSS）
-//   用法：node scripts/fonts-prepare.mjs <fontsource-tgz...> --out <目录> [--base <URL>]
+//   用法：node scripts/fonts-prepare.mjs <fontsource-tgz...> --out <目录> [--base /api/files] [--prefix fonts/v1]
+//
+// --prefix 是切片在桶里的路径前缀。**它同时是缓存版本号**：
+// R2 对象带 immutable 会被边缘缓存一年，改了 CORS/内容却想复用旧路径会一直吃脏缓存
+// （实测：重传同 key 不会让 CF 的边缘缓存失效），所以需要变更时就把前缀往上推一版。
 //
 // 为什么这么做：
 //   Google Fonts 在大陆网络下不可达，读者拿到的是系统字体兜底；
@@ -29,10 +33,12 @@ const posix = (p) => p.split('\\').join('/');
 const args = process.argv.slice(2);
 const outIdx = args.indexOf('--out');
 const baseIdx = args.indexOf('--base');
+const prefixIdx = args.indexOf('--prefix');
 const outDir = resolve(outIdx >= 0 ? args[outIdx + 1] : '.pai/temp/fonts-out');
 // 默认同源相对路径：本地开发、自托管部署、CSP 的 font-src 'self' 三种场景都对；
-// 若日后把 R2 绑了自定义域，再显式传 --base https://static.example.com
+// 若把 R2 绑了自定义域，构建期用 FONTS_BASE 改写（见 astro.config.mjs），仓库里始终是相对路径
 const base = (baseIdx >= 0 ? args[baseIdx + 1] : '/api/files').replace(/\/+$/, '');
+const prefix = (prefixIdx >= 0 ? args[prefixIdx + 1] : 'fonts/v1').replace(/^\/+|\/+$/g, '');
 // 注意：只在对应选项真的出现时才排除它的取值，否则 --base 缺省时 baseIdx+1 = 0
 // 会把第一个 tarball 当参数值吃掉（此前 serif 包整族 392 条 unicode-range 就是这么丢的）
 const tarballs = args.filter(
@@ -157,7 +163,7 @@ for (const file of present) {
       '  font-style: normal;',
       `  font-weight: ${face.weight};`,
       '  font-display: swap;',
-      `  src: url('${base}/fonts/v1/woff2/${file}') format('woff2');`,
+      `  src: url('${base}/${prefix}/woff2/${file}') format('woff2');`,
       `  unicode-range: ${range};`,
       '}',
     ].join('\n'),

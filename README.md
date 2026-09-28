@@ -152,6 +152,8 @@ pnpm theme:update <slug>[@version]  # 升级 / 按版本回滚
 pnpm theme <slug>                 # 安装后切换
 ```
 
+主题源可换：在 `.env` 里设 `THEMES_REPO=<owner>/<repo>`，`theme:add` 就从这个仓库拉（例如自己的 fork 或镜像），留空用内置默认。
+
 **新建主题三步**：
 
 1. 复制任一现有主题（如 `classic`）为 `src/themes/<slug>/`，改 `theme.json` 的 name/slug；若需要起步模板可从官方仓库 `theme:add starter` 获取；
@@ -289,7 +291,9 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 | 变量 | 说明 | 获取方式 |
 | --- | --- | --- |
 | `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
+| `BLOG_THEME` | 当前激活主题（`pnpm theme <slug>` 自动写入；留空 = 内置默认 `modern`） | — |
 | `FONTS_BASE` | 字体切片外链前缀（可选，构建期变量） | 见「字体自托管」 |
+| `THEMES_REPO` | 官方主题仓库来源（`owner/repo`，留空 = `WhiteMoon319/themes_for_blog`） | 见「主题系统」 |
 
 ### 绑定一览
 

@@ -171,7 +171,16 @@ for (const file of present) {
 if (missingRange.length > 0) {
   console.warn(`⚠️ ${missingRange.length} 个切片没有 unicode-range（未在包内 CSS 里找到），已跳过`);
 }
-
+// 一条都没生成时必须失败：否则会静默写出一份空的 fonts.css，
+// 覆盖主题样式后整站字体全丢，而退出码仍是 0。
+if (blocks.length === 0) {
+  console.error(
+    '❌ 没有生成任何 @font-face，已中止（不会写出空 fonts.css）\n' +
+      '   常见原因：tarball 名不是 `<包名>-<版本>.tgz`（脚本按文件名认包，' +
+      '期望 noto-serif-sc / noto-sans-sc / ma-shan-zheng / inter），或包内缺细切 woff2。',
+  );
+  process.exit(1);
+}
 writeFileSync(join(outDir, 'fonts.css'), blocks.join('\n') + '\n');
 console.log(`✅ 产物切片 ${present.length} 个 → ${join(outDir, 'woff2')}`);
 console.log(`✅ @font-face ${blocks.length} 条 → ${join(outDir, 'fonts.css')}`);

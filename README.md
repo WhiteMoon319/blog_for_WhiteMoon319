@@ -70,7 +70,7 @@ admin/                    Vue 3 管理端 SPA（/admin/ 基路径）
   src/lib/                drafts（草稿自动保存）、editor、format、import 解析
   src/store/auth.ts       登录态
 db/
-  migrations/             0001_init ~ 0033_reading_history（D1 迁移）
+  migrations/             0001_init ~ 0036_post_layout（D1 迁移）
   seed.sql                本地演示种子数据
   reset-local.sql         本地整库重置（cf:db:local 可重入）
 scripts/
@@ -79,7 +79,9 @@ scripts/
   merge-admin.mjs         把 admin/dist 合并进 dist/client/admin
   build-worker.mjs        生成 scheduled-worker.mjs 包装入口（承接 cron）
   pack-release.mjs        发布打包：组装便携运行时 + 生成发布 zip
-  deploy.mjs              一键部署：构建 → 远程迁移 → 部署
+  deploy.mjs              一键部署：字体外链预检 → 构建 → 远程迁移 → 部署
+  fonts-prepare.mjs       字体自托管：从 fontsource 包解出细切 woff2 并生成 @font-face
+  fonts-upload.mjs        字体自托管：把切片批量上传到 R2（写失败名单，--from-file 可补传）
   setup-deploy.mjs        从零部署向导（断点续传）
   theme.mjs               查看/切换主题
   theme-pack.mjs          打包主题 zip 并自检
@@ -102,7 +104,9 @@ deploy.bat / deploy.sh    日常更新入口（构建 → 迁移 → 部署，�
 cliff.toml                git-cliff 的 changelog 配置（发布流程用）
 .github/workflows/        CI：release.yml 打 tag 时构建并发布两种发布包
 wrangler.jsonc.template   Workers 配置模板（占位符，可提交）
+r2-cors.json              R2 桶的 CORS 策略（字体/媒体跨域取用，wrangler r2 bucket cors set 用）
 .env.example              真实资源 ID 的填法示例
+.git-blame-ignore-revs    让 git blame / GitHub 跳过全量格式化提交（本地启用：git config blame.ignoreRevsFile .git-blame-ignore-revs）
 ```
 
 ## 主题系统
@@ -295,19 +299,36 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 | `ASSETS` | Static Assets | `dist/client` 静态资源 |
 | vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
 | secret | `AI_SETTINGS_ENCRYPTION_KEY` | API Key 加密主密钥 |
+| secret | `R2_PUBLIC_URL` | 上传媒体返回的公网前缀（可选；空则走本站 `/api/files` 路由） |
 | cron | `*/5 * * * *` | 定时刊发到期文章 |
+
+### 安全头与 CSP
+
+安全头统一由 `src/core/SiteHead.astro` 封装，CSP 以**响应头**下发（不写 meta，否则 `frame-ancestors` 不生效）：
+
+- 默认：`default-src 'self'`、`script-src 'self' 'unsafe-inline'`、`style-src 'self' 'unsafe-inline'`、`connect-src 'self'`、`frame-ancestors 'none'`、`base-uri 'self'`、`form-action 'self'`
+- 额外放行：`https://static.cloudflareinsights.com`（script-src）与 `https://cloudflareinsights.com`（connect-src），供 Cloudflare 在边缘注入的 Web Analytics beacon 使用。**若在 CF 面板关掉 Web Analytics，这两条可以删掉**
+- 配了 `FONTS_BASE` 时，`font-src` 会自动带上该来源（见「字体自托管」）
+- 另有：HSTS、HTTP → HTTPS 308 跳转、会话 cookie 带 `Secure`（依据 `x-forwarded-proto` 判定）
 
 ### 字体自托管（可选）
 
 字体切片**不从 Google Fonts 拉**：`src/themes/*/styles/fonts.css` 是 879 条 `@font-face`（按 unicode-range 细切，与 Google 同粒度；CJK 必须切片，否则每页要下全量），`src` 写的是同源相对路径 `/api/files/fonts/...`，由 Worker 的 `/api/files` 路由从 R2 分发。
 
-要把这部分流量从 Worker 挪到 CDN（每页约 50 次请求），两步：
+**默认不需要做任何事**：切片走同源路由就能用，也不需要配 R2 的 CORS。只有想把每页约 50 次切片请求从 Worker 挪到 CDN，才做下面几步：
 
 ```bash
-# 1. 从 fontsource 包解出细切 woff2 并生成 @font-face（tarball 自行下载，如 npmmirror）
+# 1. 准备 4 个 fontsource 包的 tarball：@fontsource/noto-serif-sc、noto-sans-sc、
+#    ma-shan-zheng、inter。官方源慢时可走镜像（下面 URL 是示例，版本号按需替换；
+#    需要系统有 tar：Windows 10+ 自带 bsdtar，Git Bash 也有）：
+curl -O https://registry.npmmirror.com/@fontsource/noto-serif-sc/-/noto-serif-sc-5.3.0.tgz
+#    注意：tarball 文件名要保持 `<包名>-<版本>.tgz`，脚本按文件名识别是哪个包，
+#    改名后会被跳过，最后因没生成任何 @font-face 而直接报错中止。
+
+# 2. 解包生成 @font-face（--prefix 同时是缓存版本号，见下方第 1 点）
 node scripts/fonts-prepare.mjs <fontsource-*.tgz...> --out .pai/temp/fonts-out --prefix fonts/v2
 
-# 2. 给桶配 CORS，再批量上传（Windows 上并发别超 3；失败名单写 failed.txt，可用 --from-file 补传）
+# 3. 给桶配 CORS，再批量上传（Windows 上并发别超 3；有失败会写 failed.txt，可用 --from-file 补传）
 node node_modules/wrangler/bin/wrangler.js r2 bucket cors set blog-images --file r2-cors.json
 node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrency 3
 ```
@@ -317,11 +338,13 @@ node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrenc
 | `R2_PUBLIC_URL` | Worker secret（`wrangler secret put`） | 上传媒体返回的公网前缀；空则走本站 `/api/files` 路由 |
 | `FONTS_BASE` | `.env`（**构建期**，不是 Worker 变量） | 字体切片外链前缀；空则走本站路由，设为 R2 自定义域则直取 CDN |
 
-三点必须知道：
+四点必须知道：
 
 - **切片路径前缀就是缓存版本号**：R2 对象带 `Cache-Control: immutable`，会被 CF 边缘缓存一年，**重传同 key 不会让缓存失效**（实测）。要换内容或事后补 CORS，就把 `--prefix` 推一版（`fonts/v1` → `fonts/v2`），不要复用旧路径。
 - **自定义域必须配 CORS**：跨域 webfont 要求响应带 `Access-Control-Allow-Origin`，R2 自定义域默认不给，缺了浏览器会静默拦下全部字体、页面回退系统字体。策略见 `r2-cors.json`；`pnpm run deploy` 在 `FONTS_BASE` 非空时会自动预检该域（不可达或缺 CORS 就中止，可用 `pnpm run deploy -- --skip-font-check` 跳过）。
 - **`FONTS_BASE` 是构建期注入**：`astro.config.mjs` 改写 `fonts.css` 的切片前缀，并同步放宽 CSP 的 `font-src`；改完必须重新构建，且要与部署时 `.env` 里的值一致。仓库里的 `fonts.css` 始终是相对路径，不设它的 fork 不会指向别人的桶。
+- **它对 `pnpm run dev` 同样生效**：本地开发也读 `.env`，配了外链就从别人的桶取字体；调字体样式时把这一行清空，再看本地切片。
+- **第三方主题需要自带 `styles/fonts.css`**：这两套入库主题各自 import 了自己那份；外部安装的主题若不引入，就没有自托管字体（回退系统字体），按同样做法加一份 CSS 即可。
 
 ## 构建与测试
 
@@ -420,12 +443,13 @@ pnpm exec wrangler d1 create blog-db
 # 5. 创建 R2 存储桶
 pnpm exec wrangler r2 bucket create blog-images
 
-# 6. 复制 .env.example 为 .env，填入真实 D1 数据库 ID
+# 6. 复制 .env.example 为 .env，填入真实 D1 数据库 ID（FONTS_BASE 留空即字体走本站路由）
 cp .env.example .env
 
 # 7. 设置生产密钥（逐个输入）
 npx wrangler secret put BLOG_ADMIN_PASSWORD
 npx wrangler secret put BLOG_SESSION_SECRET
+npx wrangler secret put R2_PUBLIC_URL              # 可选：媒体走 R2 自定义域时填 https://static.example.com，留空则走 /api/files
 npx wrangler secret put AI_SETTINGS_ENCRYPTION_KEY   # 32 字节 hex，用 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 生成
 npx wrangler secret put SMTP_USER
 npx wrangler secret put SMTP_PASS
@@ -456,6 +480,7 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 | 按需渲染 | KaTeX 样式、hljs 样式、mermaid/markmap 运行时仅在正文含对应内容时加载 |
 | 编辑器懒加载 | 编辑器相关重资源动态 chunk，避免首屏阻塞 |
 | 公开页面 | 首页仅 1 个 CSS，0 个 JS，首次加载无 JS 阻塞 |
+| 字体自托管 | 879 条 `@font-face` 按 unicode-range 细切、`font-display: swap`，浏览器只取命中字符所在切片；配 `FONTS_BASE` 后切片直取 R2 自定义域（CF CDN），每页约 50 次请求不再消耗 Worker 调用 |
 | D1 查询优化 | 点赞计数批量计算、sitemap 列裁剪 |
 
 ## 数据库

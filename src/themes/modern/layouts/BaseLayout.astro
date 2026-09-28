@@ -3,6 +3,8 @@
 // Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // 主题布局：纯展示组件，一切数据经 props.ctx 下传，禁止自行访问 DB/env。
 import '../styles/tokens.css';
+// 字体自托管：切片与 @font-face 见 scripts/fonts-prepare.mjs（Google Fonts 已移除，不再依赖外网字体域）
+import '../styles/fonts.css';
 import '../styles/base.css';
 import SiteHead from '@core/SiteHead.astro';
 import type { SiteContext } from '../../../lib/theme-context.ts';
@@ -36,12 +38,6 @@ const FAVICON =
       image={image}
       faviconHref={FAVICON}
       rssTitle={t('rss.title')}
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600&display=swap"
     />
   </head>
   <body>

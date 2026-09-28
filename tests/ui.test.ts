@@ -64,16 +64,23 @@ test('导入视图：拖入文件与选择文件共用同一条解析入口', ()
   assert.match(src, /async function onDrop\(e: DragEvent\)[\s\S]*?await addFiles\(/, 'onDrop 必须复用 addFiles');
 });
 
-test('站点布局：字体样式表为普通 link（无被 CSP 拦截的内联 onload）', () => {
+test('站点布局：字体走自托管样式表（无内联 onload、CSP 只放行同源字体）', () => {
   const src = readFileSync(resolve('src/themes/classic/layouts/BaseLayout.astro'), 'utf8');
-  assert.ok(src.includes('https://fonts.googleapis.com/css2?'), '应保留 Google Fonts 样式表');
-  assert.ok(!src.includes('onload='), '不得再使用内联 onload（CSP script-src 拦截）');
+  assert.ok(src.includes("import '../styles/fonts.css'"), '应引入自托管字体样式表');
+  assert.ok(!src.includes('fonts.googleapis.com'), '不应再引用 Google Fonts');
+  assert.ok(!src.includes('onload='), '不得使用内联 onload（CSP script-src 拦截）');
   assert.ok(!src.includes('media="print"'), '不得残留 print 媒体占位');
+
+  // 字体样式表本体：@font-face 必须带 unicode-range（这是「按需加载」的开关）
+  const fonts = readFileSync(resolve('src/themes/classic/styles/fonts.css'), 'utf8');
+  assert.ok(fonts.includes('@font-face'), '自托管字体样式表应含 @font-face');
+  assert.ok(fonts.includes('unicode-range:'), '每个 @font-face 必须带 unicode-range（按需加载）');
+  assert.ok(fonts.includes("url('/api/files/fonts/"), '切片应走同源路径（本地开发与自托管部署都成立）');
+  assert.ok(!/@font-face[^}]*url\('(?!\/)/.test(fonts), '不得出现非根路径的字体 URL');
+
   const head = readFileSync(resolve('src/core/SiteHead.astro'), 'utf8');
-  assert.ok(
-    head.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"),
-    'CSP style-src 必须放行字体样式表源',
-  );
+  assert.ok(head.includes("font-src 'self'"), 'CSP font-src 应只放行同源');
+  assert.ok(!head.includes('fonts.gstatic.com'), 'CSP 不应再放行 Google 字体域');
 });
 
 test('列表卡：不得用 <a> 包裹整卡（卡内署名链接会造成非法 <a> 嵌套）', () => {

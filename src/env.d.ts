@@ -35,6 +35,8 @@ declare global {
       SMTP_PASS?: string;
       SMTP_FROM?: string;
       EDGE_CACHE?: string;
+      /** 'false' 关闭「HTTP→HTTPS 强制跳转」（e2e 用 http://e2e.test 时必须关闭） */
+      HTTPS_REDIRECT?: string;
     }
   }
 

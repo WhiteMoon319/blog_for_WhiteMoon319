@@ -15,17 +15,11 @@ import {
   isStorableHtmlResponse,
   shouldUseEdgeCache,
 } from './lib/edge-cache';
+import { isHttpsRedirectDisabled, isHttpsRequest, needsHttpsRedirect, securityHeaders } from './lib/http-security';
 
-const SECURITY_HEADERS: Record<string, string> = {
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-};
-
-function withSecurityHeaders(response: Response): Response {
+function withSecurityHeaders(response: Response, isHttps: boolean): Response {
   const headers = new Headers(response.headers);
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+  for (const [name, value] of Object.entries(securityHeaders(isHttps))) {
     if (!headers.has(name)) headers.append(name, value);
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -38,10 +32,9 @@ function withSecurityHeaders(response: Response): Response {
  * 不查库（查库会让缓存失去意义），只作为缓存决策依据，不用于任何鉴权。
  * 判定异常时按「有会话」处理（放弃缓存），避免把个性化响应钉在边缘。
  */
-async function hasVerifiedSessionCookie(token: string): Promise<boolean> {
+async function hasVerifiedSessionCookie(token: string, secret: string | undefined): Promise<boolean> {
   try {
-    const env = await envOf();
-    return (await verifyTokenShape(env.BLOG_SESSION_SECRET, token)) !== null;
+    return (await verifyTokenShape(secret, token)) !== null;
   } catch {
     return true;
   }
@@ -50,13 +43,39 @@ async function hasVerifiedSessionCookie(token: string): Promise<boolean> {
 export const onRequest = defineMiddleware(async (context, next) => {
   const method = context.request.method;
   const path = context.url.pathname;
+  const forwardedProto = context.request.headers.get('x-forwarded-proto');
+  const isHttps = isHttpsRequest(context.url.protocol, forwardedProto);
+
+  let env: Env | null = null;
+  try {
+    env = await envOf();
+  } catch {
+    // env 解析失败不应让请求整体失败；后续按「无 env」降级
+    env = null;
+  }
+
+  // ---- 传输层：HTTP 一律 308 跳 HTTPS（生产、且非本地地址；HTTPS_REDIRECT=false 可关）----
+  // 站上有账号体系，明文 HTTP 是明面上的缺口；顺带保证 cookie 的 Secure 生效
+  if (
+    needsHttpsRedirect({
+      isProd: import.meta.env.PROD,
+      protocol: context.url.protocol,
+      hostname: context.url.hostname,
+      forwardedProto,
+      disabled: isHttpsRedirectDisabled(env?.HTTPS_REDIRECT as unknown),
+    })
+  ) {
+    const target = new URL(context.url);
+    target.protocol = 'https:';
+    return new Response(null, { status: 308, headers: { Location: target.toString(), ...securityHeaders(isHttps) } });
+  }
+
   const token = context.cookies.get('blog_session')?.value ?? '';
-  const hasSession = token ? await hasVerifiedSessionCookie(token) : false;
+  const hasSession = token ? await hasVerifiedSessionCookie(token, env?.BLOG_SESSION_SECRET) : false;
 
   // ---- 匿名 GET 公开 HTML 页面：Workers Cache API 边缘缓存（60s 新鲜 + SWR）----
   // 仅生产启用；e2e/dev 通过 EDGE_CACHE=false 关闭，避免测试间脏缓存
   // 仅 GET：HEAD 跳过（Cache API put 不接受 HEAD），避免双重渲染
-  const env = method === 'GET' && !hasSession && import.meta.env.PROD ? await envOf() : null;
   if (
     env &&
     shouldUseEdgeCache({
@@ -73,7 +92,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       if (cached) {
         const headers = new Headers(cached.headers);
         headers.set('X-Cache', 'HIT');
-        for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+        for (const [name, value] of Object.entries(securityHeaders(isHttps))) {
           if (!headers.has(name)) headers.append(name, value);
         }
         return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
@@ -84,7 +103,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       // 否则会把「不缓存」的语义冲掉，把后台外壳之类钉在边缘。
       if (isStorableHtmlResponse(response)) {
         const headers = new Headers(response.headers);
-        for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+        for (const [name, value] of Object.entries(securityHeaders(isHttps))) {
           if (!headers.has(name)) headers.append(name, value);
         }
         headers.set('Cache-Control', `public, max-age=${EDGE_CACHE_MAX_AGE}`);
@@ -94,7 +113,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         await cache.put(context.request, res.clone());
         return res;
       }
-      return withSecurityHeaders(response);
+      return withSecurityHeaders(response, isHttps);
     } catch {
       // 缓存层异常时降级为直渲染
     }
@@ -104,7 +123,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const response = await next();
   const headers = new Headers(response.headers);
 
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+  for (const [name, value] of Object.entries(securityHeaders(isHttps))) {
     if (!headers.has(name)) headers.append(name, value);
   }
 

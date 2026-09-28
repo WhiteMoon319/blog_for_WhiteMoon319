@@ -146,6 +146,8 @@ export async function makeE2e(): Promise<E2eClient> {
             LOGIN_RATE_LIMIT_MAX: { type: 'json', value: 10 },
             LOGIN_RATE_LIMIT_WINDOW: { type: 'json', value: 300 },
             EDGE_CACHE: { type: 'json', value: false },
+            // e2e 走 http://e2e.test（非 localhost），关掉强制跳转，否则所有请求都会被 308 到 https
+            HTTPS_REDIRECT: { type: 'json', value: false },
           },
         },
       },

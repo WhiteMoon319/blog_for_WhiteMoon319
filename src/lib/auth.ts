@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { envOf } from './db/index.ts';
 import { getCredentials, verifyPasswordHash, getSessionVersion } from './db/credentials.ts';
 import { type UserRow, getUserById } from './db/users.ts';
+import { isHttpsRequest } from './http-security.ts';
 
 const COOKIE_NAME = 'blog_session';
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -88,8 +89,10 @@ export async function verifyTokenShape(secret: string | undefined, token: string
 export async function setSessionCookie(ctx: APIContext, sub: string, sessionVersion: number): Promise<void> {
   const env = await envOf();
   const token = await signToken(env.BLOG_SESSION_SECRET, sub, sessionVersion);
+  // Secure 判定不能只看 ctx.url.protocol：Cloudflare 边缘终结 TLS 时协议可能落在 x-forwarded-proto
+  const secure = isHttpsRequest(ctx.url.protocol, ctx.request.headers.get('x-forwarded-proto'));
   ctx.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true, sameSite: 'lax', secure: ctx.url.protocol === 'https:', path: '/', maxAge: TOKEN_TTL_SECONDS,
+    httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: TOKEN_TTL_SECONDS,
   });
 }
 

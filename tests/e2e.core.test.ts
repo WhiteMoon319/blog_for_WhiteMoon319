@@ -78,8 +78,20 @@ test('e2e：未登录无法读草稿列表、无法写数据', async () => {
   assert.equal(create.status, 401);
 });
 
-test('e2e：sitemap 覆盖静态页、文集与文章', async () => {
+test('e2e：sitemap 覆盖静态页、文集、文章与标签页', async () => {
   if (!HAS_BUILD) return;
+  // 标签页此前不进 sitemap；口径与 /tags/ 索引一致（只收至少有内容的标签）
+  await c.sql(
+    `INSERT INTO posts (title, slug, content_md, status, created_at, updated_at)
+     VALUES ('站图文章', 'sitemap-post', 'x', 'published', datetime('now'), datetime('now'))`,
+  );
+  await c.sql(`INSERT INTO tags (name, created_at) VALUES ('sitemap-tag', datetime('now'))`);
+  await c.sql(`INSERT INTO tags (name, created_at) VALUES ('empty-tag', datetime('now'))`);
+  await c.sql(
+    `INSERT INTO post_tags (post_id, tag_id)
+     SELECT p.id, t.id FROM posts p, tags t WHERE p.slug = 'sitemap-post' AND t.name = 'sitemap-tag'`,
+  );
+
   const res = await c.get('/sitemap.xml');
   assert.equal(res.status, 200);
   const xml = await res.text();
@@ -87,6 +99,8 @@ test('e2e：sitemap 覆盖静态页、文集与文章', async () => {
   assert.ok(xml.includes('<loc>http://e2e.test/collections/essays/</loc>'));
   assert.ok(xml.includes('<loc>http://e2e.test/collections/tech/astro-on-cloudflare/</loc>'));
   assert.ok(!xml.includes('draft-post'));
+  assert.ok(xml.includes('<loc>http://e2e.test/tags/sitemap-tag/</loc>'), '有内容的标签页应进 sitemap');
+  assert.ok(!xml.includes('/tags/empty-tag/'), '无内容的标签不应进 sitemap');
 });
 
 test('e2e：404 页带站点样式，静态资源可达', async () => {

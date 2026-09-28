@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { APIContext } from 'astro';
-import { envOf, listCollections } from '../lib/db';
+import { envOf, listAllTagCounts, listCollections } from '../lib/db';
 import { postHref } from '../lib/utils';
 
 export const prerender = false;
@@ -35,13 +35,18 @@ export async function GET(ctx: APIContext): Promise<Response> {
     )
     .all<{ id: number; username: string; display_name: string; status: string; created_at: string }>();
 
+  // 标签页同样纳入：口径与 /tags/ 索引一致（只收「至少有内容」的标签）
+  const tags = (await listAllTagCounts(env.DB)).filter((t) => t.total > 0);
+
   // 代际 key 必须包含作者数据：改笔名/封禁作者都会改变 sitemap 内容
   const cacheKey =
     collections.map((c) => `${c.id}:${c.updated_at}`).join('|') +
     '||' +
     (posts.results ?? []).map((p) => `${p.id}:${p.updated_at}`).join('|') +
     '||' +
-    (authors.results ?? []).map((a) => `${a.id}:${a.username}:${a.display_name}:${a.status}`).join('|');
+    (authors.results ?? []).map((a) => `${a.id}:${a.username}:${a.display_name}:${a.status}`).join('|') +
+    '||' +
+    tags.map((t) => `${t.id}:${t.name}:${t.total}`).join('|');
   if (sitemapCache && sitemapCache.key === cacheKey) {
     return new Response(sitemapCache.xml, {
       headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
@@ -60,6 +65,10 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }
   for (const a of authors.results ?? []) {
     urls.push({ path: `/authors/${encodeURIComponent(a.username)}/`, lastmod: a.created_at });
+  }
+  for (const t of tags) {
+    // 标签页 URL 用标签名（含 % 等字符走 encodeURIComponent）
+    urls.push({ path: `/tags/${encodeURIComponent(t.name)}/`, lastmod: t.created_at });
   }
 
   const body = urls.map((u) => {

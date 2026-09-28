@@ -82,6 +82,7 @@ scripts/
   deploy.mjs              一键部署：字体外链预检 → 构建 → 远程迁移 → 部署
   fonts-prepare.mjs       字体自托管：从 fontsource 包解出细切 woff2 并生成 @font-face
   fonts-upload.mjs        字体自托管：把切片批量上传到 R2（写失败名单，--from-file 可补传）
+  fonts-sync.mjs          字体自托管：从公开源拉取切片并上传到自己的 R2（向导用，也可单跑）
   setup-deploy.mjs        从零部署向导（断点续传）
   theme.mjs               查看/切换主题
   theme-pack.mjs          打包主题 zip 并自检
@@ -320,7 +321,12 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 
 字体切片**不从 Google Fonts 拉**：`src/themes/*/styles/fonts.css` 是 879 条 `@font-face`（按 unicode-range 细切，与 Google 同粒度；CJK 必须切片，否则每页要下全量），`src` 写的是同源相对路径 `/api/files/fonts/...`，由 Worker 的 `/api/files` 路由从 R2 分发。
 
-**默认不需要做任何事**：切片走同源路由就能用，也不需要配 R2 的 CORS。只有想把每页约 50 次切片请求从 Worker 挪到 CDN，才做下面几步：
+**切片有两种来源**：
+
+- **用部署向导（推荐）**：`setup.bat` / `setup.sh` 会问"现在上传字体切片吗"，答 y 就从公开源拉取 879 个细切片并传进**你自己的** R2（首次约十几分钟，之后不用再做）。跳过或事后补传：`pnpm fonts:sync`。
+- **手动**：你能拿到切片（自己跑流水线或从别处拷贝）时，用下面两步自己准备并上传。
+
+⚠️ 新部署的桶里**一个切片都没有**：不跑上面任一条，页面的 `@font-face` 会整批 404、字体静默回退系统字体（站点能用，只是没有站内字体）。`pnpm run deploy` 在 `FONTS_BASE` 非空时会先探一条切片，缺切片或不可达都会中止部署并提示。
 
 ```bash
 # 1. 准备 4 个 fontsource 包的 tarball：@fontsource/noto-serif-sc、noto-sans-sc、
@@ -337,6 +343,16 @@ node scripts/fonts-prepare.mjs <fontsource-*.tgz...> --out .pai/temp/fonts-out -
 node node_modules/wrangler/bin/wrangler.js r2 bucket cors set blog-images --file r2-cors.json
 node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrency 3
 ```
+
+`pnpm fonts:sync` 是上面这套的"省事版"——不自己准备切片，直接从公开源抓现成细切片再传进你的桶：
+
+```bash
+pnpm fonts:sync                                  # 默认源 https://static.whitemoon319.xyz
+pnpm fonts:sync --from https://<你的镜像> --prefix fonts/v2   # 换源；须提供同样的 <prefix>/woff2/<file> 路径
+pnpm fonts:sync --limit 5 --dry-run              # 只处理前 5 个 / 只看会做什么
+```
+
+已下载的切片缓存在 `.pai/temp/fonts-cache/`，重复运行只补缺失项，中断可重跑。切片内容来自 fontsource 的细切产物（OFL 许可），与 Google Fonts 同粒度。
 
 | 变量 | 位置 | 作用 |
 | --- | --- | --- |

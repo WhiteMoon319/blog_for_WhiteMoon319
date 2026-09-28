@@ -65,9 +65,20 @@ async function checkFontBase(base) {
     process.exit(1);
   }
   const acao = res.headers.get('access-control-allow-origin');
-  if (!res.ok || !acao) {
+  if (!res.ok) {
+    const hint =
+      res.status === 404
+        ? `   切片不存在：该域对应的桶里没有 ${slice.replace(/^\/api\/files\//, '')}。\n` +
+          `   先补齐切片：pnpm fonts:sync（或自己跑 fonts-prepare + fonts-upload）`
+        : `   该域不可达或路径不对（检查 FONTS_BASE 是否指向 R2 自定义域、前缀是否与桶里的目录一致）`;
     console.error(
-      `❌ 字体预检失败：${url}\n   HTTP ${res.status}，Access-Control-Allow-Origin: ${acao ?? '缺失'}\n` +
+      `❌ 字体预检失败：${url}\n   HTTP ${res.status}\n${hint}\n   跳过本检查：pnpm run deploy -- --skip-font-check`,
+    );
+    process.exit(1);
+  }
+  if (!acao) {
+    console.error(
+      `❌ 字体预检失败：${url}\n   HTTP ${res.status}，但缺 Access-Control-Allow-Origin\n` +
         `   FONTS_BASE 指向的域必须允许跨域取字体，否则浏览器会拦下全部切片、页面回退系统字体。\n` +
         `   设置 CORS：node node_modules/wrangler/bin/wrangler.js r2 bucket cors set blog-images --file r2-cors.json\n` +
         `   （R2 对象带 immutable 会被边缘缓存一年，且重传同 key 不会失效；若旧路径已脏，请推到新的路径前缀）\n` +

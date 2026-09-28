@@ -246,11 +246,28 @@ async function main() {
 
   await guard('config', '生成部署配置', () => {
     run('pnpm -C admin install');
-    run('pnpm exec wrangler d1 migrations apply blog-db --remote');
+    // 必须先生成 wrangler.jsonc，后面的迁移/部署都依赖它（干净克隆里没有这个文件）
+    run('pnpm run cf:config');
   });
 
   await guard('migrate', '迁移 + 种子', () => {
     run('pnpm exec wrangler d1 migrations apply blog-db --remote');
+  });
+
+  await guard('fonts', '自托管字体（可选）', async () => {
+    // 主题的 styles/fonts.css 指向 /api/files/fonts/<prefix>/woff2/…，而切片是站点侧资源：
+    // 新桶里一个都没有，跳过这步前台字体会整批 404、静默回退系统字体。
+    console.log(
+      `${INFO} 站点自带的 CJK 字体切成 879 个细切片（约 27MB）。\n` +
+        `   现在从公开源拉取并上传到你的 R2 桶，首次约十几分钟，之后不用再做。\n` +
+        `   跳过也能跑，只是前台字体用访客系统的中文字体。`,
+    );
+    const ans = await ask('现在上传字体切片吗？[y/n]', 'y');
+    if (ans.toLowerCase() !== 'y') {
+      console.log(`${INFO} 已跳过。日后想补：pnpm fonts:sync`);
+      return;
+    }
+    run('pnpm fonts:sync');
   });
 
   await guard('build', '构建', () => {

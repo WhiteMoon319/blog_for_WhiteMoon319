@@ -21,6 +21,7 @@
     "theme:pack": "node scripts/theme-pack.mjs",
     "theme:add": "node scripts/theme-add.mjs",
     "theme:update": "node scripts/theme-update.mjs",
+    "fonts:sync": "node scripts/fonts-sync.mjs",
     "cf:login": "wrangler login",
     "cf:config": "node scripts/cf-config.mjs",
     "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/reset-local.sql && wrangler d1 migrations apply blog-db --local && wrangler d1 execute blog-db --local --file=db/seed.sql",

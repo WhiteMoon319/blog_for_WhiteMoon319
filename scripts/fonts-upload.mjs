@@ -13,7 +13,7 @@
 // wrangler 一次只能传一个对象、单次冷启动约 59s、热启动约 3.5s，
 // 因此这里做并发池（默认 6）把 800+ 个切片压到十分钟级。
 // 注意：Windows 上并发过高会让 wrangler 的 libuv 崩（STATUS_STACK_BUFFER_OVERRUN），
-// 因此失败名单会写入 <dir>/failed.txt，可用 --from-file 以低并发补传。
+// 因此失败名单会写入 <dir>/failed.txt（只在真的有失败时写），可用 --from-file 以低并发补传。
 //
 // 上传后对象带 `Cache-Control: immutable` 与 `font/woff2`，经 `/api/files/...` 或 R2 自定义域分发。
 
@@ -22,11 +22,18 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const args = process.argv.slice(2);
+const OPTS = ['prefix', 'bucket', 'concurrency', 'from-file'];
 const getOpt = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.pai/temp/fonts-out');
+// 位置参数 = 第一个既不是选项、也不是选项取值的参数（不受参数顺序影响）
+const optValueIdx = new Set(
+  OPTS.map((n) => args.indexOf(`--${n}`))
+    .filter((i) => i >= 0)
+    .map((i) => i + 1),
+);
+const dir = resolve(args.find((a, i) => !a.startsWith('--') && !optValueIdx.has(i)) ?? '.pai/temp/fonts-out');
 const prefix = getOpt('prefix', 'fonts/v1');
 const bucket = getOpt('bucket', 'blog-images');
 const concurrency = Number(getOpt('concurrency', '6'));
@@ -34,14 +41,27 @@ const fromFile = getOpt('from-file', '');
 
 const wranglerEntry = resolve('node_modules/wrangler/bin/wrangler.js');
 const all = readdirSync(join(dir, 'woff2')).filter((f) => f.endsWith('.woff2'));
-const files = fromFile
-  ? readFileSync(resolve(fromFile), 'utf8')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => all.includes(l))
-  : all;
+let files = all;
+if (fromFile) {
+  const want = readFileSync(resolve(fromFile), 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (want.length === 0) {
+    console.error(
+      `--from-file ${fromFile} 里没有条目。\n` +
+        `（failed.txt 只在上传有失败时才写；上一次补传成功后它不会被改回空名单，请直接跑全量上传）`,
+    );
+    process.exit(1);
+  }
+  files = want.filter((l) => all.includes(l));
+  const unknown = want.filter((l) => !all.includes(l));
+  if (unknown.length > 0) {
+    console.warn(`⚠️ 名单里 ${unknown.length} 个文件不在产物目录，已忽略：${unknown.slice(0, 3).join('、')}`);
+  }
+}
 if (files.length === 0) {
-  console.error(`没有找到切片：${join(dir, 'woff2')}（先跑 scripts/fonts-prepare.mjs）`);
+  console.error(`没有可上传的切片：${join(dir, 'woff2')}（先跑 scripts/fonts-prepare.mjs，或检查 --prefix/目录）`);
   process.exit(1);
 }
 console.log(`待上传 ${files.length} 个切片 → r2://${bucket}/${prefix}/woff2/（并发 ${concurrency}）`);
@@ -98,11 +118,14 @@ async function worker() {
 }
 
 await Promise.all(Array.from({ length: concurrency }, worker));
-writeFileSync(join(dir, 'failed.txt'), failedNames.join('\n'));
 console.log(`✅ 上传完成：成功 ${done - failed}，失败 ${failed}`);
 if (failed > 0) {
+  // 只有真的失败才写名单：否则一次成功的补传会把 failed.txt 清空，
+  // 之后照提示再跑 --from-file failed.txt 会拿到空名单（此前踩过）。
+  writeFileSync(join(dir, 'failed.txt'), failedNames.join('\n'));
+  console.log(`失败名单（${failedNames.length}）：${join(dir, 'failed.txt')}`);
   console.log(
-    `失败名单：${join(dir, 'failed.txt')}（补传：node scripts/fonts-upload.mjs ${dir} --from-file ${join(dir, 'failed.txt')} --concurrency 2）`,
+    `补传：node scripts/fonts-upload.mjs "${dir}" --prefix ${prefix} --from-file "${join(dir, 'failed.txt')}" --concurrency 2`,
   );
   process.exit(1);
 }

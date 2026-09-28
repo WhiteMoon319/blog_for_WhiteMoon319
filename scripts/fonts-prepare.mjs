@@ -41,9 +41,8 @@ const base = (baseIdx >= 0 ? args[baseIdx + 1] : '/api/files').replace(/\/+$/, '
 const prefix = (prefixIdx >= 0 ? args[prefixIdx + 1] : 'fonts/v1').replace(/^\/+|\/+$/g, '');
 // 注意：只在对应选项真的出现时才排除它的取值，否则 --base 缺省时 baseIdx+1 = 0
 // 会把第一个 tarball 当参数值吃掉（此前 serif 包整族 392 条 unicode-range 就是这么丢的）
-const tarballs = args.filter(
-  (a, i) => !a.startsWith('--') && !(outIdx >= 0 && i === outIdx + 1) && !(baseIdx >= 0 && i === baseIdx + 1),
-);
+const optValueIdx = new Set([outIdx, baseIdx, prefixIdx].filter((i) => i >= 0).map((i) => i + 1));
+const tarballs = args.filter((a, i) => !a.startsWith('--') && !optValueIdx.has(i));
 
 /** 需要自托管的「家族 × 字重」——与主题原先向 Google 请求的档位一致，避免缺字重导致浏览器合成 */
 const FACES = [

@@ -1,0 +1,59 @@
+name: CI
+
+# 每次推 main / 开 PR 都跑 typecheck + 构建 + 全量测试。
+# 存在的理由：原来的 CI 只在打 tag 时构建，且不跑 typecheck/test，
+# 于是 src/middleware.ts 这类没有任何测试的模块成了问题温床（两个 P0 都出在那里）。
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 校验（typecheck / build / test）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "11.18.0"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        # astro check 依赖 .astro/types.d.ts，先 sync 生成类型
+        env:
+          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+        run: |
+          pnpm exec astro sync
+          pnpm run typecheck
+
+      - name: Build
+        env:
+          # CI 没有真实 D1 资源 ID；给一个合法占位 UUID，避免 wrangler.jsonc 残留 ${...} 占位符
+          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+        run: pnpm run build
+
+      - name: Test
+        # e2e 用例通过 miniflare 跑 dist 产物，因此必须在 Build 之后执行
+        env:
+          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
+        run: pnpm test

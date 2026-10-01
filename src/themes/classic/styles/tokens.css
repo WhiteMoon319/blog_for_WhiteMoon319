@@ -25,6 +25,13 @@
   --ink-faint: rgba(0, 0, 0, 0.06);
   --hairline: rgba(0, 0, 0, 0.06);
 
+  /* 前景色（按用途命名，深色模式下才翻转得动）
+     注意 --ink-black 同时被用作深色块背景（页脚、代码块），所以它不随主题翻转；
+     需要「正文里的强调前景」时用下面这几个语义 token，不要直接拿 --ink-black 当文字色。 */
+  --fg-strong: #1a1a2e; /* 正文强调 / 站点标识 */
+  --fg-on-ink: #faf7f2; /* 墨色底上的文字（页脚） */
+  --code-bg: #1a1a2e; /* 代码块底色 */
+
   /* 纸色 */
   --paper-warm: #faf7f2;
   --paper-card: #fffef9;
@@ -69,6 +76,9 @@
     --ink-soft: #a5a19e;
     --ink-faint: rgba(255, 255, 255, 0.11);
     --hairline: rgba(255, 255, 255, 0.11);
+    --fg-strong: #f0e9e2;
+    --fg-on-ink: #f0e9e2;
+    --code-bg: #0d0c10;
     --paper-warm: #141316;
     --paper-card: #1d1b20;
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);

@@ -67,7 +67,9 @@ body {
   left: 0;
   right: 0;
   z-index: 50;
-  background: rgba(250, 247, 242, 0.92);
+  /* 用 --paper-warm 表达：浅色得到 rgba(250,247,242,0.92)、深色得到 rgba(20,19,22,0.92)，
+     与原先两条硬编码完全等价，深色段落因此不必再重复一条背景规则 */
+  background: color-mix(in srgb, var(--paper-warm) 92%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--hairline);
   box-shadow: 0 1px 8px rgba(26, 26, 46, 0.04);
@@ -88,7 +90,7 @@ body {
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: var(--ink-black);
+  color: var(--fg-strong);
   cursor: pointer;
   flex: 0 0 auto;
   margin-right: auto;
@@ -193,7 +195,7 @@ body {
 .site-footer h3 {
   font-family: var(--font-brush);
   font-size: 1.25rem;
-  color: var(--paper-warm);
+  color: var(--fg-on-ink);
   letter-spacing: 0.1em;
   margin: 0 0 6px;
 }
@@ -823,7 +825,7 @@ body {
 }
 
 .article-body strong {
-  color: var(--ink-black);
+  color: var(--fg-strong);
 }
 
 .article-body blockquote {
@@ -851,7 +853,7 @@ body {
   margin: 1.6em 0;
   padding: 18px 20px;
   overflow-x: auto;
-  background: var(--ink-black);
+  background: var(--code-bg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
 }
@@ -1315,12 +1317,7 @@ section[id],
   }
 
   .site-nav {
-    background: rgba(20, 19, 22, 0.92);
     box-shadow: 0 1px 8px rgba(0, 0, 0, 0.34);
-  }
-
-  .site-logo {
-    color: #f0e9e2;
   }
 
   .site-logo-seal {
@@ -1341,37 +1338,25 @@ section[id],
     background: rgba(255, 255, 255, 0.07);
   }
 
-  .article-body strong {
-    color: #f0e9e2;
-  }
-
-  .article-body pre {
-    background: #0d0c10;
-  }
-
   .article-body th {
-    background: rgba(224, 107, 97, 0.1);
+    background: color-mix(in srgb, var(--cinnabar) 10%, transparent);
   }
 
   .tl-item::before {
     background: var(--paper-warm);
   }
-
-  .site-footer h3 {
-    color: #f0e9e2;
-  }
 }
 
 @media (prefers-color-scheme: dark) and (max-width: 599px) {
   .nav-links {
-    background: rgba(20, 19, 22, 0.98);
+    background: color-mix(in srgb, var(--paper-warm) 98%, transparent);
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.46);
   }
   .nav-links .nav-link {
     background: rgba(255, 255, 255, 0.045);
   }
   .nav-links .nav-link.active {
-    background: rgba(224, 107, 97, 0.14);
+    background: color-mix(in srgb, var(--cinnabar) 14%, transparent);
   }
 }
 

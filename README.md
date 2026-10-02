@@ -359,13 +359,15 @@ pnpm fonts:sync --limit 5 --dry-run              # 只处理前 5 个 / 只看�
 | `R2_PUBLIC_URL` | Worker secret（`wrangler secret put`） | 上传媒体返回的公网前缀；空则走本站 `/api/files` 路由 |
 | `FONTS_BASE` | `.env`（**构建期**，不是 Worker 变量） | 字体切片外链前缀；空则走本站路由，设为 R2 自定义域则直取 CDN |
 
-四点必须知道：
+五点必须知道：
 
 - **切片路径前缀就是缓存版本号**：R2 对象带 `Cache-Control: immutable`，会被 CF 边缘缓存一年，**重传同 key 不会让缓存失效**（实测）。要换内容或事后补 CORS，就把 `--prefix` 推一版（`fonts/v1` → `fonts/v2`），不要复用旧路径。
 - **自定义域必须配 CORS**：跨域 webfont 要求响应带 `Access-Control-Allow-Origin`，R2 自定义域默认不给，缺了浏览器会静默拦下全部字体、页面回退系统字体。策略见 `r2-cors.json`；`pnpm run deploy` 在 `FONTS_BASE` 非空时会自动预检该域（不可达或缺 CORS 就中止，可用 `pnpm run deploy -- --skip-font-check` 跳过）。
 - **`FONTS_BASE` 是构建期注入**：`astro.config.mjs` 改写 `fonts.css` 的切片前缀，并同步放宽 CSP 的 `font-src`；改完必须重新构建，且要与部署时 `.env` 里的值一致。仓库里的 `fonts.css` 始终是相对路径，不设它的 fork 不会指向别人的桶。
 - **它对 `pnpm run dev` 同样生效**：本地开发也读 `.env`，配了外链就从别人的桶取字体；调字体样式时把这一行清空，再看本地切片。
 - **第三方主题需要自带 `styles/fonts.css`**：这两套入库主题各自 import 了自己那份；外部安装的主题若不引入，就没有自托管字体（回退系统字体），按同样做法加一份 CSS 即可。
+
+**站点专属子集补丁（可选）**：粒度较粗的展示字体（例如只用于标题的毛笔字）可以再切一版「常用字子集」、避免首屏为少量用字下载整片：构建期追加在切片之后（CSS 同族同字重后声明者优先，集外生僻字仍由原切片兜底）。补丁文件放本地 `site-fonts/`、不随仓库分发——它取决于站点自身的文案与内容；`astro.config.mjs` 检测到该目录即注入、缺失自动跳过，fork 无需任何处理。
 
 ## 构建与测试
 
@@ -424,7 +426,7 @@ chmod +x setup.sh
 7. ✅ 设置生产密钥（管理员密码、会话密钥、AI 加密密钥、SMTP 凭据等）
 8. ✅ 生成部署配置（wrangler.jsonc）
 9. ✅ 应用数据库迁移
-10. ✅ 上传自托管字体切片（可选，约十几分钟；跳过则前台用系统字体，事后可 `pnpm fonts:sync` 补）
+10. ✅ 上传自托管字体切片（可选，约 30 分钟；跳过则前台用系统字体，事后可 `pnpm fonts:sync` 补）
 11. ✅ 构建并部署到 Cloudflare Workers
 
 部署完成后，用浏览器访问你的域名即可看到博客。

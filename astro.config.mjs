@@ -83,15 +83,27 @@ function envValue(key) {
  */
 const FONTS_BASE = envValue('FONTS_BASE').replace(/\/+$/, '');
 
+// 站点专属字体补丁（子集）——主题保持通用，这里按本站内容注入。
+// site-fonts/ 不入库（用字集与子集字体取决于站点内容），存在时注入、缺失自动跳过。
+const SITE_FONTS_PATCH = path.join(ROOT, 'site-fonts', 'ma-shan-zheng-subset.css');
+
 function fontsBasePlugin() {
   return {
     name: 'fonts-base',
     enforce: 'pre',
     /** @param {string} code @param {string} id */
     transform(code, id) {
-      if (!FONTS_BASE) return null;
       if (!toId(id).endsWith('/styles/fonts.css')) return null;
-      return code.replaceAll("url('/api/files/fonts/", `url('${FONTS_BASE}/fonts/`);
+      let out = code;
+      // 追加站点专属子集：必须放在 879 条切片之后（同族同字重后声明者优先），
+      // 这样常用字走 59KB 单文件，集外生僻字仍由原切片兜底
+      if (existsSync(SITE_FONTS_PATCH)) {
+        out += '\n' + readFileSync(SITE_FONTS_PATCH, 'utf8');
+      }
+      if (FONTS_BASE) {
+        out = out.replaceAll("url('/api/files/fonts/", `url('${FONTS_BASE}/fonts/`);
+      }
+      return out === code ? null : out;
     },
   };
 }

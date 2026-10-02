@@ -22,6 +22,8 @@ wrangler.jsonc
 PLAN.md
 #agent目录
 .pai
+# 站点专属字体补丁（用字集与子集字体取决于本站内容，不入对外仓库）
+site-fonts/
 docs/comments-readers-plan.md
 
 /src/themes/*

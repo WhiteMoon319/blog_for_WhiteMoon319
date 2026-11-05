@@ -1,0 +1,64 @@
+# 月下独酌 · blog — systemd 服务单元
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 安装：
+#   sudo cp deploy/blog.service /etc/systemd/system/blog.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now blog
+#   sudo journalctl -u blog -f        # 看日志
+#
+# 按实际路径改 WorkingDirectory / ExecStart / User / EnvironmentFile。
+
+[Unit]
+Description=月下独酌 blog (Node backend)
+Documentation=https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blog
+Group=blog
+WorkingDirectory=/opt/blog
+
+# 环境变量与机密放独立文件，权限 600，不要写进 unit
+EnvironmentFile=/etc/blog/blog.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node /opt/blog/server/index.mjs
+
+# ---- 优雅重启与停机 ----
+# 收到 SIGTERM 后进程会停止接新连接、等存量请求收尾（最长 5s）
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=5
+
+# ---- 日志 ----
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=blog
+
+# ---- 安全加固 ----
+# 只允许写数据目录与临时目录，其余按只读挂载
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/blog
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# node:sqlite 需要能 mmap 数据库文件，故不开 MemoryDenyWriteExecute
+
+# ---- 资源限制（按机器规格调整）----
+LimitNOFILE=65535
+# 单个进程内存上限，超出会被 OOM 杀掉并由 systemd 重启
+# MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

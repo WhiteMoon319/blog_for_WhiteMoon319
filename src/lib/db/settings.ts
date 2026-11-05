@@ -6,7 +6,7 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 
 const WHITELIST = [
   'SITE_NAME',

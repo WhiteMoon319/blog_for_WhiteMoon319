@@ -9,7 +9,7 @@
 // 文集协作：私有文集只有归属人、协作者与管理员可写入。
 // 协作者由归属人手动拉入，或由其他作者申请、归属人同意后自动加入。
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 
 export interface CollaboratorRow {
   user_id: number;

@@ -5,11 +5,37 @@
 // 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// ============================================================================
+// 环境类型定义（Node 后端版）
+// ============================================================================
+//
+// 原来这里声明的是 Cloudflare 的 Env（D1Database / R2Bucket 来自
+// @cloudflare/workers-types）。Node 后端不依赖 Cloudflare 类型包，
+// 改为在 src/types/bindings.ts 里自建等价的最小接口，
+// 这样业务代码的 `const db: D1Database` 之类的写法无需改动。
 
 /// <reference types="astro/client" />
-/// <reference types="@cloudflare/workers-types" />
+
+import type {
+  D1Database as D1DatabaseType,
+  D1PreparedStatement as D1PreparedStatementType,
+  D1Result as D1ResultType,
+  Fetcher as FetcherType,
+  R2Bucket as R2BucketType,
+} from './types/bindings.ts';
 
 declare global {
+  // ---- 全局类型别名 ----
+  // @cloudflare/workers-types 提供了全局的 D1Database / D1PreparedStatement / D1Result，
+  // 业务代码大量直接引用这些名字（不 import）。去掉那个包后必须在这里补上等价声明，
+  // 否则 30+ 文件的类型标注全部失效。
+  type D1Database = D1DatabaseType;
+  type D1PreparedStatement<T = Record<string, unknown>> = D1PreparedStatementType<T>;
+  type D1Result<T = Record<string, unknown>> = D1ResultType<T>;
+  type R2Bucket = R2BucketType;
+  type Fetcher = FetcherType;
+
   namespace Cloudflare {
     interface Env {
       DB: D1Database;
@@ -39,8 +65,13 @@ declare global {
       HTTPS_REDIRECT?: string;
     }
   }
-
   interface Env extends Cloudflare.Env {}
+
+  /** 由 server/index.mjs 注入 */
+  // eslint-disable-next-line no-var
+  var __BLOG_ENV_RESOLVER__: (() => Promise<Env>) | undefined;
+  // eslint-disable-next-line no-var
+  var __BLOG_PAGE_CACHE__: unknown;
 }
 
 declare module '*.html?raw' {

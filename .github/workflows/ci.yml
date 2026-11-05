@@ -3,9 +3,13 @@ name: CI
 # 每次推 main / 开 PR 都跑 typecheck + 构建 + 全量测试。
 # 存在的理由：原来的 CI 只在打 tag 时构建，且不跑 typecheck/test，
 # 于是 src/middleware.ts 这类没有任何测试的模块成了问题温床（两个 P0 都出在那里）。
+#
+# 本分支（Node 后端）不再需要 wrangler / D1 资源 ID / miniflare，
+# 测试直接在进程内起真实 HTTP 服务 + node:sqlite 内存库。
+
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feat/node-backend"]
   pull_request:
   workflow_dispatch:
 
@@ -32,6 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+          # node:sqlite 需要 Node >= 22；这里钉 24 与本地验证环境一致
           node-version: "24.16.0"
           cache: pnpm
 
@@ -43,8 +48,6 @@ jobs:
 
       - name: Typecheck
         # 不指定主题：走默认解析（modern），顺带覆盖默认主题的类型检查
-        env:
-          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
         run: |
           pnpm exec astro sync
           pnpm run typecheck
@@ -55,14 +58,11 @@ jobs:
       # 因此这里显式钉住，缺口另立任务。（类型检查层面已不再排除任何主题目录。）
       - name: Build
         env:
-          # CI 没有真实 D1 资源 ID；给一个合法占位 UUID，避免 wrangler.jsonc 残留 ${...} 占位符
-          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
           BLOG_THEME: classic
         run: pnpm run build
 
       - name: Test
-        # e2e 用例通过 miniflare 跑 dist 产物，因此必须在 Build 之后执行
+        # e2e 用例跑 dist 产物（进程内起 HTTP server），因此必须在 Build 之后执行
         env:
-          BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
           BLOG_THEME: classic
         run: pnpm test

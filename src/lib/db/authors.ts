@@ -9,7 +9,7 @@
 // 多作者署名：post_authors 记录对外署名（有序，第一位为主作者），
 // 与 posts.created_by（归属人，决定编辑权）解耦；作者身份复用统一 users 表。
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 import type { AuthorRef, AuthorSummary, PostRow } from './types.ts';
 import { escapeLike } from './search.ts';
 

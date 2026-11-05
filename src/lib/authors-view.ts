@@ -9,7 +9,7 @@
 // 前台作者展示契约：把库里的用户行整理成"可直接渲染"的作者徽标，
 // 让主题不必判断封禁/角色（主题禁止访问 DB，判断逻辑必须留在核心）。
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../types/bindings';
 import type { AuthorBadge } from './theme-context.ts';
 
 interface AuthorRow {

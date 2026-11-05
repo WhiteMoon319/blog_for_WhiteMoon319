@@ -185,7 +185,7 @@ export async function createPost(db: D1Database, data: PostInput): Promise<PostR
          FROM posts WHERE id = last_insert_rowid()`,
     ),
   ]);
-  return (results[1].results?.[0] as PostRow | undefined) ?? null;
+  return (results[1].results?.[0] as unknown as PostRow | undefined) ?? null;
 }
 
 // 创建 + 打标签原子写：主体、初始版本、标签 ensure/关联、孤儿清理放进同一个 D1 batch。
@@ -256,7 +256,7 @@ export async function createPostWithTags(
     );
   });
   const results = await db.batch(stmts);
-  const post = (results[1].results?.[0] as PostRow | undefined) ?? null;
+  const post = (results[1].results?.[0] as unknown as PostRow | undefined) ?? null;
   if (!post) return null;
   return { post, tags: await listPostOwnTags(db, post.id) };
 }
@@ -338,7 +338,7 @@ export async function updatePost(
         ...versionArgs,
       ),
   ]);
-  const row = results[0].results?.[0] as PostRow | undefined;
+  const row = (results[0].results?.[0] as unknown as PostRow | undefined);
   if (!row) return baseVersion !== undefined ? 'conflict' : null;
   return row;
 }
@@ -444,7 +444,7 @@ export async function updatePostWithTags(
   );
   if (tagNames !== null) stmts.push(...setPostOwnTagsStmts(db, id, tagNames));
   const results = await db.batch(stmts);
-  const row = results[0].results?.[0] as PostRow | undefined;
+  const row = (results[0].results?.[0] as unknown as PostRow | undefined);
   if (!row) return baseVersion !== undefined ? 'conflict' : null;
   return { post: row, tags: await listPostOwnTags(db, id) };
 }

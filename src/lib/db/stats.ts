@@ -6,7 +6,7 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 import { clientIp } from '../ratelimit.ts';
 
 // 去重口径：同一 IP 访问同一篇文章，同一自然日（UTC）只计 1 次。

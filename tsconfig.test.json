@@ -3,6 +3,6 @@
   "include": ["tests/**/*.ts", "src/env.d.ts"],
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node", "@cloudflare/workers-types"]
+    "types": ["node"]
   }
 }

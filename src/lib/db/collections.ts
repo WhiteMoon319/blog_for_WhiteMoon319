@@ -159,7 +159,7 @@ export async function createCollectionWithTags(
     stmts.push(purgeOrphanTagsStmt(db));
   }
   const results = await db.batch(stmts);
-  const collection = (results[0].results?.[0] as CollectionRow | undefined) ?? null;
+  const collection = (results[0].results?.[0] as unknown as CollectionRow | undefined) ?? null;
   if (!collection) return null;
   return { collection, tags: await listCollectionTags(db, collection.id) };
 }
@@ -224,7 +224,7 @@ export async function updateCollectionWithTags(
   }
   if (tagNames !== null) stmts.push(...setCollectionTagsStmts(db, id, tagNames));
   const results = await db.batch(stmts);
-  const collection = (results[0]?.results?.[0] as CollectionRow | undefined) ?? (await getCollectionById(db, id));
+  const collection = (results[0]?.results?.[0] as unknown as CollectionRow | undefined) ?? (await getCollectionById(db, id));
   if (!collection) return null;
   return { collection, tags: await listCollectionTags(db, id) };
 }

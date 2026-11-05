@@ -1,24 +1,15 @@
 # 构建产物
 dist/
-.wrangler/
 .astro/
 node_modules/
 admin/node_modules/
 admin/dist/
 admin/dist-write/
-
 # 环境变量
-.dev.vars
 .env
-
-# 本地生成的 Wrangler 配置（由 wrangler.jsonc.template + .env 经 scripts/cf-config.mjs 生成）
-wrangler.jsonc
-
-# 发布包自带的便携运行环境（由 CI 生成，不入库）
-/runtime/
-# 部署向导的断点续跑标记
-.setup-progress
-#计划文档
+# Node 后端运行时数据（SQLite 数据库 + 上传文件），绝不入库
+/data/
+# 计划文档
 PLAN.md
 #agent目录
 .pai

@@ -250,7 +250,7 @@ test('e2e：Markdown 清洗——script/onerror/javascript: 全部去除', async
 test('e2e：同秒文章的相邻排序按 id 决胜', async () => {
   if (!HAS_BUILD) return;
   await c.login();
-  const db = await c.mf.getD1Database('DB');
+  const db = c.db;
   const a = await c.post('/api/posts', { title: '同秒 A', slug: 'same-a', status: 'published' });
   const b = await c.post('/api/posts', { title: '同秒 B', slug: 'same-b', status: 'published' });
   assert.equal(a.status, 201);
@@ -330,7 +330,7 @@ test('e2e：文集与归档分页——页 1 满页、页 2 余量、页码越�
   const colRes = await c.post('/api/collections', { title: '分页集', slug: 'page-col', sort_order: 8 });
   assert.equal(colRes.status, 201);
   const colId = (await colRes.json()).collection.id as number;
-  const db = await c.mf.getD1Database('DB');
+  const db = c.db;
   const ids: number[] = [];
   for (let i = 0; i < 13; i++) {
     const r = await c.post('/api/posts', {

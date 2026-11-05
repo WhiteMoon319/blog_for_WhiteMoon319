@@ -9,7 +9,7 @@
 // 文章编辑权判定：归属人（posts.created_by）与署名（post_authors）解耦后的统一入口。
 
 import type { APIContext } from 'astro';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 import type { PostRow } from '../db/types.ts';
 import type { UserRow } from '../db/users.ts';
 import { getPostAuthorIds } from '../db/authors.ts';

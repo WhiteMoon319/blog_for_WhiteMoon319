@@ -6,15 +6,18 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/cf-config.mjs && node scripts/copy-vendor-css.mjs && pnpm -C admin run build && astro build && node scripts/merge-admin.mjs && node scripts/build-worker.mjs",
+    "build": "node scripts/copy-vendor-css.mjs && pnpm -C admin run build && astro build && node scripts/merge-admin.mjs",
     "build:admin": "pnpm -C admin run build",
     "dev:admin": "pnpm -C admin run dev",
     "preview": "astro preview",
     "astro": "astro",
-    "typecheck": "pnpm run typecheck:astro && pnpm run typecheck:admin && pnpm run typecheck:worker && pnpm run typecheck:tests",
+    "start": "node server/index.mjs",
+    "start:prod": "NODE_ENV=production node server/index.mjs",
+    "migrate": "node server/migrate.mjs --verbose",
+    "db:reset": "node server/migrate.mjs && node scripts/db-seed.mjs",
+    "typecheck": "pnpm run typecheck:astro && pnpm run typecheck:admin && pnpm run typecheck:tests",
     "typecheck:astro": "astro check",
     "typecheck:admin": "pnpm -C admin run typecheck",
-    "typecheck:worker": "tsc -p tsconfig.worker.json",
     "typecheck:tests": "tsc -p tsconfig.test.json",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
     "theme": "node scripts/theme.mjs",
@@ -22,18 +25,11 @@
     "theme:add": "node scripts/theme-add.mjs",
     "theme:update": "node scripts/theme-update.mjs",
     "fonts:sync": "node scripts/fonts-sync.mjs",
-    "cf:login": "wrangler login",
-    "cf:config": "node scripts/cf-config.mjs",
-    "cf:db:local": "node scripts/cf-config.mjs && wrangler d1 execute blog-db --local --file=db/reset-local.sql && wrangler d1 migrations apply blog-db --local && wrangler d1 execute blog-db --local --file=db/seed.sql",
-    "cf:dev": "pnpm run build && wrangler dev",
-    "cf:deploy": "pnpm run build && wrangler deploy",
-    "deploy": "node scripts/deploy.mjs",
-    "setup": "node scripts/setup-deploy.mjs",
     "format": "prettier --write \"src/**/*.{ts,astro}\" \"tests/**/*.ts\" \"scripts/**/*.{mjs,ts}\" \"admin/src/**/*.{ts,vue}\"",
     "format:check": "prettier --check \"src/**/*.{ts,astro}\" \"tests/**/*.ts\" \"scripts/**/*.{mjs,ts}\" \"admin/src/**/*.{ts,vue}\""
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.2.1",
+    "@astrojs/node": "^11.1.9",
     "astro": "^7.2.2",
     "d3": "^7.9.0",
     "diff": "^9.0.0",
@@ -48,7 +44,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
-    "@cloudflare/workers-types": "^5.20260815.1",
+    
     "@types/diff": "^7.0.2",
     "@types/katex": "^0.16.8",
     "@types/node": "^24.0.0",
@@ -56,10 +52,8 @@
     "@types/sanitize-html": "^2.16.0",
     "esbuild": "^0.28.2",
     "fflate": "^0.8.3",
-    "miniflare": "5.20260811.1-alpha",
     "prettier": "3.6.2",
     "prettier-plugin-astro": "0.14.1",
-    "typescript": "^5.7.0",
-    "wrangler": "^4.60.0"
+    "typescript": "^5.7.0"
   }
 }

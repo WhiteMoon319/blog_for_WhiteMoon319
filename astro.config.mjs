@@ -8,7 +8,7 @@
 
 // @ts-check
 import { defineConfig } from 'astro/config';
-import cloudflare from '@astrojs/cloudflare';
+import node from '@astrojs/node';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,9 +110,10 @@ function fontsBasePlugin() {
 
 export default defineConfig({
   output: 'server',
-  adapter: cloudflare({
-    platformProxy: { enabled: true },
-    imageService: 'passthrough',
+  // Node 后端：standalone 模式产出 dist/server/entry.mjs，内部自带 HTTP 服务器，
+  // 可直接 `node ./dist/server/entry.mjs` 启动，不依赖宿主框架。
+  adapter: node({
+    mode: 'standalone',
   }),
   vite: {
     plugins: [themeResolver(), fontsBasePlugin()],

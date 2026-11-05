@@ -9,7 +9,7 @@
 // 文集写权限判定：集合作者化后，作者只能管理自己创建的文集，管理员全权。
 
 import type { APIContext } from 'astro';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '../../types/bindings';
 import type { CollectionRow } from '../db/types.ts';
 import type { UserRow } from '../db/users.ts';
 import { getCollectionById } from '../db/collections.ts';

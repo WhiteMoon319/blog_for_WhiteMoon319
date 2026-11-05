@@ -41,7 +41,14 @@ test('e2e：scheduled 触发——到点定时草稿被刊发并公开可见', a
   await c.sql('UPDATE posts SET scheduled_at = ? WHERE id = ?', PAST, id);
 
   const before_ = await c.anon('/posts/sched-e2e/');
-  assert.equal(before_.status, 404, '到点但未触发 cron 时仍不可见');
+  // 全站用 Astro.redirect('/404') 表达「不存在」：未刊发的文章对外就是 302 → /404。
+  // （Cloudflare 版下 miniflare 的 dispatchFetch 会跟随这条重定向并落成 404 状态，
+  //   Node e2e 客户端对齐的是「不跟随」，因此这里按 302 + Location 断言，语义相同。）
+  assert.equal(before_.status, 302, '到点但未触发 cron 时仍不可见（302 → /404）');
+  assert.ok(
+    String(before_.headers.get('location') ?? '').includes('/404'),
+    '未刊发文章应指向 /404',
+  );
 
   await c.triggerScheduled();
 

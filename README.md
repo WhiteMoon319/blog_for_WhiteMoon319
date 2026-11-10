@@ -1,6 +1,8 @@
 # 月下独酌 · blog
 
-架在 Cloudflare 上的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写作，可分文集（合集），支持发布/草稿/定时切换、版本历史与回滚、图片直传 R2、AI 摘要生成、用户注册与评论互动。前台为 Astro SSR，后台为 Vue 3 单页应用，全部运行在 Cloudflare Workers + D1 + R2 之上。
+一套代码、两个运行目标的个人博客：前台访客展卷，后台主人落笔。文章以 Markdown 写作，可分文集（合集），支持发布/草稿/定时切换、版本历史与回滚、图片直传 R2、AI 摘要生成、用户注册与评论互动。前台为 Astro SSR，后台为 Vue 3 单页应用。
+
+默认目标为 **Cloudflare Workers + D1 + R2**；把 `BLOG_TARGET` 设为 `node`，同一份源码可编译成 **原生 Node.js + `node:sqlite` + 本地磁盘** 的产物，部署到任意 x86 Linux 服务器，不依赖任何云服务。两条线共用全部业务代码，平台差异由三个兼容层在运行时探测分流，详见 [docs/node-backend.md](docs/node-backend.md)。
 
 ## 功能
 
@@ -58,7 +60,8 @@
 - **OpenAI-compatible API**：AI 摘要生成（DeepSeek / OpenAI / 自定义端点）
 - **nodemailer**：SMTP 邮件发送；兼容 Resend / Mailgun / SMTP2Go 等 HTTP API 邮件服务
 - **Workers Cache API**：公开页面边缘缓存；**cron 触发器**：定时刊发到期文章
-- **miniflare + node:test**：本地 e2e 测试
+- **Node 目标**：`@astrojs/node` standalone + `node:sqlite`（D1 兼容层）+ 本地文件系统（R2 兼容层）
+- **miniflare + node:test**：本地 e2e 测试（按产物自动分流 miniflare / 进程内 http.Server）
 
 ## 目录结构
 
@@ -509,6 +512,108 @@ pnpm run build
 npx wrangler deploy
 ```
 
+### 部署到自己的服务器（Node 目标）
+
+不想用 Cloudflare 时，同一份源码可编译成纯 Node 产物。以下是最小可跑路径（x86_64 Linux 实测）。
+
+**① 准备**
+
+```bash
+# 需要 Node >= 22（node:sqlite 在 22 才稳定）、pnpm、git
+node -v && pnpm -v
+```
+
+**② 拉代码并构建**
+
+```bash
+git clone https://github.com/WhiteMoon319/blog_for_WhiteMoon319.git
+cd blog_for_WhiteMoon319
+pnpm install
+BLOG_TARGET=node pnpm run build      # admin + write + astro 三套产物
+```
+
+**③ 配置 `.env`**
+
+```bash
+SITE_URL=https://你的域名
+PORT=8020
+FONTS_BASE=https://static.你的域名   # 构建期变量，改了必须重新 build
+BLOG_ADMIN_PASSWORD=初始管理员密码
+BLOG_SESSION_SECRET=至少32字节随机串
+```
+
+```bash
+chmod 600 .env
+```
+
+**④ 迁移数据库并启动**
+
+```bash
+pnpm run migrate          # 应用 db/migrations 全部迁移
+pnpm start                # 直接跑 server/index.mjs
+```
+
+> Node 侧**不走** `@astrojs/node` 的 autostart，`pnpm start` 启动的是自写的 `server/index.mjs`，
+> 由它注入 env / cache / 静态资源三个兼容层。健康检查路径是 `/__health`（不是 `/api/health`）。
+
+**⑤ systemd 常驻**
+
+```ini
+# /etc/systemd/system/bwm.service
+[Unit]
+Description=blog
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/bwm
+Environment=NODE_ENV=production
+Environment=BLOG_TARGET=node
+EnvironmentFile=/home/ubuntu/bwm/.env
+ExecStart=/opt/node/bin/node server/index.mjs
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now bwm
+```
+
+**⑥ 反向代理（gzip 必须补全）**
+
+nginx 反代到 `127.0.0.1:8020` 时，`gzip_types` 与 `gzip_proxied any` 默认缺失会让反代响应整份裸传：
+
+```nginx
+gzip on;
+gzip_vary on;
+gzip_proxied any;          # 关键：默认 off，反代响应一律不压
+gzip_comp_level 6;
+gzip_min_length 1024;
+gzip_types text/plain text/css text/javascript application/javascript
+           application/json image/svg+xml application/manifest+json;
+```
+
+实测补全后：后台 JS 116KB → 45KB、CSS 32KB → 7KB、首页 16KB → 6KB。
+
+**⑦ 字体（可选）**
+
+字体是站点侧资源，不在构建产物里，Node 环境下二选一：
+
+- 走 Astro 路由 `/api/files/fonts/…`：从 `data/blobs` 读取，需先把切片同步到本地
+- **静态直连（推荐）**：设 `FONTS_BASE` 后重新构建，构建期把路径改写成 `${FONTS_BASE}/fonts/`，
+  CSP 的 `font-src` 同步更新，nginx 直接发送文件，完全绕开 Node
+
+**⑧ 从 Cloudflare 迁数据**
+
+```bash
+pnpm cf:import -- --token=你的Token --account=账号ID --database=数据库ID --bucket=桶名
+```
+
+会拉取 D1 全量导出与 R2 对象，按 `NodeR2Bucket` 布局落到 `data/`。目标库已有表时拒绝执行，
+需 `--force`（自动备份到 `data/blog.db.backup-<ISO时间>`）。
+
 ### 日常更新
 
 ```bash
@@ -527,6 +632,8 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 | 公开页面     | 首页仅 1 个 CSS，0 个 JS，首次加载无 JS 阻塞                                                                                                                                        |
 | 字体自托管   | 879 条 `@font-face` 按 unicode-range 细切、`font-display: swap`，浏览器只取命中字符所在切片；配 `FONTS_BASE` 后切片直取 R2 自定义域（CF CDN），每页约 50 次请求不再消耗 Worker 调用 |
 | D1 查询优化  | 点赞计数批量计算、sitemap 列裁剪                                                                                                                                                    |
+| 列表响应瘦身 | `/api/posts?brief=1` 剥离 `content_md`：48 篇正文共 14 万字符、占响应 92%，剥离后 468KB → 49KB（−89.5%）；不带该参数时行为不变 |
+| 传输压缩     | 反代场景须显式 `gzip_proxied any` + `gzip_types`，否则整份裸传；补全后 JS −61%、CSS −77%、首页 −64% |
 
 ## 数据库
 

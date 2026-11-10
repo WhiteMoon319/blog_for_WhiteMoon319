@@ -467,7 +467,9 @@ function parseArgs(argv) {
 }
 
 if (import.meta.filename === process.argv[1]) {
-  const args = parseArgs(process.argv.slice(2));
+  // pnpm run cf:import -- --help 会把多余的 '--' 透传进来，先过滤掉，
+  // 否则 --help 开关识别不到、帮助文本出不来
+  const args = parseArgs(process.argv.slice(2).filter((a) => a !== '--'));
 
   if (args.help) {
     console.log(`

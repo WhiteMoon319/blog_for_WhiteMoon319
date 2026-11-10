@@ -122,6 +122,8 @@ server/
 ├── r2.mjs        R2 兼容层（本地文件系统）+ ASSETS 兼容
 ├── cache.mjs     进程内 LRU 页面缓存
 ├── static.mjs    SSR-first 静态分发与缓存头
+├── cf-import.mjs Cloudflare 数据导入（D1 导出 + R2 下载）
+├── cf-import.d.mts cf-import.mjs 的类型声明
 └── migrate.mjs   迁移执行器（含 CLI）
 
 deploy/
@@ -133,7 +135,100 @@ Dockerfile        两阶段构建镜像
 
 ---
 
-## 五、本地运行
+## 五、从 Cloudflare 迁移数据
+
+已经用 Workers 版跑过一段时间、线上有真实数据时，用 `server/cf-import.mjs`
+一键搬迁，不需要手工导出 SQL，也不需要 `wrangler login`。
+
+### 1. 准备 API Token
+
+到 Cloudflare 仪表盘 → My Profile → API Tokens → Create Token，用
+**Custom token**，需要这两项权限：
+
+| 权限 | 级别 | 用途           |
+| ---- | ---- | -------------- |
+| D1   | Read | 列库、导出 SQL |
+| R2   | Read | 列桶、下载对象 |
+
+再补一个 **Account Resources → Include → 你的账号**，以及 **User → User Details: Read**
+（用于 `/user/tokens/verify` 校验）。Account ID 在仪表盘右侧栏或 URL 里
+（`dash.cloudflare.com/<ACCOUNT_ID>/...`）。
+
+### 2. 先干跑确认资源
+
+```bash
+pnpm run cf:import -- --token=<TOKEN> --account=<ACCOUNT_ID> --dry-run
+```
+
+输出会列出账号下的 D1 库和 R2 桶，确认它选中了 `blog-db` / `blog-images`。
+名字不一致时用 `--database=<name|uuid>`、`--bucket=<name>` 指定。
+
+### 3. 正式导入
+
+```bash
+pnpm run cf:import -- --token=<TOKEN> --account=<ACCOUNT_ID>
+```
+
+流程与产物：
+
+```
+1/5 校验 token
+2/5 定位资源（D1 库 / R2 桶）
+3/5 导出 D1 → 下载 SQL → 写入 $BLOG_DB_PATH
+4/5 列出 R2 对象（分页拉全）
+5/5 下载对象到 $BLOG_BLOB_DIR
+```
+
+结束后直接 `pnpm start:prod`，用**原来的账号密码**登录后台即可，文章、评论、
+用户、阅读历史、图片全部在位。
+
+### 4. 目标库已有数据时
+
+默认拒绝覆盖。确认要覆盖时加 `--force`，脚本会先 `VACUUM INTO` 备份原库
+（生成 `blog.db.backup-<时间戳>`）再导入。
+
+### 5. 导入时做了什么（关键细节）
+
+这几处如果处理错了，会静默丢失功能，所以单独说明：
+
+1. **D1 导出用 `compatibility: 'sqlite3_cli_only'`**
+   本项目有 FTS5 外部内容表 `posts_fts`。默认的 `d1` 格式**不导出虚拟表**，
+   导进来之后 `posts_fts` 不存在，站内搜索会直接报错。用 CLI 格式才能带上
+   `CREATE VIRTUAL TABLE` 与三个同步触发器。
+
+2. **导入后强制 `rebuild` 全文索引**
+   trigram 索引对内容敏感，直接从别处搬来的索引可能与数据对不上，统一重建一次。
+
+3. **补登 `d1_migrations`**
+   dump 里通常不含这张表的数据。如果不补，下次启动 `runMigrations` 会对着
+   已经存在的表再跑一遍 `CREATE TABLE`，服务直接起不来。导入末尾会自动把
+   `db/migrations/` 下的全部文件名登记为已应用（幂等）。
+
+4. **R2 对象 key 的 `/` 不编码**
+   Cloudflare 明确要求保留斜杠字面量；逐段 `encodeURIComponent` 后拼接。
+
+5. **元信息写进 `.meta/`**
+   与 `NodeR2Bucket` 同一套布局，保留原 `http_metadata.contentType`，
+   否则图片取回时会变成 `application/octet-stream`。
+
+6. **路径穿越防护**
+   导入时对每个 key 做与运行时相同的校验，`../`、绝对路径、盘符一律跳过。
+
+### 6. 常见错误
+
+| 现象                                    | 原因与处理                                                     |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `找不到数据库 "blog-db"`                | 库名不同，用 `--database=<uuid>`；或只用 `--skip-db` 导文件    |
+| `Authentication error` / 403            | token 缺 D1:Read 或 R2:Read，或 Account Resources 没包含该账号 |
+| 导出卡住超过 10 分钟                    | 大库（>5GB）建议改用 `wrangler d1 export` 手动导入             |
+| 导入后搜索报 `no such table: posts_fts` | 导出格式没用 `sqlite3_cli_only`；本脚本已默认处理              |
+| 启动时报 `table posts already exists`   | `d1_migrations` 没补登；重跑导入脚本即可（会自动补）           |
+
+> token 只在进程内存里用，不写日志、不落盘、不入库。
+
+---
+
+## 六、本地运行
 
 ```bash
 # 1. 装依赖
@@ -170,7 +265,7 @@ data/
 
 ---
 
-## 六、生产部署
+## 七、生产部署
 
 ### 方式 A：systemd（推荐，最省资源）
 
@@ -226,7 +321,7 @@ docker run -d --name blog \
 
 ---
 
-## 七、测试
+## 八、测试
 
 ```bash
 # 全量（313 个用例：单元 + e2e）
@@ -245,7 +340,7 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 
 ---
 
-## 八、迁移清单（相对 Cloudflare 版）
+## 九、迁移清单（相对 Cloudflare 版）
 
 **删除**
 
@@ -275,7 +370,7 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 
 ---
 
-## 九、已知差异
+## 十、已知差异
 
 | 项             | 说明                                                                                                      |
 | -------------- | --------------------------------------------------------------------------------------------------------- |

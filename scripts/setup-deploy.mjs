@@ -13,6 +13,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync, appendFileSync, readFileSync, unlinkSync } from 'node:fs';
 import readline from 'node:readline/promises';
+import { runLocal, runRemote } from './setup-node.mjs';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const PROGRESS_FILE = '.setup-progress';
@@ -219,7 +220,27 @@ async function main() {
   console.log(`\n${'='.repeat(60)}`);
   console.log(` ${VER}  月下独酌 · 一键部署向导`);
   console.log(`${'='.repeat(60)}`);
-  console.log(`${INFO} 本向导将引导你从零把博客部署到 Cloudflare\n`);
+  console.log(`${INFO} 本向导将引导你从零把博客部署起来。\n`);
+  // 目标选择：cloudflare（默认）或 node
+  let TARGET = 'cloudflare';
+  console.log(`${INFO} 选择部署目标：`);
+  console.log(`  1) Cloudflare Workers（默认，免费，无需服务器）`);
+  console.log(`  2) 自己的服务器 / 本机（Node + SQLite，需要 Node >= 22）`);
+  const pick = await ask('请输入 1 或 2', '1');
+  if (pick === '2') TARGET = 'node';
+
+  if (TARGET === 'node') {
+    console.log(`\n${INFO} Node 目标：可部署到本机，也可部署到远程服务器。`);
+    const where = await ask('部署到哪？(1=本机 2=远程服务器)', '2');
+    const ctx = { ask, askSecret, guard, root: process.cwd() };
+    if (where === '1') await runLocal(ctx);
+    else await runRemote(ctx);
+    clearProgress();
+    rl.close();
+    return;
+  }
+
+  console.log(`${INFO} 目标：Cloudflare Workers\n`);
 
   await guard('deps', '安装依赖', () => {
     if (!existsSync('node_modules')) run('pnpm install');

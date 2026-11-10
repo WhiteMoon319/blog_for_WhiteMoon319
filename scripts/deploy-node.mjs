@@ -151,10 +151,10 @@ export function initRemote(remote, cfg) {
   remote.writeRemoteFile(`${appDir}/.env`, envFile);
   remote.exec(`chmod 600 ${appDir}/.env`, { label: '收紧 .env 权限' });
 
-  remote.exec(
-    `cd ${appDir} && (pnpm install --prod --ignore-scripts 2>&1 | tail -3)`,
-    { label: '安装运行时依赖', stdio: 'inherit' },
-  );
+  remote.exec(`cd ${appDir} && (pnpm install --prod --ignore-scripts 2>&1 | tail -3)`, {
+    label: '安装运行时依赖',
+    stdio: 'inherit',
+  });
 
   remote.exec(`cd ${appDir} && node server/migrate.mjs 2>&1 | tail -5`, {
     label: '应用数据库迁移',
@@ -248,7 +248,10 @@ server {
   // SSL：先验解析，避免 certbot 打空靶并触发速率限制
   const resolved = remote.probe(`getent hosts ${domain} | awk '{print $1}' | head -3`);
   const serverIp = remote.probe(`curl -s --max-time 5 https://api.ipify.org || echo unknown`);
-  const hit = resolved.split('\n').map((s) => s.trim()).filter(Boolean);
+  const hit = resolved
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (!hit.includes(serverIp.trim())) {
     return {
       ssl: false,

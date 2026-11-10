@@ -13,23 +13,8 @@
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync, spawn } from 'node:child_process';
-import {
-  Remote,
-  ensureKeyPair,
-  installPubkey,
-  verifyKeyLogin,
-  saveDeployState,
-  STATE_DIR,
-} from './remote.mjs';
-import {
-  probeRemote,
-  nginxInUse,
-  buildLocal,
-  packPayload,
-  initRemote,
-  setupNginx,
-  genSecret,
-} from './deploy-node.mjs';
+import { Remote, ensureKeyPair, installPubkey, verifyKeyLogin, saveDeployState, STATE_DIR } from './remote.mjs';
+import { probeRemote, nginxInUse, buildLocal, packPayload, initRemote, setupNginx, genSecret } from './deploy-node.mjs';
 
 const OK = '✅';
 const ERR = '❌';
@@ -207,7 +192,9 @@ export async function runRemote(ctx) {
     });
     if (!manageNginx) {
       console.log(`\n${INFO} 已写入 /etc/nginx/sites-available/bwm，但未启用（检测到已有站点）。`);
-      console.log(`  ${INFO} 确认不冲突后手动启用：sudo ln -s /etc/nginx/sites-available/bwm /etc/nginx/sites-enabled/bwm && sudo nginx -s reload`);
+      console.log(
+        `  ${INFO} 确认不冲突后手动启用：sudo ln -s /etc/nginx/sites-available/bwm /etc/nginx/sites-enabled/bwm && sudo nginx -s reload`,
+      );
     }
   }
 

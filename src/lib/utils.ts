@@ -48,9 +48,7 @@ export function isValidSlug(input: string): boolean {
 }
 
 export function postHref(slug: string, collectionSlug?: string | null): string {
-  return collectionSlug
-    ? `/${encodeURI(collectionSlug)}/${encodeURI(slug)}/`
-    : `/posts/${encodeURI(slug)}/`;
+  return collectionSlug ? `/${encodeURI(collectionSlug)}/${encodeURI(slug)}/` : `/posts/${encodeURI(slug)}/`;
 }
 
 /** R2 公共访问基地址：去掉首尾空白与末尾斜杠，避免拼出双斜杠 URL */
@@ -63,10 +61,31 @@ export function publicBase(raw: string): string {
  * 否则新建文集会把 /about/、/archive/ 这类页面顶掉，或让 /collections/ 变成文集。
  */
 export const RESERVED_COLLECTION_SLUGS = new Set([
-  'admin', 'api', 'login', 'logout', 'register', 'verify-email',
-  'feed', 'rss', 'atom', 'sitemap', 'search', 'tags', 'archive',
-  'collections', 'media', 'export', 'upload', 'posts', 'pages',
-  'authors', 'write', 'preview', 'account', 'about', '404',
+  'admin',
+  'api',
+  'login',
+  'logout',
+  'register',
+  'verify-email',
+  'feed',
+  'rss',
+  'atom',
+  'sitemap',
+  'search',
+  'tags',
+  'archive',
+  'collections',
+  'media',
+  'export',
+  'upload',
+  'posts',
+  'pages',
+  'authors',
+  'write',
+  'preview',
+  'account',
+  'about',
+  '404',
 ]);
 
 /** 校验文集 slug：除通用规则外，再排除会与顶层静态路由冲突的保留字 */

@@ -73,7 +73,7 @@ function authorNames(p: Post): string {
 
 function postUrl(p: Post): string {
   const col = collections.value.find((c) => c.id === p.collection_id);
-  return col ? `/collections/${encodeURI(col.slug)}/${encodeURI(p.slug)}/` : `/posts/${encodeURI(p.slug)}/`;
+  return col ? `/${encodeURI(col.slug)}/${encodeURI(p.slug)}/` : `/posts/${encodeURI(p.slug)}/`;
 }
 
 function edit(p: Post) {

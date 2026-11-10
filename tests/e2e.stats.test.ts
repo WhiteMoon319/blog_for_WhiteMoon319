@@ -40,9 +40,9 @@ test('e2e：访问文章后日聚合入账，同 IP 去重', async () => {
   if (!HAS_BUILD) return;
   await c.login();
 
-  await visit('/collections/essays/first-post/', '61.61.61.1');
-  await visit('/collections/essays/first-post/', '61.61.61.1');
-  await visit('/collections/essays/first-post/', '61.61.61.2');
+  await visit('/essays/first-post/', '61.61.61.1');
+  await visit('/essays/first-post/', '61.61.61.1');
+  await visit('/essays/first-post/', '61.61.61.2');
 
   const r = await c.get('/api/stats?days=7');
   assert.equal(r.status, 200);
@@ -62,7 +62,7 @@ test('e2e：爬虫 UA 访问不计入日聚合', async () => {
   await c.login();
   const before = (await (await c.get('/api/stats?days=7')).json()).total_views as number;
 
-  const r = await c.get('/collections/essays/first-post/', {
+  const r = await c.get('/essays/first-post/', {
     'User-Agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)',
     'CF-Connecting-IP': '70.70.70.7',
   });

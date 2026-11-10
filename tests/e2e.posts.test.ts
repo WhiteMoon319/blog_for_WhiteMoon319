@@ -40,15 +40,15 @@ test('e2e：文章页 TOC 锚点与相邻导航', async () => {
   assert.ok(html.includes('href="#第一标题"'), '目录应链接到锚点');
   await c.del(`/api/posts/${(await created.json()).post.id}`);
 
-  const page = await c.get('/collections/tech/astro-on-cloudflare/');
+  const page = await c.get('/tech/astro-on-cloudflare/');
   assert.equal(page.status, 200);
   const html2 = await page.text();
   assert.ok(html2.includes('article-pagination'), '应渲染相邻导航');
-  assert.ok(html2.includes('/collections/essays/first-post/'), '相邻链接应正确');
+  assert.ok(html2.includes('/essays/first-post/'), '相邻链接应正确');
 
   const legacy = await c.get('/posts/astro-on-cloudflare/');
   assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
-  assert.ok(String(legacy.headers.get('location')).includes('/collections/tech/astro-on-cloudflare/'));
+  assert.ok(String(legacy.headers.get('location')).includes('/tech/astro-on-cloudflare/'));
 });
 
 test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', async () => {
@@ -83,13 +83,13 @@ test('e2e：相邻导航文集内优先，组内无文章才跨文集回退', as
   });
   assert.equal(r.status, 201);
 
-  const html = await (await c.get('/collections/adj-col-a/adj-a-2/')).text();
-  assert.ok(html.includes('/collections/adj-col-a/adj-a-1/'), '上一篇应为同文集邻一');
-  assert.ok(html.includes('/collections/adj-col-a/adj-a-3/'), '下一篇应为同文集邻三');
-  assert.ok(!html.includes('/collections/adj-col-b/'), '同文集存在时不应跨文集相邻');
+  const html = await (await c.get('/adj-col-a/adj-a-2/')).text();
+  assert.ok(html.includes('/adj-col-a/adj-a-1/'), '上一篇应为同文集邻一');
+  assert.ok(html.includes('/adj-col-a/adj-a-3/'), '下一篇应为同文集邻三');
+  assert.ok(!html.includes('/adj-col-b/'), '同文集存在时不应跨文集相邻');
 
-  const htmlB = await (await c.get('/collections/adj-col-b/adj-b-1/')).text();
-  assert.ok(htmlB.includes('/collections/adj-col-a/adj-a-3/'), '别集组内无文章，上一篇应回退为邻三');
+  const htmlB = await (await c.get('/adj-col-b/adj-b-1/')).text();
+  assert.ok(htmlB.includes('/adj-col-a/adj-a-3/'), '别集组内无文章，上一篇应回退为邻三');
 });
 
 test('e2e：集内文章顺序 post_order（asc 旧在前 / desc 新在前）', async () => {
@@ -125,42 +125,42 @@ test('e2e：集内文章顺序 post_order（asc 旧在前 / desc 新在前）', 
     assert.equal(r.status, 201);
   }
 
-  const novelHtml = await (await c.get('/collections/order-novel/')).text();
-  const novelLinks = [...novelHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) =>
+  const novelHtml = await (await c.get('/order-novel/')).text();
+  const novelLinks = [...novelHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) =>
     decodeURIComponent(m[1]),
   );
   assert.deepEqual(
     novelLinks,
     [
-      '/collections/order-novel/order-novel-第一章/',
-      '/collections/order-novel/order-novel-第二章/',
-      '/collections/order-novel/order-novel-第三章/',
+      '/order-novel/order-novel-第一章/',
+      '/order-novel/order-novel-第二章/',
+      '/order-novel/order-novel-第三章/',
     ],
     '连载集应第一章在前',
   );
 
-  const blogHtml = await (await c.get('/collections/order-blog/')).text();
-  const blogLinks = [...blogHtml.matchAll(/href="(\/collections\/order-blog\/[^"]+)"/g)].map((m) =>
+  const blogHtml = await (await c.get('/order-blog/')).text();
+  const blogLinks = [...blogHtml.matchAll(/href="(\/order-blog\/[^"]+)"/g)].map((m) =>
     decodeURIComponent(m[1]),
   );
   assert.deepEqual(
     blogLinks,
-    ['/collections/order-blog/order-blog-乙帖/', '/collections/order-blog/order-blog-甲帖/'],
+    ['/order-blog/order-blog-乙帖/', '/order-blog/order-blog-甲帖/'],
     '博客集应最新在前',
   );
 
   const flipped = await c.put(`/api/collections/${novelId}`, { post_order: 'desc' });
   assert.equal(flipped.status, 200);
-  const flippedHtml = await (await c.get('/collections/order-novel/')).text();
-  const flippedLinks = [...flippedHtml.matchAll(/href="(\/collections\/order-novel\/[^"]+)"/g)].map((m) =>
+  const flippedHtml = await (await c.get('/order-novel/')).text();
+  const flippedLinks = [...flippedHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) =>
     decodeURIComponent(m[1]),
   );
   assert.deepEqual(
     flippedLinks,
     [
-      '/collections/order-novel/order-novel-第三章/',
-      '/collections/order-novel/order-novel-第二章/',
-      '/collections/order-novel/order-novel-第一章/',
+      '/order-novel/order-novel-第三章/',
+      '/order-novel/order-novel-第二章/',
+      '/order-novel/order-novel-第一章/',
     ],
     '改 desc 后应最新在前',
   );
@@ -210,9 +210,9 @@ test('e2e：登录后创建文集→文章→发布→可见→删除', async ()
 
   const legacy = await c.get('/posts/e2e-post/');
   assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
-  assert.ok(String(legacy.headers.get('location')).includes('/collections/test-col/e2e-post/'));
+  assert.ok(String(legacy.headers.get('location')).includes('/test-col/e2e-post/'));
 
-  const page = await c.get('/collections/test-col/e2e-post/');
+  const page = await c.get('/test-col/e2e-post/');
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.ok(html.includes('e2e 文章'));
@@ -274,7 +274,7 @@ test('e2e：搜索页按关键字命中已刊文章', async () => {
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.ok(html.includes('把 Astro 架到 Cloudflare 上'), '应命中标题含关键字的文章');
-  assert.ok(html.includes('/collections/tech/astro-on-cloudflare/'));
+  assert.ok(html.includes('/tech/astro-on-cloudflare/'));
 
   const miss = await c.get('/search/?q=不存在的关键字XYZ');
   assert.equal(miss.status, 200);
@@ -285,11 +285,11 @@ test('e2e：搜索页按关键字命中已刊文章', async () => {
 
 test('e2e：文章页阅读量递增并展示', async () => {
   if (!HAS_BUILD) return;
-  const first = await c.get('/collections/essays/first-post/');
+  const first = await c.get('/essays/first-post/');
   assert.equal(first.status, 200);
   const m1 = (await first.text()).match(/data-views="(\d+)"/);
   assert.ok(m1, '文章页应展示阅读数');
-  const second = await c.get('/collections/essays/first-post/');
+  const second = await c.get('/essays/first-post/');
   const m2 = (await second.text()).match(/data-views="(\d+)"/);
   assert.ok(m2);
   assert.ok(Number(m2[1]) > Number(m1[1]), '再次访问阅读数应递增');
@@ -303,17 +303,20 @@ test('e2e：slug 文集内唯一——跨文集可同名，旧路径 301 转跳�
   assert.equal(a.status, 201, '文集 1 内可用 same-name');
   assert.equal(b.status, 201, '文集 2 内可复用 same-name');
 
-  const pageA = await c.get('/collections/essays/same-name/');
+  const pageA = await c.get('/essays/same-name/');
   assert.equal(pageA.status, 200);
   assert.ok((await pageA.text()).includes('同名甲'), '文集 1 路径应指向自己的文章');
 
-  const pageB = await c.get('/collections/tech/same-name/');
+  const pageB = await c.get('/tech/same-name/');
   assert.equal(pageB.status, 200);
   assert.ok((await pageB.text()).includes('同名乙'), '文集 2 路径应指向自己的文章');
 
   const legacy = await c.get('/posts/same-name/');
   assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
-  assert.ok(String(legacy.headers.get('location')).includes('/collections/'));
+  const legacyLoc = decodeURIComponent(String(legacy.headers.get('location')));
+  // same-name 在 essays 与 tech 两个文集都存在，查询未定序，只要跳到某个集内路径即可
+  assert.ok(/\/same-name\/$/.test(new URL(legacyLoc, 'http://x').pathname), '旧路径应 301 到扁平化后的文集路径, 实际: ' + legacyLoc);
+  assert.ok(!legacyLoc.includes('/collections/'), '301 目标不应再含 /collections/ 前缀');
 
   const dup = await c.post('/api/posts', { title: '同名丙', slug: 'same-name', collection_id: 1, status: 'published' });
   assert.equal(dup.status, 409, '同一文集内重复 slug 应 409');
@@ -346,7 +349,7 @@ test('e2e：文集与归档分页——页 1 满页、页 2 余量、页码越�
     );
   }
 
-  const p1 = await c.get('/collections/page-col/');
+  const p1 = await c.get('/page-col/');
   assert.equal(p1.status, 200);
   const h1 = await p1.text();
   assert.ok(h1.includes('分页文12'), '页 1 应含最新一篇');
@@ -354,14 +357,14 @@ test('e2e：文集与归档分页——页 1 满页、页 2 余量、页码越�
   assert.ok(h1.includes('?page=2'), '应有下一页链接');
   assert.ok(!h1.includes('分页文00'), '页 1 不应含最旧一篇');
 
-  const p2 = await c.get('/collections/page-col/?page=2');
+  const p2 = await c.get('/page-col/?page=2');
   assert.equal(p2.status, 200);
   const h2 = await p2.text();
   assert.ok(h2.includes('分页文00'), '页 2 应含最旧一篇');
-  assert.ok(h2.includes('href="/collections/page-col/"'), '应有回页 1 链接');
+  assert.ok(h2.includes('href="/page-col/"'), '应有回页 1 链接');
   assert.ok(h2.includes('13 篇'), '页头应显示文集文章总数而非当前页条数');
 
-  const pBad = await c.get('/collections/page-col/?page=999');
+  const pBad = await c.get('/page-col/?page=999');
   assert.equal(pBad.status, 200);
   assert.ok((await pBad.text()).includes('分页文00'), '越界页码应回落末页');
 
@@ -848,7 +851,7 @@ test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼�
     status: 'published',
   });
   assert.equal(abs.status, 201);
-  const page = await c.get('/collections/og-col/og-abs/');
+  const page = await c.get('/og-col/og-abs/');
   const html = await page.text();
   assert.ok(html.includes('property="og:image" content="https://cdn.example/uploads/a.png"'), '绝对 URL 不得二次拼接');
   assert.ok(!html.includes('http://e2e.testhttps://'), '不得出现拼接出的非法地址');
@@ -862,7 +865,7 @@ test('e2e：OG 图片——绝对 URL 原样输出，相对 URL 基于站点拼�
     status: 'published',
   });
   assert.equal(rel.status, 201);
-  const page2 = await c.get('/collections/og-col/og-rel/');
+  const page2 = await c.get('/og-col/og-rel/');
   const html2 = await page2.text();
   assert.ok(
     html2.includes('property="og:image" content="http://e2e.test/api/files/uploads/rel.png"'),

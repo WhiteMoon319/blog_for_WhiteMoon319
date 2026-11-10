@@ -60,7 +60,7 @@ export function validatePageSlug(slug: string): { ok: true } | { ok: false; erro
   return e ? { ok: false, error: e } : { ok: true };
 }
 
-// 与文章、文集 slug 的跨表冲突校验（路由层面 `/posts/{slug}`、`/collections/{slug}` 与 `/pages/{slug}` 并存）
+// 与文章、文集 slug 的跨表冲突校验（路由层面 `/posts/{slug}`、`/{collection}/` 与 `/pages/{slug}` 并存）
 export async function pageSlugConflicts(db: D1Database, slug: string): Promise<string | null> {
   const post = await db
     .prepare('SELECT slug FROM posts WHERE slug = ? AND deleted_at IS NULL LIMIT 1')

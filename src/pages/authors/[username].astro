@@ -29,7 +29,7 @@ const rows = await listPublishedPostsByAuthor(env.DB, author.id, {
   limit: PAGE_SIZE,
   offset: (page - 1) * PAGE_SIZE,
 });
-// 卡片需要文集 slug 才能拼出 /collections/{slug}/{post}/ 路径
+// 卡片需要文集 slug 才能拼出 /{collection}/{post}/ 路径
 const collections = await getCollectionsByIds(
   env.DB,
   rows.map((p) => p.collection_id ?? 0),

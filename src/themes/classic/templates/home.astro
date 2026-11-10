@@ -95,7 +95,7 @@ const t = classicT(ctx.locale);
             <div class="portal-card reveal" data-delay={String(i + 1)} style={`--pc: ${c.theme_color};`}>
               <div class="portal-seal">{Array.from(c.title)[0]}</div>
               <h3>
-                <CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
+                <CardLink href={`/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
               </h3>
               <p class="portal-sub">{c.summary}</p>
               {collectionOwners[String(c.id)] && (

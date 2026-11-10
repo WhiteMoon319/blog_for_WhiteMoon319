@@ -16,7 +16,7 @@ import {
   isSlugConflict,
 } from '../../../lib/db';
 import { json, requireAuthor, checkCsrf } from '../../../lib/auth';
-import { ensureSlug, isValidSlug } from '../../../lib/utils';
+import { ensureSlug, isValidSlug, validateCollectionSlug } from '../../../lib/utils';
 
 export const prerender = false;
 
@@ -61,8 +61,9 @@ export async function POST(ctx: APIContext): Promise<Response> {
   }
 
   const slug = typeof body.slug === 'string' && body.slug.trim() ? body.slug.trim() : undefined;
-  if (slug && !isValidSlug(slug)) {
-    return json({ error: 'invalid slug: 仅允许中英文、数字与连字符，且不以连字符起止' }, 400);
+  if (slug) {
+    const slugErr = validateCollectionSlug(slug);
+    if (slugErr) return json({ error: 'invalid slug: ' + slugErr }, 400);
   }
 
   const postOrder = typeof body.post_order === 'string' ? body.post_order : undefined;

@@ -101,13 +101,13 @@ test('e2e：文章页渲染 meta keywords 与安全 JSON-LD（BlogPosting）', a
 
 test('e2e：文集页输出 CollectionPage JSON-LD', async () => {
   if (!HAS_BUILD) return;
-  const res = await c.get('/collections/essays/');
+  const res = await c.get('/essays/');
   assert.equal(res.status, 200);
   const html = await res.text();
   const script = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1] ?? '';
   assert.ok(script.includes('"@type":"CollectionPage"'), '应输出 CollectionPage');
   assert.ok(script.includes('"name":"随笔"'), '应含文集名');
-  assert.ok(script.includes('http://e2e.test/collections/essays/'), '应含文集 URL');
+  assert.ok(script.includes('http://e2e.test/essays/'), '应含文集 URL');
   assert.ok(script.includes('"@type":"ListItem"'), '应列举文集内文章');
 });
 

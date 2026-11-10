@@ -104,7 +104,7 @@ test('e2e：标签——文集继承、自有叠加、标签页规则、孤儿�
   assert.ok(!unionHtml.includes('标引测试集'), '交集：文集只带玄幻试，不具备全部选中标签 → 不出现');
   assert.ok(!unionHtml.includes('标引散篇'), '交集：散篇只带玄幻试 → 不出现');
 
-  const chapter = await c.get('/collections/tag-e2e-col/tag-e2e-a/');
+  const chapter = await c.get('/tag-e2e-col/tag-e2e-a/');
   assert.equal(chapter.status, 200);
   assert.ok((await chapter.text()).includes(tagName), '章节页展示继承的文集标签');
 

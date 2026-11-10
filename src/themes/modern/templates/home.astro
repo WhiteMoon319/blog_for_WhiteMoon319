@@ -25,6 +25,18 @@ interface PostRow {
   created_at: string;
 }
 
+interface ReadingRow {
+  postId: number;
+  scrollPct: number;
+  updatedAt: string;
+  title: string;
+  slug: string;
+  summary: string;
+  coverUrl: string | null;
+  collectionId: number | null;
+  collectionSlug: string | null;
+}
+
 interface Props {
   ctx: SiteContext;
   /** 站名/口号/题记：取原始 env 文案（不经 settings 覆盖链），保持卷首文案与历史版本一致 */
@@ -34,8 +46,8 @@ interface Props {
   collections: CollectionRow[];
   pinnedPosts: PostRow[];
   latestPosts: PostRow[];
-  /** 登录用户阅读历史（核心壳传入；本主题暂不渲染，接受即可） */
-  recentReadings?: unknown[];
+  /** 登录用户阅读历史（未登录为空数组，不渲染该区块） */
+  recentReadings?: ReadingRow[];
   /** 文章署名，按文章 id 索引（一次批量取回） */
   authorsByPost?: Record<string, AuthorBadge[]>;
   /** 文集集主，按文集 id 索引 */
@@ -45,6 +57,7 @@ interface Props {
 const { ctx, siteName, slogan, poem, collections, pinnedPosts, latestPosts } = Astro.props;
 const authorsByPost = Astro.props.authorsByPost ?? {};
 const collectionOwners = Astro.props.collectionOwners ?? {};
+const recentReadings = Astro.props.recentReadings ?? [];
 const t = modernT(ctx.locale);
 ---
 
@@ -154,6 +167,36 @@ const t = modernT(ctx.locale);
     }
   </section>
 
+  {
+    recentReadings.length > 0 && (
+      <section class="section" id="history">
+        <div class="section-head reveal">
+          <span class="kicker">{t('home.history_kicker')}</span>
+          <h2 class="section-title">{t('home.history_title')}</h2>
+          <p class="section-lead">{t('home.history_lead')}</p>
+        </div>
+        <div class="posts-grid">
+          {recentReadings.map((r) => {
+            const col = collections.find((c) => c.id === r.collectionId);
+            return (
+              <div class="post-card reveal" style={`--cc: ${col?.theme_color ?? '#2563eb'};`}>
+                {r.coverUrl && <img class="post-cover" src={r.coverUrl} alt="" loading="lazy" decoding="async" />}
+                <h3 class="post-title">
+                  <CardLink href={postHref(r.slug, r.collectionSlug)}>{r.title}</CardLink>
+                </h3>
+                {r.summary && <p class="post-summary">{r.summary}</p>}
+                <div class="post-meta">
+                  {col && <span class="post-tag">{col.title}</span>}
+                  <AuthorByline authors={authorsByPost[String(r.postId)] ?? []} variant="card" />
+                  <span>{fmtDate(r.updatedAt)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    )
+  }
   <section class="epigraph" id="epigraph">
     <div class="reveal">
       <blockquote>{t('home.epigraph_quote')}</blockquote>

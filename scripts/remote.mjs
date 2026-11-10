@@ -56,11 +56,16 @@ export class Remote {
   /** ssh 公共参数：强制非交互式但保留 tty（sudo 与首次密码提示都需要） */
   get baseArgs() {
     const args = [
-      '-p', String(this.port),
-      '-o', 'StrictHostKeyChecking=accept-new',
-      '-o', `ConnectTimeout=15`,
-      '-o', 'ServerAliveInterval=15',
-      '-o', 'LogLevel=ERROR',
+      '-p',
+      String(this.port),
+      '-o',
+      'StrictHostKeyChecking=accept-new',
+      '-o',
+      `ConnectTimeout=15`,
+      '-o',
+      'ServerAliveInterval=15',
+      '-o',
+      'LogLevel=ERROR',
     ];
     if (this.keyPath) args.push('-i', this.keyPath, '-o', 'IdentitiesOnly=yes');
     return args;
@@ -109,25 +114,19 @@ export class Remote {
     const tar = IS_WIN ? 'tar.exe' : 'tar';
     // 远端只做解包，不接受任何来自本地的脚本内容
     const remoteCmd = `mkdir -p ${remotePath} && tar -xf - -C ${remotePath}`;
-    const child = spawnSync(
-      'ssh',
-      [...this.baseArgs, this.target, remoteCmd],
-      {
-        input: execSync(`${tar} -cf - -C "${localPath}" .`, {
-          maxBuffer: 1024 * 1024 * 512,
-          stdio: ['ignore', 'pipe', 'inherit'],
-        }),
-        stdio: ['pipe', 'inherit', 'inherit'],
-      },
-    );
+    const child = spawnSync('ssh', [...this.baseArgs, this.target, remoteCmd], {
+      input: execSync(`${tar} -cf - -C "${localPath}" .`, {
+        maxBuffer: 1024 * 1024 * 512,
+        stdio: ['ignore', 'pipe', 'inherit'],
+      }),
+      stdio: ['pipe', 'inherit', 'inherit'],
+    });
     if (child.status !== 0) throw new Error(`上传失败：${localPath} → ${remotePath}`);
   }
 
   /** 传一段文本到远端文件（走 stdin，避免转义地狱） */
   writeRemoteFile(remotePath, content, opts = {}) {
-    const script = opts.sudo
-      ? `sudo -n tee ${remotePath} >/dev/null`
-      : `cat > ${remotePath}`;
+    const script = opts.sudo ? `sudo -n tee ${remotePath} >/dev/null` : `cat > ${remotePath}`;
     const r = spawnSync('ssh', [...this.baseArgs, this.target, script], {
       input: content,
       stdio: ['pipe', 'inherit', 'inherit'],
@@ -147,10 +146,7 @@ export function ensureKeyPair() {
   const pub = `${priv}.pub`;
   if (!existsSync(priv)) {
     console.log('  生成部署专用 SSH 密钥（不影响你已有的密钥）…');
-    execSync(
-      `ssh-keygen -t ed25519 -N "" -C "bwm-deploy" -f "${priv}"`,
-      { stdio: ['ignore', 'ignore', 'inherit'] },
-    );
+    execSync(`ssh-keygen -t ed25519 -N "" -C "bwm-deploy" -f "${priv}"`, { stdio: ['ignore', 'ignore', 'inherit'] });
     try {
       chmodSync(priv, 0o600);
     } catch {
@@ -169,11 +165,16 @@ export function ensureKeyPair() {
  */
 export function installPubkey(opts, pubBody) {
   const args = [
-    '-p', String(opts.port || 22),
-    '-o', 'StrictHostKeyChecking=accept-new',
-    '-o', 'ConnectTimeout=15',
-    '-o', 'PreferredAuthentications=password,keyboard-interactive',
-    '-o', 'PubkeyAuthentication=no',
+    '-p',
+    String(opts.port || 22),
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    'ConnectTimeout=15',
+    '-o',
+    'PreferredAuthentications=password,keyboard-interactive',
+    '-o',
+    'PubkeyAuthentication=no',
     `${opts.user}@${opts.host}`,
     // 幂等追加：已存在就跳过，避免 authorized_keys 越滚越长
     `mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && grep -qxF '${pubBody}' ~/.ssh/authorized_keys || echo '${pubBody}' >> ~/.ssh/authorized_keys`,
@@ -181,9 +182,7 @@ export function installPubkey(opts, pubBody) {
   console.log('\n  接下来会提示输入该服务器的登录密码（由 ssh 自己处理，脚本不会记录）');
   const r = spawnSync('ssh', args, { stdio: 'inherit' });
   if (r.status !== 0) {
-    throw new Error(
-      '公钥安装失败。请确认：主机地址/端口/用户名正确，密码可登录，且远端允许密码认证。',
-    );
+    throw new Error('公钥安装失败。请确认：主机地址/端口/用户名正确，密码可登录，且远端允许密码认证。');
   }
 }
 

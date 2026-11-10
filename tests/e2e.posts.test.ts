@@ -126,42 +126,24 @@ test('e2e：集内文章顺序 post_order（asc 旧在前 / desc 新在前）', 
   }
 
   const novelHtml = await (await c.get('/order-novel/')).text();
-  const novelLinks = [...novelHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) =>
-    decodeURIComponent(m[1]),
-  );
+  const novelLinks = [...novelHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   assert.deepEqual(
     novelLinks,
-    [
-      '/order-novel/order-novel-第一章/',
-      '/order-novel/order-novel-第二章/',
-      '/order-novel/order-novel-第三章/',
-    ],
+    ['/order-novel/order-novel-第一章/', '/order-novel/order-novel-第二章/', '/order-novel/order-novel-第三章/'],
     '连载集应第一章在前',
   );
 
   const blogHtml = await (await c.get('/order-blog/')).text();
-  const blogLinks = [...blogHtml.matchAll(/href="(\/order-blog\/[^"]+)"/g)].map((m) =>
-    decodeURIComponent(m[1]),
-  );
-  assert.deepEqual(
-    blogLinks,
-    ['/order-blog/order-blog-乙帖/', '/order-blog/order-blog-甲帖/'],
-    '博客集应最新在前',
-  );
+  const blogLinks = [...blogHtml.matchAll(/href="(\/order-blog\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  assert.deepEqual(blogLinks, ['/order-blog/order-blog-乙帖/', '/order-blog/order-blog-甲帖/'], '博客集应最新在前');
 
   const flipped = await c.put(`/api/collections/${novelId}`, { post_order: 'desc' });
   assert.equal(flipped.status, 200);
   const flippedHtml = await (await c.get('/order-novel/')).text();
-  const flippedLinks = [...flippedHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) =>
-    decodeURIComponent(m[1]),
-  );
+  const flippedLinks = [...flippedHtml.matchAll(/href="(\/order-novel\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   assert.deepEqual(
     flippedLinks,
-    [
-      '/order-novel/order-novel-第三章/',
-      '/order-novel/order-novel-第二章/',
-      '/order-novel/order-novel-第一章/',
-    ],
+    ['/order-novel/order-novel-第三章/', '/order-novel/order-novel-第二章/', '/order-novel/order-novel-第一章/'],
     '改 desc 后应最新在前',
   );
 });
@@ -315,7 +297,10 @@ test('e2e：slug 文集内唯一——跨文集可同名，旧路径 301 转跳�
   assert.equal(legacy.status, 301, '已收录文章的旧路径 301 转跳文集路径');
   const legacyLoc = decodeURIComponent(String(legacy.headers.get('location')));
   // same-name 在 essays 与 tech 两个文集都存在，查询未定序，只要跳到某个集内路径即可
-  assert.ok(/\/same-name\/$/.test(new URL(legacyLoc, 'http://x').pathname), '旧路径应 301 到扁平化后的文集路径, 实际: ' + legacyLoc);
+  assert.ok(
+    /\/same-name\/$/.test(new URL(legacyLoc, 'http://x').pathname),
+    '旧路径应 301 到扁平化后的文集路径, 实际: ' + legacyLoc,
+  );
   assert.ok(!legacyLoc.includes('/collections/'), '301 目标不应再含 /collections/ 前缀');
 
   const dup = await c.post('/api/posts', { title: '同名丙', slug: 'same-name', collection_id: 1, status: 'published' });

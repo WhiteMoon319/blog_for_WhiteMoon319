@@ -1,6 +1,12 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["tests/**/*.ts", "src/env.d.ts"],
+  "include": [
+    "tests/**/*.ts",
+    "src/env.d.ts",
+    "src/types/bindings.ts",
+    "src/types/globals.d.ts",
+    "src/types/cf-workers-shim.d.ts"
+  ],
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"]

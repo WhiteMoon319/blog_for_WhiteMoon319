@@ -1,15 +1,47 @@
-# Node 后端改造说明
+# 双平台说明（Node 后端 + Cloudflare 单包）
 
-本分支（`feat/node-backend`）把项目从 **Cloudflare Workers + D1 + R2** 迁移到
-**原生 Node.js + node:sqlite + 本地文件系统**，可直接跑在任何 x86 Linux 服务器上。
+本分支（`feat/node-backend`）把项目改造成 **一份代码、两个构建目标**：
+
+- `BLOG_TARGET=cloudflare`（**默认**）：产物与主线完全一致，跑在 Cloudflare Workers + D1 + R2 上；
+- `BLOG_TARGET=node`：产物跑在原生 Node.js + `node:sqlite` + 本地文件系统上，可部署到任何 x86 Linux 服务器。
 
 改造原则：**业务代码零改动**。全站 548 处 D1 调用、所有 Astro 路由、所有 Vue 组件
-一行没动，靠三个兼容层把平台能力补齐。这样上游的 bug 修复与功能更新都能直接
-`git merge` 过来，不会因为这次改造而分叉。
+一行没动，靠兼容层在运行时探测平台并分流。**因此合回主线不会影响 Cloudflare 版**——
+默认目标就是 CF，不设 `BLOG_TARGET` 时行为与改造前完全一致。
 
 ---
 
-## 一、架构对照
+## 一、怎么选目标
+
+```bash
+# Cloudflare（默认，不设 BLOG_TARGET 就是它）
+pnpm run build          # → dist/ 交给 wrangler
+pnpm run cf:deploy
+
+# Node 服务器
+BLOG_TARGET=node pnpm run build
+BLOG_TARGET=node pnpm start     # 需 Node >= 22
+```
+
+四个分流点，全部自动判定，不需要手改代码：
+
+| 分流点       | 判定方式             | 说明                                                                                    |
+| ------------ | -------------------- | --------------------------------------------------------------------------------------- |
+| 构建适配器   | 构建期 `BLOG_TARGET` | `astro.config.mjs` 选 `@astrojs/cloudflare` 或 `@astrojs/node`                          |
+| 运行环境 env | 运行期探测           | 先看 `globalThis.__BLOG_ENV_RESOLVER__`（Node 注入），再 `import('cloudflare:workers')` |
+| 页面缓存     | 运行期探测           | 先看 `__BLOG_PAGE_CACHE__`（Node 注入），再 `caches.default`，都没有则 NOOP             |
+| 静态资源分发 | 构建期               | Node 走 `server/static.mjs`，CF 走 `run_worker_first`                                   |
+
+平台探测统一在 `src/lib/platform.ts`。注意 Workers 判定用的是
+`WebSocketPair` + `caches` 双重特征，**不能只看 `caches`**——Node 20+ 也有全局 `caches`。
+
+---
+
+## 二、Node 侧改造细节
+
+本节及其后是 Node 侧的改造细节；只关心 Cloudflare 的读者可以停在上面「一」。
+
+### 架构对照
 
 | 能力        | Cloudflare 版                  | Node 版                              |
 | ----------- | ------------------------------ | ------------------------------------ |
@@ -25,7 +57,7 @@
 
 ---
 
-## 二、三个兼容层
+### 三个兼容层
 
 ### 1. D1 兼容层 —— `server/d1.mjs`
 
@@ -76,7 +108,7 @@ Workers 缓存等价。多实例部署时各实例各自持有，一致性仍由
 
 ---
 
-## 三、必须知道的两个坑
+### 必须知道的两个坑
 
 ### 坑 1：`ASTRO_NODE_AUTOSTART=disabled`
 
@@ -111,7 +143,7 @@ process.env.ASTRO_NODE_AUTOSTART = 'disabled';
 
 ---
 
-## 四、目录结构
+### 目录结构
 
 ```
 server/
@@ -135,7 +167,7 @@ Dockerfile        两阶段构建镜像
 
 ---
 
-## 五、从 Cloudflare 迁移数据
+## 三、从 Cloudflare 迁移数据
 
 已经用 Workers 版跑过一段时间、线上有真实数据时，用 `server/cf-import.mjs`
 一键搬迁，不需要手工导出 SQL，也不需要 `wrangler login`。
@@ -228,7 +260,7 @@ pnpm run cf:import -- --token=<TOKEN> --account=<ACCOUNT_ID>
 
 ---
 
-## 六、本地运行
+## 四、本地运行
 
 ```bash
 # 1. 装依赖
@@ -265,7 +297,7 @@ data/
 
 ---
 
-## 七、生产部署
+## 五、生产部署
 
 ### 方式 A：systemd（推荐，最省资源）
 
@@ -321,7 +353,7 @@ docker run -d --name blog \
 
 ---
 
-## 八、测试
+## 六、测试
 
 ```bash
 # 全量（313 个用例：单元 + e2e）
@@ -340,7 +372,7 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 
 ---
 
-## 九、迁移清单（相对 Cloudflare 版）
+## 七、迁移清单（相对 Cloudflare 版）
 
 **删除**
 
@@ -370,7 +402,7 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 
 ---
 
-## 十、已知差异
+## 八、已知差异
 
 | 项             | 说明                                                                                                      |
 | -------------- | --------------------------------------------------------------------------------------------------------- |
@@ -382,7 +414,7 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 
 ---
 
-## 十一、备案信息（ICP / 公安联网备案）
+## 九、备案信息（ICP / 公安联网备案）
 
 国内服务器上线必须展示备案号。两个备案都是**选配开关**，默认关闭，
 未备案的站点不会在页脚看到多余内容。

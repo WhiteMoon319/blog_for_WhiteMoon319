@@ -17,25 +17,7 @@
 
 /// <reference types="astro/client" />
 
-import type {
-  D1Database as D1DatabaseType,
-  D1PreparedStatement as D1PreparedStatementType,
-  D1Result as D1ResultType,
-  Fetcher as FetcherType,
-  R2Bucket as R2BucketType,
-} from './types/bindings.ts';
-
 declare global {
-  // ---- 全局类型别名 ----
-  // @cloudflare/workers-types 提供了全局的 D1Database / D1PreparedStatement / D1Result，
-  // 业务代码大量直接引用这些名字（不 import）。去掉那个包后必须在这里补上等价声明，
-  // 否则 30+ 文件的类型标注全部失效。
-  type D1Database = D1DatabaseType;
-  type D1PreparedStatement<T = Record<string, unknown>> = D1PreparedStatementType<T>;
-  type D1Result<T = Record<string, unknown>> = D1ResultType<T>;
-  type R2Bucket = R2BucketType;
-  type Fetcher = FetcherType;
-
   namespace Cloudflare {
     interface Env {
       DB: D1Database;

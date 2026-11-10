@@ -127,12 +127,13 @@ import AuthorByline from '@core/AuthorByline.astro';
 - **全文样式预设**：页面壳传 `layout={post.layout}`（`''` / `wechat` / `magazine` / `warm`）。主题用 `articleLayoutClass(layout)`（从 `@core/utils` 引用）把它并进正文容器 class：
 
   ```astro
-  import { articleLayoutClass } from '@core/utils';
-  const bodyClass = ['article-body', 'reveal', 'in', articleLayoutClass(layout)].filter(Boolean).join(' ');
+  import {articleLayoutClass} from '@core/utils'; const bodyClass = ['article-body', 'reveal', 'in',
+  articleLayoutClass(layout)].filter(Boolean).join(' ');
   <div class={bodyClass} set:html={html} />
   ```
 
   预设样式定义在核心 `src/core/blocks.css` 的 `.article-body.layout-*` 下，任何主题默认即生效；主题可自行覆盖。
+
 - **排版块**：核心把 `:::` 容器渲染为固定 class 锚点 `.blk .blk-<name> .is-<variant>`（如 `.blk-callout.is-warning`），块样式同样由核心 `blocks.css` 全局注入，主题只需保证正文容器带 `article-body` 类即可承载。
 
 ```
@@ -169,66 +170,66 @@ pnpm theme <slug>                 # 安装后切换
 
 ## 路由
 
-| 路径 | 说明 |
-| --- | --- |
-| `/` | 首页：文集入口、置顶与最新文章；登录用户另见「历史记录」区块 |
-| `/collections/{collectionSlug}/` | 文集页 |
-| `/collections/{collectionSlug}/{postSlug}/` | 文章页（有文集的文章） |
-| `/posts/{postSlug}/` | 文章页（无文集的文章；有文集的旧路径访问自动 301） |
-| `/pages/{slug}/` | 独立页面 |
-| `/archive/`、`/about/` | 归档、关于 |
-| `/search/?q=` | 站内搜索；`#标签` 开头转跳标签页 |
-| `/tags/` | 标签云 |
-| `/tags/{tag}/`；`/tags/?t=` | 独立标签页；多 `t` 取交集，`q` 为标签内关键词 |
-| `/feed.xml`、`/sitemap.xml` | RSS 与站点地图（动态生成） |
-| `/login/`、`/register/`、`/verify-email/`、`/account/` | 登录、注册、邮箱验证、个人中心 |
-| `/preview/{id}/` | 草稿预览（需登录，归属人/署名作者/管理员可见，`noindex`） |
-| `/authors/{username}/` | 作者页（仅未封禁的作者/管理员，展示简介与名下文章） |
-| `/admin/...` | 管理端 SPA（管理员专属；作者访问会转到写作区） |
-| `/write/...` | 作者写作区（独立产物：我的文章、写新篇、我的文集、媒体） |
+| 路径                                                   | 说明                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------ |
+| `/`                                                    | 首页：文集入口、置顶与最新文章；登录用户另见「历史记录」区块 |
+| `/collections/{collectionSlug}/`                       | 文集页                                                       |
+| `/collections/{collectionSlug}/{postSlug}/`            | 文章页（有文集的文章）                                       |
+| `/posts/{postSlug}/`                                   | 文章页（无文集的文章；有文集的旧路径访问自动 301）           |
+| `/pages/{slug}/`                                       | 独立页面                                                     |
+| `/archive/`、`/about/`                                 | 归档、关于                                                   |
+| `/search/?q=`                                          | 站内搜索；`#标签` 开头转跳标签页                             |
+| `/tags/`                                               | 标签云                                                       |
+| `/tags/{tag}/`；`/tags/?t=`                            | 独立标签页；多 `t` 取交集，`q` 为标签内关键词                |
+| `/feed.xml`、`/sitemap.xml`                            | RSS 与站点地图（动态生成）                                   |
+| `/login/`、`/register/`、`/verify-email/`、`/account/` | 登录、注册、邮箱验证、个人中心                               |
+| `/preview/{id}/`                                       | 草稿预览（需登录，归属人/署名作者/管理员可见，`noindex`）    |
+| `/authors/{username}/`                                 | 作者页（仅未封禁的作者/管理员，展示简介与名下文章）          |
+| `/admin/...`                                           | 管理端 SPA（管理员专属；作者访问会转到写作区）               |
+| `/write/...`                                           | 作者写作区（独立产物：我的文章、写新篇、我的文集、媒体）     |
 
 ### API
 
-| 方法 | 路径 | 用途 | 鉴权 |
-| --- | --- | --- | --- |
-| POST | `/api/auth/login` | 登录 | 公开 |
-| POST | `/api/auth/register` | 注册（邮箱验证码） | 公开 |
-| POST | `/api/auth/verify-email` | 邮箱验证 | 公开 |
-| POST | `/api/auth/resend-verification` | 重发验证码 | 登录 |
-| POST | `/api/auth/logout`，GET `/api/auth/me` | 注销 / 校验会话 | 登录 |
-| POST | `/api/auth/password` | 修改密码 | 登录 |
-| GET/PUT | `/api/account`，POST `/api/account/password`，POST `/api/account/avatar` | 个人中心 | 登录 |
-| GET/POST | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}` | 文集 CRUD | 写需登录 |
-| GET/POST | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}` | 文章 CRUD（PUT 带 `base_version` 乐观锁） | 写需登录 |
-| POST | `/api/posts/batch` | 批量创建/刊发/转草稿/移动/删除 | 登录 |
-| GET/POST | `/api/posts/{id}/versions`，GET/POST `.../{version}/restore` | 版本历史与回滚 | 登录 |
-| GET | `/api/tags` | 标签云计数 | 公开 |
-| POST | `/api/upload` | 图片上传 → R2 | 登录 |
-| GET/DELETE | `/api/media` | 媒体库 | 登录 |
-| GET | `/api/files/[...key]` | R2 图片回源 | 公开 |
-| GET/PUT | `/api/settings` | 站点设置 + AI 配置 | 登录 |
-| POST | `/api/settings/email` | 邮件配置测试/保存 | 登录 |
-| DELETE | `/api/settings/ai-key` | 清除 API Key | 登录 |
-| GET/POST | `/api/pages`，GET/PUT/DELETE `/api/pages/{id}` | 独立页面 CRUD | 写需登录 |
-| POST | `/api/render` | 源码模式预览渲染（Markdown → HTML） | 登录 |
-| GET | `/api/stats`，`/api/stats/corpus` | 阅读趋势与字数统计 | 登录 |
-| POST | `/api/ai/summary` | 单篇 AI 摘要生成 | 登录 |
-| GET | `/api/ai/models` | 获取模型列表 | 登录 |
-| POST | `/api/ai/test` | 测试并保存 AI 配置 | 登录 |
-| POST | `/api/ai/batch-summary` | 批量 AI 摘要生成 | 登录 |
-| GET/POST | `/api/comments`，DELETE `/api/comments/{id}`，POST `.../{id}/like` | 评论发布/审核/点赞 | 写需登录 |
-| POST | `/api/comments/upload` | 评论图片附件 → R2 | 登录 |
-| GET/POST | `/api/users`，POST `/api/users/{id}/ban` | 用户列表与封禁 | 登录 |
-| POST | `/api/users/{id}/role` | 提为作者 / 降回读者（管理员角色不可改） | 登录 |
-| PUT | `/api/users/{id}` | 管理员编辑他人昵称与作者简介 | 登录 |
-| GET | `/api/authors` | 可选署名作者名单（编辑器作者多选） | 作者/管理员 |
-| GET | `/api/collections?mine=1`｜`?view=1` | 我的文集 / 写作区文集视图（关系+可写性+申请状态） | 作者/管理员 |
-| GET/POST/DELETE | `/api/collections/{id}/members` | 协作者列表、拉人、移除、裁决申请 | 归属人/管理员 |
-| POST | `/api/collections/{id}/join` | 申请协作（私有文集） | 作者/管理员 |
-| POST | `/api/posts/{id}/like` | 文章点赞 | 公开 |
-| POST | `/api/reading` | 静默上报阅读进度（离开文章页时） | 登录 |
-| GET | `/api/export`，`/api/export/posts/{id}.md` | 数据导出 | 登录 |
-| GET | `/api/admin/comments`，`/api/admin/comments/{id}` | 评论审核管理 | 登录 |
+| 方法            | 路径                                                                     | 用途                                              | 鉴权          |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------------------------- | ------------- |
+| POST            | `/api/auth/login`                                                        | 登录                                              | 公开          |
+| POST            | `/api/auth/register`                                                     | 注册（邮箱验证码）                                | 公开          |
+| POST            | `/api/auth/verify-email`                                                 | 邮箱验证                                          | 公开          |
+| POST            | `/api/auth/resend-verification`                                          | 重发验证码                                        | 登录          |
+| POST            | `/api/auth/logout`，GET `/api/auth/me`                                   | 注销 / 校验会话                                   | 登录          |
+| POST            | `/api/auth/password`                                                     | 修改密码                                          | 登录          |
+| GET/PUT         | `/api/account`，POST `/api/account/password`，POST `/api/account/avatar` | 个人中心                                          | 登录          |
+| GET/POST        | `/api/collections`，GET/PUT/DELETE `/api/collections/{id}`               | 文集 CRUD                                         | 写需登录      |
+| GET/POST        | `/api/posts`，GET/PUT/DELETE `/api/posts/{id}`                           | 文章 CRUD（PUT 带 `base_version` 乐观锁）         | 写需登录      |
+| POST            | `/api/posts/batch`                                                       | 批量创建/刊发/转草稿/移动/删除                    | 登录          |
+| GET/POST        | `/api/posts/{id}/versions`，GET/POST `.../{version}/restore`             | 版本历史与回滚                                    | 登录          |
+| GET             | `/api/tags`                                                              | 标签云计数                                        | 公开          |
+| POST            | `/api/upload`                                                            | 图片上传 → R2                                     | 登录          |
+| GET/DELETE      | `/api/media`                                                             | 媒体库                                            | 登录          |
+| GET             | `/api/files/[...key]`                                                    | R2 图片回源                                       | 公开          |
+| GET/PUT         | `/api/settings`                                                          | 站点设置 + AI 配置                                | 登录          |
+| POST            | `/api/settings/email`                                                    | 邮件配置测试/保存                                 | 登录          |
+| DELETE          | `/api/settings/ai-key`                                                   | 清除 API Key                                      | 登录          |
+| GET/POST        | `/api/pages`，GET/PUT/DELETE `/api/pages/{id}`                           | 独立页面 CRUD                                     | 写需登录      |
+| POST            | `/api/render`                                                            | 源码模式预览渲染（Markdown → HTML）               | 登录          |
+| GET             | `/api/stats`，`/api/stats/corpus`                                        | 阅读趋势与字数统计                                | 登录          |
+| POST            | `/api/ai/summary`                                                        | 单篇 AI 摘要生成                                  | 登录          |
+| GET             | `/api/ai/models`                                                         | 获取模型列表                                      | 登录          |
+| POST            | `/api/ai/test`                                                           | 测试并保存 AI 配置                                | 登录          |
+| POST            | `/api/ai/batch-summary`                                                  | 批量 AI 摘要生成                                  | 登录          |
+| GET/POST        | `/api/comments`，DELETE `/api/comments/{id}`，POST `.../{id}/like`       | 评论发布/审核/点赞                                | 写需登录      |
+| POST            | `/api/comments/upload`                                                   | 评论图片附件 → R2                                 | 登录          |
+| GET/POST        | `/api/users`，POST `/api/users/{id}/ban`                                 | 用户列表与封禁                                    | 登录          |
+| POST            | `/api/users/{id}/role`                                                   | 提为作者 / 降回读者（管理员角色不可改）           | 登录          |
+| PUT             | `/api/users/{id}`                                                        | 管理员编辑他人昵称与作者简介                      | 登录          |
+| GET             | `/api/authors`                                                           | 可选署名作者名单（编辑器作者多选）                | 作者/管理员   |
+| GET             | `/api/collections?mine=1`｜`?view=1`                                     | 我的文集 / 写作区文集视图（关系+可写性+申请状态） | 作者/管理员   |
+| GET/POST/DELETE | `/api/collections/{id}/members`                                          | 协作者列表、拉人、移除、裁决申请                  | 归属人/管理员 |
+| POST            | `/api/collections/{id}/join`                                             | 申请协作（私有文集）                              | 作者/管理员   |
+| POST            | `/api/posts/{id}/like`                                                   | 文章点赞                                          | 公开          |
+| POST            | `/api/reading`                                                           | 静默上报阅读进度（离开文章页时）                  | 登录          |
+| GET             | `/api/export`，`/api/export/posts/{id}.md`                               | 数据导出                                          | 登录          |
+| GET             | `/api/admin/comments`，`/api/admin/comments/{id}`                        | 评论审核管理                                      | 登录          |
 
 ## 本地开发
 
@@ -289,24 +290,24 @@ pnpm run cf:config      # 生成 wrangler.jsonc（.gitignore 已忽略）
 
 `.env` 需要：
 
-| 变量 | 说明 | 获取方式 |
-| --- | --- | --- |
-| `BLOG_D1_ID` | D1 数据库 ID | `npx wrangler d1 list` |
-| `BLOG_THEME` | 当前激活主题（`pnpm theme <slug>` 自动写入；留空 = 内置默认 `modern`） | — |
-| `FONTS_BASE` | 字体切片外链前缀（可选，构建期变量） | 见「字体自托管」 |
-| `THEMES_REPO` | 官方主题仓库来源（`owner/repo`，留空 = `WhiteMoon319/themes_for_blog`） | 见「主题系统」 |
+| 变量          | 说明                                                                    | 获取方式               |
+| ------------- | ----------------------------------------------------------------------- | ---------------------- |
+| `BLOG_D1_ID`  | D1 数据库 ID                                                            | `npx wrangler d1 list` |
+| `BLOG_THEME`  | 当前激活主题（`pnpm theme <slug>` 自动写入；留空 = 内置默认 `modern`）  | —                      |
+| `FONTS_BASE`  | 字体切片外链前缀（可选，构建期变量）                                    | 见「字体自托管」       |
+| `THEMES_REPO` | 官方主题仓库来源（`owner/repo`，留空 = `WhiteMoon319/themes_for_blog`） | 见「主题系统」         |
 
 ### 绑定一览
 
-| 绑定 | 类型 | 用途 |
-| --- | --- | --- |
-| `DB` | D1 | 全部数据 |
-| `IMAGES` | R2 | 上传图片 |
-| `ASSETS` | Static Assets | `dist/client` 静态资源 |
-| vars | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置 |
-| secret | `AI_SETTINGS_ENCRYPTION_KEY` | API Key 加密主密钥 |
-| secret | `R2_PUBLIC_URL` | 上传媒体返回的公网前缀（可选；空则走本站 `/api/files` 路由） |
-| cron | `*/5 * * * *` | 定时刊发到期文章 |
+| 绑定     | 类型                                                                                                        | 用途                                                         |
+| -------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `DB`     | D1                                                                                                          | 全部数据                                                     |
+| `IMAGES` | R2                                                                                                          | 上传图片                                                     |
+| `ASSETS` | Static Assets                                                                                               | `dist/client` 静态资源                                       |
+| vars     | `SITE_NAME` / `SITE_SLOGAN` / `SITE_POEM` / `SITE_URL` / `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW` | 站点配置                                                     |
+| secret   | `AI_SETTINGS_ENCRYPTION_KEY`                                                                                | API Key 加密主密钥                                           |
+| secret   | `R2_PUBLIC_URL`                                                                                             | 上传媒体返回的公网前缀（可选；空则走本站 `/api/files` 路由） |
+| cron     | `*/5 * * * *`                                                                                               | 定时刊发到期文章                                             |
 
 ### 安全头与 CSP
 
@@ -354,10 +355,10 @@ pnpm fonts:sync --limit 5 --dry-run              # 只处理前 5 个 / 只看�
 
 已下载的切片缓存在 `.pai/temp/fonts-cache/`，重复运行只补缺失项，中断可重跑。切片内容来自 fontsource 的细切产物（OFL 许可），与 Google Fonts 同粒度。
 
-| 变量 | 位置 | 作用 |
-| --- | --- | --- |
-| `R2_PUBLIC_URL` | Worker secret（`wrangler secret put`） | 上传媒体返回的公网前缀；空则走本站 `/api/files` 路由 |
-| `FONTS_BASE` | `.env`（**构建期**，不是 Worker 变量） | 字体切片外链前缀；空则走本站路由，设为 R2 自定义域则直取 CDN |
+| 变量            | 位置                                   | 作用                                                         |
+| --------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `R2_PUBLIC_URL` | Worker secret（`wrangler secret put`） | 上传媒体返回的公网前缀；空则走本站 `/api/files` 路由         |
+| `FONTS_BASE`    | `.env`（**构建期**，不是 Worker 变量） | 字体切片外链前缀；空则走本站路由，设为 R2 自定义域则直取 CDN |
 
 五点必须知道：
 
@@ -371,17 +372,28 @@ pnpm fonts:sync --limit 5 --dry-run              # 只处理前 5 个 / 只看�
 
 ## 构建与测试
 
+本仓库支持**一份代码、两个构建目标**，用环境变量 `BLOG_TARGET` 选择：
+
+| 目标                     | 命令                              | 产物                                                              |
+| ------------------------ | --------------------------------- | ----------------------------------------------------------------- |
+| `cloudflare`（**默认**） | `pnpm run build`                  | Workers 入口 `dist/server/scheduled-worker.mjs`，交 wrangler 部署 |
+| `node`                   | `BLOG_TARGET=node pnpm run build` | `@astrojs/node` standalone，`BLOG_TARGET=node pnpm start` 启动    |
+
+不设 `BLOG_TARGET` 时行为与改造前完全一致，所以两条线可以共用一个仓库开发。
+
 ```bash
-pnpm run build          # cf-config → vendor css → admin 构建 → astro build → 合并 → worker 包装
+pnpm run build          # 默认 cloudflare：cf-config → vendor css → admin 构建 → astro build → 合并 → worker 包装
+BLOG_TARGET=node pnpm run build   # node：admin 构建 → astro build → 合并（不包 worker）
 pnpm run typecheck      # astro check + vue-tsc + tsc（含 worker/tests）
 pnpm test               # 单测 + e2e（需先 pnpm run build）
 pnpm run format         # prettier 全量格式化（singleQuote + printWidth 120）
 pnpm run format:check   # CI 用这条卡格式，提交前先跑
 ```
 
-两点注意：
+三点注意：
 
 - **e2e 有 dist 新鲜度门禁**：`pnpm test` 会比对 `dist` 与源码时间戳，源码一改就得重新 `pnpm run build` 再跑测试，否则 e2e 会整批失败（也别在 build 之后跑 `format`）。
+- **e2e 会按产物自动分流**：测试跑的是已构建的产物，helper 通过 `dist/server/entry.mjs` 里是否含 `cloudflare:workers` 判定目标，再加载 `e2e.cloudflare.ts`（miniflare）或 `e2e.node.ts`（进程内 http.Server）。所以换了目标就要重新 build，别指望用环境变量欺骗它。
 - **CI 用 `BLOG_THEME=classic` 构建与测试**（默认主题是 modern，本地与 CI 主题不同属正常）。
 
 ## 部署（从零开始）
@@ -408,6 +420,7 @@ cd blog_for_WhiteMoon319
 **Windows**：双击 `setup.bat`（自动检查/安装 Node.js 与 pnpm，随后启动部署向导）
 
 **macOS / Linux**：
+
 ```bash
 chmod +x setup.sh
 ./setup.sh
@@ -435,13 +448,13 @@ chmod +x setup.sh
 
 不想自己折腾环境的话，到 [Releases](https://github.com/WhiteMoon319/blog_for_WhiteMoon319/releases) 下载现成包：
 
-| 包 | 适用 | 用法 |
-|---|---|---|
-| `blog-<版本>-with-env-win-x64.zip` | Windows | 解压后双击 `setup.bat`；包内已带 node / pnpm / git |
-| `blog-<版本>-with-env-linux-x64.zip` | Linux x64 | 解压后 `chmod +x setup.sh && ./setup.sh`；包内带 node / pnpm，git 用系统自带的 |
-| `blog-<版本>-with-env-macos-arm64.zip` | macOS（Apple Silicon） | 同上 |
-| `blog-<版本>-with-env-macos-x64.zip` | macOS（Intel） | 同上 |
-| `blog-<版本>-without-env.zip` | 任意 | 只要源码与构建产物，需按上方「前置要求」自备 Node ≥ 22 与 pnpm |
+| 包                                     | 适用                   | 用法                                                                           |
+| -------------------------------------- | ---------------------- | ------------------------------------------------------------------------------ |
+| `blog-<版本>-with-env-win-x64.zip`     | Windows                | 解压后双击 `setup.bat`；包内已带 node / pnpm / git                             |
+| `blog-<版本>-with-env-linux-x64.zip`   | Linux x64              | 解压后 `chmod +x setup.sh && ./setup.sh`；包内带 node / pnpm，git 用系统自带的 |
+| `blog-<版本>-with-env-macos-arm64.zip` | macOS（Apple Silicon） | 同上                                                                           |
+| `blog-<版本>-with-env-macos-x64.zip`   | macOS（Intel）         | 同上                                                                           |
+| `blog-<版本>-without-env.zip`          | 任意                   | 只要源码与构建产物，需按上方「前置要求」自备 Node ≥ 22 与 pnpm                 |
 
 - **自带环境包（with-env）**：解压即用，不必自行安装 Node 与 pnpm（Windows 版另含便携 git）。
 - **不带环境包（without-env）**：仓库源码 + 已构建好的 `dist/`，即上文 `git clone` 的等价内容。
@@ -506,14 +519,14 @@ pnpm run deploy    # 构建 → 迁移 → 部署（一键）
 
 ## 性能优化
 
-| 优化 | 效果 |
-|------|------|
-| 边缘缓存 | Workers Cache API 匿名公开页面 60s 边缘命中，登录用户 no-store |
-| 按需渲染 | KaTeX 样式、hljs 样式、mermaid/markmap 运行时仅在正文含对应内容时加载 |
-| 编辑器懒加载 | 编辑器相关重资源动态 chunk，避免首屏阻塞 |
-| 公开页面 | 首页仅 1 个 CSS，0 个 JS，首次加载无 JS 阻塞 |
-| 字体自托管 | 879 条 `@font-face` 按 unicode-range 细切、`font-display: swap`，浏览器只取命中字符所在切片；配 `FONTS_BASE` 后切片直取 R2 自定义域（CF CDN），每页约 50 次请求不再消耗 Worker 调用 |
-| D1 查询优化 | 点赞计数批量计算、sitemap 列裁剪 |
+| 优化         | 效果                                                                                                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 边缘缓存     | Workers Cache API 匿名公开页面 60s 边缘命中，登录用户 no-store                                                                                                                      |
+| 按需渲染     | KaTeX 样式、hljs 样式、mermaid/markmap 运行时仅在正文含对应内容时加载                                                                                                               |
+| 编辑器懒加载 | 编辑器相关重资源动态 chunk，避免首屏阻塞                                                                                                                                            |
+| 公开页面     | 首页仅 1 个 CSS，0 个 JS，首次加载无 JS 阻塞                                                                                                                                        |
+| 字体自托管   | 879 条 `@font-face` 按 unicode-range 细切、`font-display: swap`，浏览器只取命中字符所在切片；配 `FONTS_BASE` 后切片直取 R2 自定义域（CF CDN），每页约 50 次请求不再消耗 Worker 调用 |
+| D1 查询优化  | 点赞计数批量计算、sitemap 列裁剪                                                                                                                                                    |
 
 ## 数据库
 

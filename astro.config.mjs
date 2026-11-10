@@ -9,6 +9,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
+import cloudflare from '@astrojs/cloudflare';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,15 +109,55 @@ function fontsBasePlugin() {
   };
 }
 
+/**
+ * 目标部署平台：决定用哪个 adapter。
+ *
+ *   cloudflare（默认）→ @astrojs/cloudflare，产出 Worker
+ *   node              → @astrojs/node，产出可 `node entry.mjs` 启动的服务
+ *
+ * 用环境变量 BLOG_TARGET 选择，因为两个 adapter 的产物布局、构建流程、
+ * 部署方式完全不同，没法在同一份产物里同时满足；而运行时差异
+ * （env 获取、缓存）则已经在 src/lib/{platform,db/env,cache}.ts 里抹平了。
+ *
+ * 为什么默认 cloudflare：本项目的主线部署仍在 CF 上，Node 是可选路径。
+ * 想构建 Node 版就显式设置 BLOG_TARGET=node。
+ */
+const TARGET = (envValue('BLOG_TARGET') || 'cloudflare').toLowerCase();
+if (TARGET !== 'cloudflare' && TARGET !== 'node') {
+  throw new Error(`BLOG_TARGET 只能是 cloudflare 或 node，当前为 "${TARGET}"`);
+}
+const nodeAdapter = TARGET === 'node' ? node({ mode: 'standalone' }) : null;
+const cloudflareAdapter =
+  TARGET === 'cloudflare' ? cloudflare({ platformProxy: { enabled: true }, imageService: 'passthrough' }) : null;
+
+// 二选一：两个 adapter 的产物布局完全不同，不能同时挂
+const adapter = nodeAdapter ?? cloudflareAdapter;
+
+/**
+ * Node 目标下把 `cloudflare:workers` 标记为外部依赖。
+ *
+ * src/lib/db/env.ts 里有一句 `import('cloudflare:workers')`（CF 分支用）。
+ * Node 构建时 rolldown 会尝试解析这个裸协议并直接报错：
+ *   Rolldown failed to resolve import "cloudflare:workers"
+ *
+ * 但这段代码在 Node 下永远不会执行到（先命中 __BLOG_ENV_RESOLVER__ 分支），
+ * 所以把它标记为 external 即可：产物里保留 import() 语句，
+ * 运行时不触发就不会报错，触发时也能给出清晰错误。
+ *
+ * Cloudflare 目标不需要这个设置——那边的 adapter 自己认这个协议。
+ */
+const nodeExternals = TARGET === 'node' ? ['cloudflare:workers'] : [];
+
 export default defineConfig({
   output: 'server',
-  // Node 后端：standalone 模式产出 dist/server/entry.mjs，内部自带 HTTP 服务器，
-  // 可直接 `node ./dist/server/entry.mjs` 启动，不依赖宿主框架。
-  adapter: node({
-    mode: 'standalone',
-  }),
+  adapter,
   vite: {
     plugins: [themeResolver(), fontsBasePlugin()],
+    build: {
+      rollupOptions: {
+        external: nodeExternals,
+      },
+    },
     // 把字体外链前缀也交给服务端代码（SiteHead 用它决定 CSP 的 font-src）
     define: {
       'import.meta.env.FONTS_BASE': JSON.stringify(FONTS_BASE),

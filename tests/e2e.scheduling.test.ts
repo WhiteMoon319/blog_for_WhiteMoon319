@@ -45,10 +45,7 @@ test('e2e：scheduled 触发——到点定时草稿被刊发并公开可见', a
   // （Cloudflare 版下 miniflare 的 dispatchFetch 会跟随这条重定向并落成 404 状态，
   //   Node e2e 客户端对齐的是「不跟随」，因此这里按 302 + Location 断言，语义相同。）
   assert.equal(before_.status, 302, '到点但未触发 cron 时仍不可见（302 → /404）');
-  assert.ok(
-    String(before_.headers.get('location') ?? '').includes('/404'),
-    '未刊发文章应指向 /404',
-  );
+  assert.ok(String(before_.headers.get('location') ?? '').includes('/404'), '未刊发文章应指向 /404');
 
   await c.triggerScheduled();
 

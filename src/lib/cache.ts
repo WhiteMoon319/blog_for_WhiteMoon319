@@ -7,16 +7,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // ============================================================================
-// 页面缓存适配层
+// 页面缓存（双平台）
 // ============================================================================
 //
-// 原来 middleware 直接调用 Workers 的全局 `caches.default`（Cache API）。
-// Node 后端没有这个 API，改为「由 server 注入一个缓存实现」：
-//   - 生产：server/cache.mjs 提供带 TTL 的内存 LRU
-//   - 测试/e2e：注入空实现，或 EDGE_CACHE=false 直接不走缓存分支
+// 同一套接口，两种底层实现：
 //
-// 接口只保留 middleware 用到的两个方法：match / put。
-// 语义与 Cache API 对齐：match 未命中返回 undefined，put 覆盖同 key 条目。
+//   Cloudflare Workers → 全局 caches.default（边缘共享缓存）
+//   Node.js            → server/cache.mjs 注入的进程内 LRU
+//
+// middleware 只调 pageCache().match() / .put()，不关心底层是什么。
+//
+// 优先级：
+//   1. Node 注入的 __BLOG_PAGE_CACHE__（有就说明是 Node 侧）
+//   2. Cloudflare 的 caches.default（能力探测）
+//   3. NOOP（都没有时降级：站点仍可用，只是不缓存）
 
 export interface PageCache {
   /** 命中返回 Response，未命中返回 undefined */
@@ -38,16 +42,53 @@ const NOOP_CACHE: PageCache = {
 };
 
 /**
+ * Cloudflare Cache API 的适配层。
+ *
+ * middleware 侧已保证只对匿名 GET 的公开 HTML 调用，这里再做几层防御：
+ *   - 带 Set-Cookie 的响应不缓存（Cache API 也会拒绝）
+ *   - put 失败静默忽略，不影响响应本身
+ */
+function cloudflareCache(): PageCache | null {
+  const g = globalThis as {
+    caches?: {
+      default?: { match(r: Request): Promise<Response | undefined>; put(r: Request, res: Response): Promise<void> };
+    };
+  };
+  const def = g.caches?.default;
+  if (!def) return null;
+
+  return {
+    match: (req) => def.match(req),
+    async put(req, res) {
+      if (res.headers.has('set-cookie')) return;
+      try {
+        await def.put(req, res.clone());
+      } catch {
+        // 缓存写入失败不应影响响应（例如响应体已被消费）
+      }
+    },
+    async clear() {
+      // Cache API 没有"清空全部"的接口；后台内容变更靠
+      // Cache-Control 的 max-age（60s）自然失效
+    },
+  };
+}
+
+/**
  * 解析当前生效的缓存实现。
- * 优先级：全局注入 > 空实现。
- * 用函数而不用模块级常量，保证 server 注入发生在 import 之后也能生效。
+ * 用函数而不是模块级常量，保证 Node 侧注入发生在 import 之后也能生效。
  */
 export function pageCache(): PageCache {
   const injected = (globalThis as { __BLOG_PAGE_CACHE__?: PageCache }).__BLOG_PAGE_CACHE__;
-  return injected ?? NOOP_CACHE;
+  if (injected) return injected;
+
+  const cf = cloudflareCache();
+  if (cf) return cf;
+
+  return NOOP_CACHE;
 }
 
-/** 测试与 server 启动时注入实现 */
+/** 测试与 server 启动时注入实现；传 null 清除 */
 export function __setPageCache(cache: PageCache | null): void {
   if (cache) {
     (globalThis as { __BLOG_PAGE_CACHE__?: PageCache }).__BLOG_PAGE_CACHE__ = cache;

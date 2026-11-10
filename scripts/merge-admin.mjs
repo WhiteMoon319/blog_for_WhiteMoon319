@@ -6,24 +6,51 @@
 //   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cpSync, existsSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 
 // 管理员后台与作者写作区是两份独立产物、两个 base（/admin/ 与 /write/），
 // 合并时各自落位，互不覆盖。
+//
+// 是否删除 SPA 外壳 index.html，取决于目标平台：
+//
+//   Cloudflare：外壳留在 dist/client 里是原设计。Workers Assets 配了
+//               run_worker_first，请求先进 Worker，路由会自己返回带安全头的
+//               外壳；磁盘上的那份只作为兜底，不抢路由。
+//
+//   Node：@astrojs/node 的 standalone handler 是 static 先跑，命中磁盘外壳就
+//         直接返回原文，会绕过 no-store / X-Robots-Tag / CSP。所以必须删掉。
+
+/** 读 BLOG_TARGET，与 scripts/build.mjs、astro.config.mjs 保持同一套判定 */
+function buildTarget() {
+  if (process.env.BLOG_TARGET) return process.env.BLOG_TARGET.trim().toLowerCase();
+  if (existsSync('.env')) {
+    const m = /^BLOG_TARGET=(.+)$/m.exec(readFileSync('.env', 'utf8'));
+    if (m)
+      return m[1]
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .toLowerCase();
+  }
+  return 'cloudflare';
+}
+
+const TARGET = buildTarget();
+const stripShells = TARGET === 'node';
+
 rmSync('dist/client/admin', { recursive: true, force: true });
 cpSync('admin/dist', 'dist/client/admin', { recursive: true });
 console.log('admin bundle merged into dist/client/admin');
-// 删掉 SPA 外壳 index.html：它已被 src/pages/admin/[...path].ts 以 `?raw` 内联进服务端，
-// 若留在 dist/client 里，@astrojs/node 的 static handler 会先命中它并直接返回磁盘原文，
-// 从而绕过该路由设置的 no-store / X-Robots-Tag / CSP 响应头（Cloudflare 版靠
-// run_worker_first 避免，Node adapter 没有等价开关）。同理处理 write。
-rmSync('dist/client/admin/index.html', { force: true });
-
+if (stripShells) {
+  rmSync('dist/client/admin/index.html', { force: true });
+  console.log('  （Node 目标：已移除 admin/index.html，避免静态 handler 抢走路由）');
+}
 if (!existsSync('admin/dist-write/index.html')) {
   throw new Error('admin/dist-write/index.html 缺失：请先运行 pnpm --filter blog-admin run build:write');
 }
 rmSync('dist/client/write', { recursive: true, force: true });
 cpSync('admin/dist-write', 'dist/client/write', { recursive: true });
 console.log('writer bundle merged into dist/client/write');
-// 同 admin：外壳由路由以 `?raw` 提供，留在静态目录会绕过 no-store / CSP
-rmSync('dist/client/write/index.html', { force: true });
+if (stripShells) {
+  rmSync('dist/client/write/index.html', { force: true });
+  console.log('  （Node 目标：已移除 write/index.html，避免静态 handler 抢走路由）');
+}

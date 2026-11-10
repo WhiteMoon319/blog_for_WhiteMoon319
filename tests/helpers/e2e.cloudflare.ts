@@ -1,0 +1,331 @@
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319
+//
+// 本程序是自由软件：你可以自由修改和再分发它。
+// 请遵守 AGPL-3.0 或更高版本许可协议（GNU Affero General Public License v3+）：
+//   https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { Miniflare } from 'miniflare';
+import { readStatements } from './sql.ts';
+import { hashPassword } from '../../src/lib/db/credentials.ts';
+
+const SERVER_DIR = resolve('dist/server');
+const BASE = 'http://e2e.test';
+
+export const HAS_BUILD = existsSync(resolve(SERVER_DIR, 'entry.mjs'));
+
+// 校验构建产物存在且不早于源码（改代码忘 build 时明确失败，避免 e2e 误测旧产物）
+export function requireBuild(): void {
+  if (!HAS_BUILD) throw new Error('dist/server/entry.mjs 缺失，请先运行 pnpm run build');
+
+  let srcNewest = 0;
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === 'dist' || e.name === '.git' || e.name === '.astro') continue;
+      const p = resolve(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(ts|tsx|vue|js|mjs|json|css|astro|sql)$/i.test(e.name)) {
+        const t = statSync(p).mtimeMs;
+        if (t > srcNewest) srcNewest = t;
+      }
+    }
+  };
+  for (const dir of ['src', 'admin/src', 'scripts', 'db']) walk(dir);
+
+  let distNewest = statSync(resolve(SERVER_DIR, 'entry.mjs')).mtimeMs;
+  const workerEntry = resolve(SERVER_DIR, 'scheduled-worker.mjs');
+  if (!existsSync(workerEntry)) throw new Error('dist/server/scheduled-worker.mjs 缺失，请先运行 pnpm run build');
+  const t = statSync(workerEntry).mtimeMs;
+  if (t > distNewest) distNewest = t;
+  const adminDir = resolve('dist/client/admin');
+  if (existsSync(adminDir)) {
+    for (const f of readdirSync(adminDir)) {
+      const t = statSync(resolve(adminDir, f)).mtimeMs;
+      if (t > distNewest) distNewest = t;
+    }
+  }
+  // 作者写作区是独立产物：缺了它就是没 build，不能靠 admin 产物蒙混过关
+  const writeDir = resolve('dist/client/write');
+  if (!existsSync(resolve(writeDir, 'index.html'))) {
+    throw new Error('dist/client/write/index.html 缺失，请先运行 pnpm run build');
+  }
+  for (const f of readdirSync(writeDir)) {
+    const t = statSync(resolve(writeDir, f)).mtimeMs;
+    if (t > distNewest) distNewest = t;
+  }
+  if (distNewest < srcNewest) {
+    throw new Error('dist 构建产物早于源码，请先重新运行 pnpm run build');
+  }
+}
+
+export const ORIGIN_HEADERS = { Origin: BASE, 'Sec-Fetch-Site': 'same-origin' };
+
+export interface UploadFile {
+  name: string;
+  filename: string;
+  type: string;
+  bytes: Uint8Array<ArrayBuffer>;
+}
+
+// e2e 客户端统一返回的响应形态：miniflare 的 Response 与 Node/DOM 类型存在差异，
+// 边界处转回本项目可用的最小接口，避免类型混乱
+export interface E2eResponse {
+  status: number;
+  ok: boolean;
+  url: string;
+  headers: Headers;
+  text(): Promise<string>;
+  json(): Promise<any>;
+}
+
+export interface E2eClient {
+  /**
+   * miniflare 实例（仅 Cloudflare 产物可用）。
+   * 类型声明为 unknown 而非 Miniflare：Node 产物没有它，两个 helper 的接口
+   * 要能互相赋值，就不能把一边的具体类型写进公共契约里。
+   * 需要 miniflare 的用例请先 `c.mf as Miniflare`。
+   */
+  mf?: unknown;
+  base: string;
+  get(path: string, headers?: Record<string, string>): Promise<E2eResponse>;
+  post(path: string, body: unknown): Promise<E2eResponse>;
+  put(path: string, body: unknown): Promise<E2eResponse>;
+  del(path: string): Promise<E2eResponse>;
+  raw(path: string, init: RequestInit): Promise<E2eResponse>;
+  anon(path: string, init?: RequestInit): Promise<E2eResponse>;
+  login(): Promise<void>;
+  setSession(cookieValue: string): void;
+  session(): string;
+  multipart(files: UploadFile[]): { body: Uint8Array<ArrayBuffer>; contentType: string };
+  triggerScheduled(): Promise<void>;
+  sql(stmt: string, ...binds: (string | number | null)[]): Promise<{ results: Record<string, unknown>[] }>;
+  dispose(): Promise<void>;
+}
+
+function loadModules(): Record<string, { type: 'esm'; contents: string }> {
+  const modules: Record<string, { type: 'esm'; contents: string }> = {};
+  // 生产入口为 dist/server/scheduled-worker.mjs（包装 Astro entry + scheduled 处理器，
+  // 由 scripts/build-worker.mjs 在构建末尾生成）；entry.mjs 等为它的模块清单依赖。
+  for (const file of ['scheduled-worker.mjs', 'entry.mjs', 'virtual_astro_middleware.mjs']) {
+    modules[file] = { type: 'esm', contents: readFileSync(resolve(SERVER_DIR, file), 'utf8') };
+  }
+  for (const f of readdirSync(resolve(SERVER_DIR, 'chunks'))) {
+    modules[`chunks/${f}`] = { type: 'esm', contents: readFileSync(resolve(SERVER_DIR, 'chunks', f), 'utf8') };
+  }
+  return modules;
+}
+
+export async function makeE2e(): Promise<E2eClient> {
+  requireBuild();
+  const mf = new Miniflare({
+    unsafeTriggerHandlers: true,
+    workers: [
+      {
+        config: {
+          type: 'worker',
+          name: 'e2e-blog',
+          compatibilityDate: '2025-08-01',
+          compatibilityFlags: ['nodejs_compat'],
+          manifest: { mainModule: 'scheduled-worker.mjs', modules: loadModules() },
+          triggers: [{ type: 'scheduled', schedule: '*/5 * * * *' }],
+          assets: {
+            directory: resolve('dist/client'),
+            runWorkerFirst: true,
+            hasUserWorker: true,
+            notFoundHandling: 'none',
+          },
+          env: {
+            ASSETS: { type: 'assets' },
+            DB: { type: 'd1', id: 'e2e-db' },
+            IMAGES: { type: 'r2', name: 'e2e-images' },
+            SESSION: { type: 'kv', id: 'e2e-session' },
+            SITE_NAME: { type: 'json', value: '测试书斋' },
+            SITE_SLOGAN: { type: 'json', value: '一角书斋' },
+            SITE_POEM: { type: 'json', value: '晨起摊书卷。' },
+            SITE_URL: { type: 'json', value: BASE },
+            BLOG_ADMIN_PASSWORD: { type: 'json', value: 'admin123' },
+            BLOG_SESSION_SECRET: { type: 'json', value: 'e2e-secret-0123456789abcdef0123456789abcdef' },
+            R2_PUBLIC_URL: { type: 'json', value: '' },
+            LOGIN_RATE_LIMIT_MAX: { type: 'json', value: 10 },
+            LOGIN_RATE_LIMIT_WINDOW: { type: 'json', value: 300 },
+            EDGE_CACHE: { type: 'json', value: false },
+            // e2e 走 http://e2e.test（非 localhost），关掉强制跳转，否则所有请求都会被 308 到 https
+            HTTPS_REDIRECT: { type: 'json', value: false },
+          },
+        },
+      },
+    ],
+  });
+  const db = await mf.getD1Database('DB');
+  for (const file of readdirSync(resolve('db/migrations'))
+    .filter((f) => f.endsWith('.sql'))
+    .sort()) {
+    for (const stmt of readStatements(`db/migrations/${file}`)) {
+      await db.prepare(stmt).run();
+    }
+  }
+  for (const stmt of readStatements('db/seed.sql')) {
+    await db.prepare(stmt).run();
+  }
+
+  let cookie = '';
+
+  // miniflare 的 Response 与 DOM Response 存在类型差异（迭代器实现不同），统一转回 E2eResponse
+  const fetchOf = (path: string, init: Parameters<typeof mf.dispatchFetch>[1]): Promise<E2eResponse> =>
+    mf.dispatchFetch(BASE + path, init) as unknown as Promise<E2eResponse>;
+
+  const client: E2eClient = {
+    mf,
+    base: BASE,
+    async get(path, headers = {}) {
+      return fetchOf(path, {
+        redirect: 'manual',
+        headers: { ...headers, ...(cookie ? { cookie } : {}) },
+      });
+    },
+    async post(path, body) {
+      return fetchOf(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS, ...(cookie ? { cookie } : {}) },
+        body: JSON.stringify(body),
+      });
+    },
+    async put(path, body) {
+      return fetchOf(path, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS, ...(cookie ? { cookie } : {}) },
+        body: JSON.stringify(body),
+      });
+    },
+    async del(path) {
+      return fetchOf(path, { method: 'DELETE', headers: { cookie, ...ORIGIN_HEADERS } });
+    },
+    async raw(path, init) {
+      const headers = new Headers(init.headers ?? {});
+      if (cookie) headers.set('cookie', cookie);
+      return fetchOf(path, { ...init, headers } as Parameters<typeof mf.dispatchFetch>[1]);
+    },
+    async anon(path, init = {}) {
+      return fetchOf(path, init as Parameters<typeof mf.dispatchFetch>[1]);
+    },
+    async login() {
+      if (cookie) return;
+      const res = await mf.dispatchFetch(BASE + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: BASE, 'Sec-Fetch-Site': 'same-origin' },
+        body: JSON.stringify({ password: 'admin123' }),
+      });
+      if (res.status !== 200) throw new Error('e2e login failed: ' + res.status);
+      const setCookie = res.headers.get('set-cookie') ?? '';
+      cookie = setCookie.split(';')[0];
+    },
+    setSession(cookieValue: string) {
+      cookie = cookieValue;
+    },
+    session() {
+      return cookie;
+    },
+    async triggerScheduled() {
+      // 与 wrangler dev --test-scheduled / vite 插件同机制：route-override 头把
+      // /cdn-cgi/local/scheduled 路由到本 worker，触发其 scheduled 处理器
+      const res = await mf.dispatchFetch('http://e2e.test/cdn-cgi/local/scheduled', {
+        method: 'POST',
+        headers: { 'MF-Route-Override': 'e2e-blog' },
+      });
+      if (!res.ok) throw new Error(`triggerScheduled failed: ${res.status} ${await res.text()}`);
+    },
+    async sql(stmt: string, ...binds: (string | number | null)[]) {
+      // 直接操作测试数据库：用于制造 API 无法表达的状态（如把定时回拨到过去）
+      return db
+        .prepare(stmt)
+        .bind(...binds)
+        .all();
+    },
+    multipart(files) {
+      const boundary = `----e2eBoundary${Math.random().toString(36).slice(2)}`;
+      const enc = new TextEncoder();
+      const parts: Uint8Array[] = [];
+      for (const f of files) {
+        parts.push(
+          enc.encode(
+            `--${boundary}\r\nContent-Disposition: form-data; name="${f.name}"; filename="${f.filename}"\r\nContent-Type: ${f.type}\r\n\r\n`,
+          ),
+        );
+        parts.push(f.bytes);
+        parts.push(enc.encode('\r\n'));
+      }
+      parts.push(enc.encode(`--${boundary}--\r\n`));
+      const total = parts.reduce((n, p) => n + p.length, 0);
+      const body = new Uint8Array(total);
+      let off = 0;
+      for (const p of parts) {
+        body.set(p, off);
+        off += p.length;
+      }
+      return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+    },
+    async dispose() {
+      await mf.dispose();
+    },
+  };
+  return client;
+}
+
+// 越权用例需要多身份切换：下列辅助造出可登录的普通账号并拿到其会话 cookie。
+// 注意 client.login() 有「已有 cookie 就短路」的语义，切回管理员必须用 loginAsAdmin。
+const E2E_USER_PASSWORD = 'e2e-author-pw';
+
+export interface SeededUser {
+  id: number;
+  username: string;
+  cookie: string;
+}
+
+/** 直接造一个可登录账号（reader/author/admin）并返回其会话 cookie，不改变 client 当前会话 */
+export async function seedUserSession(
+  client: E2eClient,
+  opts: { username: string; role?: 'reader' | 'author' | 'admin'; displayName?: string; bio?: string },
+): Promise<SeededUser> {
+  const { username } = opts;
+  const hash = await hashPassword(E2E_USER_PASSWORD);
+  await client.sql(
+    `INSERT INTO users (username, display_name, email, email_verified, password_hash, role, bio, session_version, created_at)
+     VALUES (?, ?, ?, 1, ?, ?, ?, 1, datetime('now'))`,
+    username,
+    opts.displayName ?? username,
+    `${username}@e2e.test`,
+    hash,
+    opts.role ?? 'author',
+    opts.bio ?? '',
+  );
+  const rows = await client.sql('SELECT id FROM users WHERE username = ?', username);
+  const id = Number(rows.results[0]?.id);
+  if (!id) throw new Error(`seedUserSession 插入失败: ${username}`);
+
+  const res = await client.anon('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS },
+    body: JSON.stringify({ username, password: E2E_USER_PASSWORD }),
+  });
+  if (res.status !== 200) throw new Error(`seedUserSession 登录失败 ${username}: ${res.status} ${await res.text()}`);
+  const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0];
+  if (!cookie) throw new Error(`seedUserSession 未取得会话 cookie: ${username}`);
+  return { id, username, cookie };
+}
+
+/** 切回管理员会话（client 的 login() 在已有会话时不会重新登录） */
+export async function loginAsAdmin(client: E2eClient): Promise<string> {
+  const res = await client.anon('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...ORIGIN_HEADERS },
+    body: JSON.stringify({ password: 'admin123' }),
+  });
+  if (res.status !== 200) throw new Error(`管理员登录失败: ${res.status} ${await res.text()}`);
+  const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0];
+  if (!cookie) throw new Error('管理员登录未取得会话 cookie');
+  client.setSession(cookie);
+  return cookie;
+}

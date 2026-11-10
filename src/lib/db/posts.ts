@@ -338,7 +338,7 @@ export async function updatePost(
         ...versionArgs,
       ),
   ]);
-  const row = (results[0].results?.[0] as unknown as PostRow | undefined);
+  const row = results[0].results?.[0] as unknown as PostRow | undefined;
   if (!row) return baseVersion !== undefined ? 'conflict' : null;
   return row;
 }
@@ -444,7 +444,7 @@ export async function updatePostWithTags(
   );
   if (tagNames !== null) stmts.push(...setPostOwnTagsStmts(db, id, tagNames));
   const results = await db.batch(stmts);
-  const row = (results[0].results?.[0] as unknown as PostRow | undefined);
+  const row = results[0].results?.[0] as unknown as PostRow | undefined;
   if (!row) return baseVersion !== undefined ? 'conflict' : null;
   return { post: row, tags: await listPostOwnTags(db, id) };
 }

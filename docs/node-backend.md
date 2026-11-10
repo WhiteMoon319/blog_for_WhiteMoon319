@@ -283,7 +283,7 @@ pnpm start           # 开发模式
 pnpm start:prod      # 生产模式（自动迁移、更严格的检查）
 ```
 
-打开 http://localhost:4321 ，用 `admin` + `BLOG_ADMIN_PASSWORD` 登录后台。
+打开 http://localhost:8020 ，用 `admin` + `BLOG_ADMIN_PASSWORD` 登录后台。
 
 `data/` 目录（默认）下会有：
 
@@ -299,57 +299,18 @@ data/
 
 ## 五、生产部署
 
-### 方式 A：systemd（推荐，最省资源）
+完整步骤（systemd、nginx、gzip、字体、数据迁移）见
+[README「部署到自己的服务器」](../README.md)。
 
-```bash
-sudo useradd --system --home /opt/blog blog
-sudo mkdir -p /opt/blog /var/lib/blog /etc/blog
-sudo chown -R blog:blog /opt/blog /var/lib/blog
+这一节只记三个**容易踩**的点：
 
-# 部署代码 + 构建产物
-sudo rsync -a --exclude node_modules ./ /opt/blog/
-cd /opt/blog && pnpm install --prod && pnpm run build
+1. **健康检查是 `/__health`**，不是 `/api/health`。systemd 或负载均衡探活别填错。
+2. **`pnpm start` 不走 `@astrojs/node` 的 autostart**，跑的是自写的 `server/index.mjs`；
+   它负责注入 env / cache / 静态资源三个兼容层。绕过它直接跑 `dist/server/entry.mjs` 会缺这三样。
+3. **gzip 必须显式配**。nginx 反代场景下 `gzip_proxied` 默认是 `off`，`gzip_types` 默认只含
+   `text/html`，结果是 JS/CSS/JSON 全部整份裸传。实测补全后 JS −61%、CSS −77%。
 
-# 配置
-sudo cp .env.example /etc/blog/blog.env
-sudo chmod 600 /etc/blog/blog.env
-sudo vim /etc/blog/blog.env        # 至少填 SESSION_SECRET、ADMIN_PASSWORD、SITE_URL
-
-# 服务
-sudo cp deploy/blog.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now blog
-sudo journalctl -u blog -f
-```
-
-Nginx 反代要点（务必保留这几项）：
-
-```nginx
-location / {
-    proxy_pass http://127.0.0.1:4321;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;   # 中间件靠它判断 HTTPS
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade    $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    client_max_body_size 20m;                     # 图片上传
-}
-```
-
-### 方式 B：Docker
-
-```bash
-docker build -t blog:latest .
-docker run -d --name blog \
-  -p 4321:4321 \
-  -v /srv/blog-data:/data \
-  -e BLOG_SESSION_SECRET="$(openssl rand -base64 48)" \
-  -e BLOG_ADMIN_PASSWORD="change-me" \
-  -e SITE_URL="https://blog.example.com" \
-  blog:latest
-```
+Docker 方式仍可用（`Dockerfile` 在仓库根目录），端口映射改成 `-p 8020:8020` 即可。
 
 ---
 
@@ -369,6 +330,10 @@ BLOG_THEME=classic pnpm run build && pnpm test
 
 e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真实 HTTP
 （`tests/helpers/e2e.ts`）。每个用例一套独立的内存库 + 临时目录，互不污染。
+
+**两个实际踩过的坑**：
+- e2e 有 dist 新鲜度门禁：源码一改就得重新 `pnpm run build` 再跑测试，否则整批失败。
+- 别在 build 之后跑 `pnpm run format`，会触发上一条。
 
 ---
 
@@ -411,6 +376,8 @@ e2e 不再用 miniflare，改为在测试进程内起真实 `http.Server` 打真
 | 静态资源       | 由自己判定而非平台，规则见 `server/static.mjs` 顶部注释                                                   |
 | Node 版本      | 需要 ≥ 22（`node:sqlite` 依赖），实际在 24.22 上验证                                                      |
 | `/404` 语义    | 全站用 `Astro.redirect('/404')` 表达不存在，对外是 302 → /404（与 Cloudflare 版一致，仅测试断言方式不同） |
+| 构建内存       | Vite 打包 `PostEditorView`（1.25MB chunk）峰值较高；1.9G 内存机器会 `OOMErrorHandler` 退出（exit 134）。小内存建议本地构建后只上传 `dist/client/{admin,write}/assets` |
+| 字体分发       | Node 不自带 R2，字体需先同步到 `data/blobs`（走路由）或设 `FONTS_BASE` 走静态直连；后者 4ms vs 路由 8–19ms |
 
 ---
 

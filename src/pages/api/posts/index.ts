@@ -65,7 +65,19 @@ export async function GET(ctx: APIContext): Promise<Response> {
     env.DB,
     posts.map((p) => p.id),
   );
-  return json({ posts: posts.map((p) => ({ ...p, authors: authorMap.get(p.id) ?? [] })) });
+  // 列表页只展示元信息，正文 content_md 是**按文章数线性增长**的重字段。
+  // 实测 48 篇正文共 144595 字符，占整个响应的 92%，所以给调用方一个
+  // brief=1 的开关：只用于列表视图；单篇/编辑器仍走 /api/posts/{id} 取全文。
+  // 默认行为保持不变，避免前台首页等已有调用点受影响。
+  const brief = url.searchParams.get('brief') === '1';
+  return json({
+    posts: posts.map((p) => {
+      const authors = authorMap.get(p.id) ?? [];
+      if (!brief) return { ...p, authors };
+      const { content_md: _contentMd, ...rest } = p;
+      return { ...rest, authors };
+    }),
+  });
 }
 
 export async function POST(ctx: APIContext): Promise<Response> {

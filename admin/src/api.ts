@@ -86,7 +86,9 @@ export const api = {
 
   deleteCollection: (id: number) => request<{ ok: boolean }>(`/api/collections/${id}`, { method: 'DELETE' }),
 
-  posts: (query = '') => request<{ posts: Post[] }>(`/api/posts?status=all${query}`),
+  // brief=1：列表视图不需要 content_md。单篇仍用 post(id) 取全文。
+  // 注意 query 自带 '&' 前缀（调用方拼筛选条件），所以这里直接追加。
+  posts: (query = '') => request<{ posts: Post[] }>(`/api/posts?status=all&brief=1${query}`),
 
   post: (id: number) => request<{ post: Post; tags: Tag[]; version: number }>(`/api/posts/${id}`),
 

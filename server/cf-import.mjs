@@ -60,13 +60,14 @@ function log(msg) {
  *
  * @param {string} token
  * @param {string} path 以 / 开头的 API 路径
- * @param {{ method?: string, body?: unknown, expectBinary?: boolean, rawUrl?: string }} [opts]
+ * @param {{ method?: string, body?: unknown, expectBinary?: boolean, rawUrl?: string, noAuth?: boolean }} [opts]
  */
 async function cfFetch(token, path, opts = {}) {
   const url = opts.rawUrl ?? `${API}${path}`;
   const init = {
     method: opts.method ?? 'GET',
-    headers: { Authorization: `Bearer ${token}` },
+    // noAuth：预签名 URL 的鉴权信息全在 query string 里，带了 Authorization 反而破坏签名
+    headers: opts.noAuth ? {} : { Authorization: `Bearer ${token}` },
   };
   if (opts.body !== undefined) {
     init.headers['Content-Type'] = 'application/json';
@@ -191,7 +192,8 @@ export async function exportDatabase(token, accountId, databaseId, opts = {}) {
  * @param {string} url 带签名的地址（仍是 Bearer 鉴权）
  */
 export async function downloadExport(token, url) {
-  const res = await cfFetch(token, '', { rawUrl: url, expectBinary: true });
+  // 预签名 URL 不能带 Authorization（会破坏 AWS 签名），故 noAuth
+  const res = await cfFetch(token, '', { rawUrl: url, expectBinary: true, noAuth: true });
   return res.text();
 }
 
@@ -508,9 +510,19 @@ Cloudflare 数据导入
 
   try {
     console.log('\n=== 1/5 校验 token ===');
-    const info = await verifyToken(token);
-    log(`token 状态：${info.status}`);
-    if (info.expires_on) log(`过期时间：${info.expires_on}`);
+    // /user/tokens/verify 只认 User API Token；Account API Token 调它会返回 1000
+    // Invalid API Token，但 token 本身完全可用（能列 D1/R2 就是证据）。
+    // 所以这里把校验降级成「尽力而为」：能验就报状态，验不了不拦路——
+    // 真正的权限由下一步列 D1/R2 资源来实证。
+    try {
+      const info = await verifyToken(token);
+      log(`token 状态：${info.status}`);
+      if (info.expires_on) log(`过期时间：${info.expires_on}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`token 校验接口不适用（${msg}）`);
+      log('  → 这是 Account API Token 的正常表现，继续用实际资源权限验证');
+    }
 
     console.log('\n=== 2/5 定位资源 ===');
     const databases = await listDatabases(token, accountId);

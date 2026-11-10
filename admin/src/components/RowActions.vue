@@ -40,7 +40,7 @@ function run(action: RowAction): void {
   if (!action.disabled) action.run();
 }
 
-function onDocDown(e: MouseEvent): void {
+function onDocDown(e: PointerEvent): void {
   if (!(e.target as HTMLElement | null)?.closest('.ra-menu')) open.value = false;
 }
 function onEsc(e: KeyboardEvent): void {
@@ -50,16 +50,16 @@ function onEsc(e: KeyboardEvent): void {
 // 只在展开时挂监听，避免几十行各挂一份
 watch(open, (v) => {
   if (v) {
-    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('pointerdown', onDocDown);
     document.addEventListener('keydown', onEsc);
   } else {
-    document.removeEventListener('mousedown', onDocDown);
+    document.removeEventListener('pointerdown', onDocDown);
     document.removeEventListener('keydown', onEsc);
   }
 });
 onMounted(() => window.addEventListener('resize', () => (open.value = false)));
 onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onDocDown);
+  document.removeEventListener('pointerdown', onDocDown);
   document.removeEventListener('keydown', onEsc);
 });
 </script>

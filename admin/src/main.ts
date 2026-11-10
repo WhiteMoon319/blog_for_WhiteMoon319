@@ -10,5 +10,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import './assets/admin.css';
+import './assets/polish.css';
+import './assets/mobile.css';
 
 createApp(App).use(router).mount('#app');

@@ -36,15 +36,15 @@ onMounted(async () => {
   <div v-if="loaded" class="stat-grid">
     <div class="card stat-card pc-cinnabar">
       <div class="num">{{ stats.collections }}</div>
-      <div class="label">文 集</div>
+      <div class="label">文集</div>
     </div>
     <div class="card stat-card pc-pine">
       <div class="num">{{ stats.published }}</div>
-      <div class="label">已 刊 篇 目</div>
+      <div class="label">已刊篇目</div>
     </div>
     <div class="card stat-card pc-amber">
       <div class="num">{{ stats.drafts }}</div>
-      <div class="label">未 竟 之 稿</div>
+      <div class="label">未竟之稿</div>
     </div>
   </div>
 

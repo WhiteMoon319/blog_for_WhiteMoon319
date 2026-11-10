@@ -1,0 +1,131 @@
+/* 后台视觉精修：保留书斋气质，收敛装饰，强化信息层级。 */
+:root {
+  color-scheme: light;
+  --hairline: rgba(42, 42, 62, 0.11);
+  --shadow-card: 0 1px 2px rgba(26, 26, 46, 0.035), 0 8px 24px rgba(26, 26, 46, 0.035);
+  --shadow-float: 0 16px 44px rgba(26, 26, 46, 0.14);
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 65% 45% at 10% 0%, rgba(194, 58, 48, 0.045), transparent 68%),
+    linear-gradient(180deg, #fbf9f5 0%, #f6f2eb 100%);
+}
+
+.admin-nav {
+  box-shadow: 0 1px 12px rgba(26, 26, 46, 0.025);
+}
+
+/* 顶栏右侧动作组：收成一层容器，窄屏时整体隐藏、改由抽屉承载 */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-brand .seal {
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.page-head {
+  margin-bottom: 24px;
+}
+
+.page-head .kicker,
+.panel-title,
+.stat-card .label {
+  letter-spacing: 0.08em;
+}
+
+.page-head .kicker::before,
+.page-head .kicker::after {
+  width: 18px;
+}
+
+.page-head h1 {
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.card {
+  box-shadow: var(--shadow-card);
+}
+
+.btn {
+  min-height: 38px;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.btn-primary {
+  box-shadow: 0 4px 12px rgba(194, 58, 48, 0.18);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 16px rgba(194, 58, 48, 0.22);
+}
+
+.btn-ghost {
+  background: rgba(255, 254, 249, 0.7);
+  border-color: var(--hairline);
+}
+
+.stat-card {
+  position: relative;
+  border-top-width: 2px;
+}
+
+.stat-card .num {
+  font-weight: 400;
+}
+
+.stats-toolbar .seg {
+  padding: 3px;
+  gap: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: rgba(255, 254, 249, 0.66);
+}
+
+.stats-toolbar .seg .btn {
+  min-height: 30px;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 7px;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.stats-toolbar .seg .active {
+  box-shadow: 0 2px 7px rgba(194, 58, 48, 0.16);
+}
+
+/* 系统深色模式下也保持同一套纸墨关系，不让浏览器自动把导航染成突兀的灰色。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ink-black: #f0ebe2;
+    --ink-deep: #e5e0d7;
+    --ink-mid: #bbb5ac;
+    --ink-light: #9d978f;
+    --hairline: rgba(240, 235, 226, 0.12);
+    --paper-warm: #1c1d21;
+    --paper-card: #25262a;
+    --cinnabar-line: rgba(225, 116, 103, 0.28);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+  body {
+    background-image: radial-gradient(ellipse 65% 45% at 10% 0%, rgba(194, 58, 48, 0.07), transparent 68%);
+  }
+  .admin-nav,
+  .mob-tabbar {
+    background: rgba(28, 29, 33, 0.96);
+  }
+  .btn-ghost,
+  .stats-toolbar .seg {
+    background: rgba(37, 38, 42, 0.9);
+  }
+}

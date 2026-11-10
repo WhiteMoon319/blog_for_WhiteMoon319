@@ -1,0 +1,296 @@
+/* 窄屏布局：720px 以下启用，桌面端保持原样。 */
+:root {
+  --mob-tabbar-h: 58px;
+  --mob-safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+.nav-hamburger,
+.nav-drawer,
+.nav-drawer-mask,
+.mob-tabbar {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .admin-main {
+    width: 100%;
+    padding: 22px 14px calc(var(--mob-tabbar-h) + var(--mob-safe-b) + 26px);
+  }
+
+  /* 单行顶栏 */
+  .admin-nav {
+    flex-wrap: nowrap;
+    height: 54px;
+    padding: 0 14px;
+    gap: 10px;
+  }
+  .admin-brand .brand-text {
+    display: inline;
+    font-size: 1.18rem;
+  }
+  .admin-brand .seal {
+    width: 28px;
+    height: 28px;
+  }
+  .admin-links,
+  .admin-nav .nav-actions {
+    display: none;
+  }
+  .admin-nav .nav-ghost {
+    min-height: 32px;
+    padding: 4px 9px;
+    font-size: 0.78rem;
+  }
+  .nav-hamburger {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    color: var(--ink-deep);
+    background: transparent;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+  }
+  .nav-hamburger svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* 分组导航抽屉 */
+  .nav-drawer-mask {
+    position: fixed;
+    inset: 54px 0 0;
+    z-index: 90;
+    display: block;
+    background: rgba(20, 20, 25, 0.36);
+    backdrop-filter: blur(2px);
+  }
+  .nav-drawer {
+    position: fixed;
+    top: 54px;
+    right: 0;
+    bottom: 0;
+    z-index: 91;
+    display: block;
+    width: min(84vw, 320px);
+    padding: 20px 18px calc(24px + var(--mob-safe-b));
+    overflow-y: auto;
+    color: var(--ink-deep);
+    background: var(--paper-card);
+    border-left: 1px solid var(--hairline);
+    box-shadow: -16px 0 44px rgba(0, 0, 0, 0.12);
+  }
+  .nav-drawer-title {
+    margin: 0 0 18px;
+    font-family: var(--font-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-light);
+  }
+  .nav-drawer-group {
+    margin-top: 18px;
+  }
+  .nav-drawer-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+    color: var(--ink-light);
+  }
+  .nav-drawer a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 9px 12px;
+    color: var(--ink-deep);
+    text-decoration: none;
+    border-radius: 8px;
+  }
+  .nav-drawer a.router-link-active {
+    color: var(--cinnabar);
+    background: rgba(194, 58, 48, 0.08);
+  }
+  .nav-drawer .drawer-logout {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 2px;
+    padding: 9px 12px;
+    font: inherit;
+    text-align: left;
+    color: var(--cinnabar);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+  }
+
+  /* 标题与操作分区，避免右侧按钮挤压标题 */
+  .page-head {
+    display: block;
+    margin-bottom: 20px;
+  }
+  .page-head h1 {
+    margin-top: 5px;
+    font-size: 1.8rem;
+  }
+  .page-head .head-actions {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 8px;
+    margin: 16px 0 0;
+  }
+  .page-head .head-actions .btn {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  .panel-title {
+    margin-bottom: 10px;
+    font-size: 0.78rem;
+  }
+
+  /* 三张指标卡横排，降低空白与纵向占用 */
+  .stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    min-width: 0;
+    padding: 13px 9px 12px;
+    text-align: center;
+    border-radius: 9px;
+  }
+  .stat-card .num {
+    font-size: 1.75rem;
+    line-height: 1.05;
+  }
+  .stat-card .label {
+    margin-top: 6px;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  /* 阅读区间保持单行，按钮不再折字 */
+  .stats-toolbar {
+    display: block;
+    margin-top: 24px;
+  }
+  .stats-toolbar::after {
+    display: none;
+  }
+  .stats-toolbar > span {
+    display: block;
+    margin-bottom: 10px;
+  }
+  .stats-toolbar .seg {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+  }
+  .stats-toolbar .seg .btn {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+
+  .card.pad {
+    padding: 16px;
+  }
+  .card-head {
+    padding: 14px 16px;
+  }
+  .card + .card,
+  .mt-20 {
+    margin-top: 14px;
+  }
+
+  /* 输入字号避免 iOS 聚焦自动放大 */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  .field {
+    margin-bottom: 16px;
+  }
+
+  /* 行操作改底部弹层，避免被表格容器裁剪 */
+  .ra-panel {
+    top: auto !important;
+    right: 12px !important;
+    bottom: calc(12px + var(--mob-safe-b));
+    left: 12px !important;
+    min-width: 0;
+    padding: 10px;
+    border-radius: 12px;
+  }
+  .ra-panel button {
+    min-height: 44px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  /* 固定主导航：列数由 data 决定（后台 5 项、写作区 4 项） */
+  .mob-tabbar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    height: calc(var(--mob-tabbar-h) + var(--mob-safe-b));
+    padding: 4px 6px var(--mob-safe-b);
+    background: rgba(250, 247, 242, 0.97);
+    border-top: 1px solid var(--hairline);
+    box-shadow: 0 -6px 24px rgba(26, 26, 46, 0.05);
+    backdrop-filter: blur(16px);
+  }
+  .mob-tabbar a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    color: var(--ink-light);
+    text-decoration: none;
+    border-radius: 8px;
+  }
+  .mob-tabbar svg {
+    width: 21px;
+    height: 21px;
+    stroke-width: 1.7;
+  }
+  .mob-tabbar span {
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+  .mob-tabbar a.router-link-active {
+    color: var(--cinnabar);
+  }
+
+  /* 编辑器工具条可横向滚动，正文保留足够宽度 */
+  .editor-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+}
+
+@media (min-width: 721px) {
+  .nav-hamburger,
+  .nav-drawer,
+  .nav-drawer-mask,
+  .mob-tabbar {
+    display: none !important;
+  }
+}

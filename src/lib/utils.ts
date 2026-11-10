@@ -49,11 +49,31 @@ export function isValidSlug(input: string): boolean {
 
 export function postHref(slug: string, collectionSlug?: string | null): string {
   return collectionSlug
-    ? `/collections/${encodeURI(collectionSlug)}/${encodeURI(slug)}/`
+    ? `/${encodeURI(collectionSlug)}/${encodeURI(slug)}/`
     : `/posts/${encodeURI(slug)}/`;
 }
 
 /** R2 公共访问基地址：去掉首尾空白与末尾斜杠，避免拼出双斜杠 URL */
 export function publicBase(raw: string): string {
   return raw.trim().replace(/\/+$/, '');
+}
+
+/**
+ * 文集 slug 会直接占用顶层路径（/{slug}/），必须避开站内既有静态路由与 API 前缀，
+ * 否则新建文集会把 /about/、/archive/ 这类页面顶掉，或让 /collections/ 变成文集。
+ */
+export const RESERVED_COLLECTION_SLUGS = new Set([
+  'admin', 'api', 'login', 'logout', 'register', 'verify-email',
+  'feed', 'rss', 'atom', 'sitemap', 'search', 'tags', 'archive',
+  'collections', 'media', 'export', 'upload', 'posts', 'pages',
+  'authors', 'write', 'preview', 'account', 'about', '404',
+]);
+
+/** 校验文集 slug：除通用规则外，再排除会与顶层静态路由冲突的保留字 */
+export function validateCollectionSlug(input: string): string | null {
+  if (!isValidSlug(input)) return 'slug 仅允许中英文、数字与连字符，且不以连字符起止';
+  if (RESERVED_COLLECTION_SLUGS.has(input.toLowerCase())) {
+    return `"${input}" 与站内路径冲突，已被系统保留`;
+  }
+  return null;
 }

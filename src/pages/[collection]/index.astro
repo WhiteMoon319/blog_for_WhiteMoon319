@@ -1,0 +1,71 @@
+---
+// 月下独酌 · blog（blog_for_WhiteMoon319）
+// Copyright (C) 2026 WhiteMoon319 · AGPL-3.0-or-later · 源码见 https://github.com/WhiteMoon319/blog_for_WhiteMoon319
+import CollectionTemplate from '@theme/templates/collection.astro';
+import { envOf, getCollectionBySlug, listPublishedPosts, countPublishedPosts } from '../../lib/db';
+import { collectionOwnerBadge, badgesByPostId } from '../../lib/authors-view';
+import { safeJsonLd } from '../../lib/seo';
+import { postHref } from '../../lib/utils';
+
+export const prerender = false;
+
+const PAGE_SIZE = 12;
+const env = await envOf();
+const { collection: slug } = Astro.params;
+const collection = slug ? await getCollectionBySlug(env.DB, slug) : null;
+
+if (!collection) {
+  return Astro.redirect('/404');
+}
+
+const pageRaw = Number(Astro.url.searchParams.get('page') ?? '1');
+const safeRaw = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+const total = await countPublishedPosts(env.DB, { collectionId: collection.id });
+const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+const page = Math.min(safeRaw, totalPages);
+const posts = await listPublishedPosts(env.DB, {
+  collectionId: collection.id,
+  limit: PAGE_SIZE,
+  offset: (page - 1) * PAGE_SIZE,
+  order: collection.post_order,
+});
+const siteUrl = env.SITE_URL.replace(/\/$/, '');
+// 文集署名：归属作者（单一），无归属时不渲染
+const owner = await collectionOwnerBadge(env.DB, collection.id);
+// 列表卡署名：一次批量取回全部，不逐篇查询
+const authorsByPost = await badgesByPostId(
+  env.DB,
+  posts.map((p) => p.id),
+);
+const collectionUrl = `${siteUrl}/${encodeURI(collection.slug)}/`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: collection.title,
+  description: collection.summary || undefined,
+  url: collectionUrl,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: posts.map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: p.title,
+      url: `${siteUrl}${postHref(p.slug, collection.slug)}`,
+    })),
+  },
+};
+import { getSiteContext } from '../../lib/theme-context';
+const siteCtx = await getSiteContext(Astro);
+---
+
+<CollectionTemplate
+  ctx={siteCtx}
+  jsonLd={safeJsonLd(jsonLd)}
+  collection={collection}
+  owner={owner}
+  posts={posts}
+  authorsByPost={authorsByPost}
+  total={total}
+  page={page}
+  totalPages={totalPages}
+/>

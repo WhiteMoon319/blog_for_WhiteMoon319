@@ -135,7 +135,7 @@ test('e2e：文集页集主署名与列表卡署名', async () => {
   });
   assert.equal(created.status, 201);
 
-  const html = await (await c.get(`/collections/${colSlug}/`)).text();
+  const html = await (await c.get(`/${colSlug}/`)).text();
   assert.ok(html.includes('砚台甲'), '文集页应展示集主署名');
   assert.ok(html.includes('/authors/view-a/'), '集主应链接作者页');
   assert.ok(/byline/.test(html), '列表卡应渲染署名标记');

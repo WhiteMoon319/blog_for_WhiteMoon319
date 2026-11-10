@@ -73,7 +73,7 @@ const t = modernT(ctx.locale);
           {collections.map((c) => (
             <div class="portal-card reveal" style={`--pc: ${c.theme_color};`}>
               <h3>
-                <CardLink href={`/collections/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
+                <CardLink href={`/${encodeURI(c.slug)}/`}>{c.title}</CardLink>
               </h3>
               <p class="portal-sub">{c.summary}</p>
               {collectionOwners[String(c.id)] && (

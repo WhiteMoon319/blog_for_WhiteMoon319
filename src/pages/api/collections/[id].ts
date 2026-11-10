@@ -19,7 +19,7 @@ import {
 } from '../../../lib/db';
 import { json, checkCsrf } from '../../../lib/auth';
 import { requireCollectionAccess } from '../../../lib/api/collection-access.ts';
-import { isValidSlug } from '../../../lib/utils';
+import { isValidSlug, validateCollectionSlug } from '../../../lib/utils';
 import { parseId } from '../../../lib/api/validate';
 
 export const prerender = false;
@@ -52,8 +52,9 @@ export async function PUT(ctx: APIContext): Promise<Response> {
   const patch: Record<string, string | number> = {};
   if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim();
   if (typeof body.slug === 'string' && body.slug.trim()) {
-    if (!isValidSlug(body.slug.trim())) {
-      return json({ error: 'invalid slug: 仅允许中英文、数字与连字符，且不以连字符起止' }, 400);
+    const slugErr = validateCollectionSlug(body.slug.trim());
+    if (slugErr) {
+      return json({ error: 'invalid slug: ' + slugErr }, 400);
     }
     patch.slug = body.slug.trim();
   }

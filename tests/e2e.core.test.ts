@@ -33,14 +33,23 @@ test('e2e：首页渲染文集与最新文章', async () => {
   assert.ok(html.includes('测试书斋'));
   assert.ok(html.includes('随笔'));
   assert.ok(html.includes('第一篇：博客开张'));
-  assert.ok(html.includes('/collections/essays/first-post/'));
+  assert.ok(html.includes('/essays/first-post/'));
 });
 
 test('e2e：草稿文章对游客 302 至 /404', async () => {
   if (!HAS_BUILD) return;
-  const res = await c.get('/collections/essays/draft-post/');
+  const res = await c.get('/essays/draft-post/');
   assert.equal(res.status, 302);
   assert.ok(String(res.headers.get('location')).includes('/404'));
+});
+test('e2e：旧文集路径 301 到扁平化路径', async () => {
+  if (!HAS_BUILD) return;
+  const list = await c.get('/collections/essays/', { redirect: 'manual' });
+  assert.equal(list.status, 301, '旧文集列表页应 301');
+  assert.ok(String(list.headers.get('location')).includes('/essays/'));
+  const post = await c.get('/collections/essays/first-post/', { redirect: 'manual' });
+  assert.equal(post.status, 301, '旧文集文章页应 301');
+  assert.ok(String(post.headers.get('location')).includes('/essays/first-post/'));
 });
 
 test('e2e：admin SPA 回退路由 200（含 no-store 与 noindex）', async () => {
@@ -96,8 +105,8 @@ test('e2e：sitemap 覆盖静态页、文集、文章与标签页', async () => 
   assert.equal(res.status, 200);
   const xml = await res.text();
   assert.ok(xml.includes('<loc>http://e2e.test/archive/</loc>'));
-  assert.ok(xml.includes('<loc>http://e2e.test/collections/essays/</loc>'));
-  assert.ok(xml.includes('<loc>http://e2e.test/collections/tech/astro-on-cloudflare/</loc>'));
+  assert.ok(xml.includes('<loc>http://e2e.test/essays/</loc>'));
+  assert.ok(xml.includes('<loc>http://e2e.test/tech/astro-on-cloudflare/</loc>'));
   assert.ok(!xml.includes('draft-post'));
   assert.ok(xml.includes('<loc>http://e2e.test/tags/sitemap-tag/</loc>'), '有内容的标签页应进 sitemap');
   assert.ok(!xml.includes('/tags/empty-tag/'), '无内容的标签不应进 sitemap');

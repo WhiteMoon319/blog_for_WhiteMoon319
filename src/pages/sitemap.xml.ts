@@ -63,7 +63,7 @@ export async function GET(ctx: APIContext): Promise<Response> {
   }));
 
   for (const c of collections) {
-    urls.push({ path: `/collections/${encodeURI(c.slug)}/`, lastmod: c.updated_at });
+    urls.push({ path: `/${encodeURI(c.slug)}/`, lastmod: c.updated_at });
   }
   for (const p of posts.results ?? []) {
     urls.push({ path: postHref(p.slug, p.collection_slug), lastmod: p.updated_at });

@@ -32,7 +32,7 @@ const collection = post.collection_id ? await getCollectionById(env.DB, post.col
 const { html, toc } = renderMarkdown(post.content_md);
 const theme = collection?.theme_color ?? '#8a6d3b';
 
-const backHref = collection ? `/collections/${encodeURI(collection.slug)}/` : '/archive/';
+const backHref = collection ? `/${encodeURI(collection.slug)}/` : '/archive/';
 const backLabel = collection ? `← ${collection.title}` : '← 归档';
 const kicker = collection?.title ?? '未分类';
 const publishedHref = post.status === 'published' && collection ? postHref(post.slug, collection.slug) : undefined;

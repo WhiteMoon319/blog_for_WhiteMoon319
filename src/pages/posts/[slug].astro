@@ -29,7 +29,7 @@ if (!post) {
   const anyPost = slug ? await getPublishedPostBySlugAny(env.DB, slug) : null;
   if (anyPost && anyPost.collection_id !== null) {
     const collection = await getCollectionById(env.DB, anyPost.collection_id);
-    return Astro.redirect(`/collections/${encodeURI(collection?.slug ?? '')}/${encodeURI(anyPost.slug)}/`, 301);
+    return Astro.redirect(`/${encodeURI(collection?.slug ?? '')}/${encodeURI(anyPost.slug)}/`, 301);
   }
   return Astro.redirect('/404');
 }

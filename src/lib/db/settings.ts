@@ -18,6 +18,13 @@ const WHITELIST = [
   'search_placeholder',
   'hero_note',
   'site_locale',
+  // ---- 备案信息（选配，默认关闭）----
+  // *_enabled 是显式开关：'1' 显示、'0' 隐藏。
+  // 号码本身独立保存，关掉开关不会丢数据，重新打开即可恢复展示。
+  'beian_icp_enabled',
+  'beian_icp',
+  'beian_mps_enabled',
+  'beian_mps',
   'ai_provider',
   'ai_base_url',
   'ai_model',

@@ -62,6 +62,16 @@ export interface SiteContext {
   searchPlaceholder: string;
   /** 首页可选题记位（copy.hero_note），空串表示不展示 */
   heroNote: string;
+  /**
+   * ICP 备案号（如「渝ICP备2026024373号-1」）。
+   * 空串表示未配置，页脚不渲染该行。
+   */
+  beianIcp: string;
+  /**
+   * 公安联网备案号（如「渝公网安备50022302000935号」）。
+   * 空串表示未配置，页脚不渲染该行（连同国徽图标一起隐藏）。
+   */
+  beianMps: string;
   locale: Locale;
   user: SiteUser;
   nav: NavLink[];
@@ -83,6 +93,20 @@ function firstNonEmpty(...vals: (string | undefined)[]): string {
 }
 
 /**
+ * 解析布尔型设置项。
+ * 库里统一存 '1' / '0'（与项目其余布尔字段一致），
+ * 兼容 'true' / 'yes' / 'on' 等手写值，避免手工改库后开关失灵。
+ *
+ * 未设置（undefined / 空串）视为关闭：备案是选配功能，
+ * 默认不打扰未备案的站点。
+ */
+function isOn(v: string | undefined): boolean {
+  if (!v) return false;
+  const s = v.trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
+/**
  * 组装站点上下文：每页面壳调用一次，结果经 props 下传。
  * 主题组件禁止自行访问 DB/env——一律消费此处的字段。
  */
@@ -100,6 +124,8 @@ export async function getSiteContext(ctx: APIContext): Promise<SiteContext> {
       tagline: COPY_DEFAULTS.site_tagline,
       searchPlaceholder: '',
       heroNote: '',
+      beianIcp: '',
+      beianMps: '',
       locale: DEFAULT_LOCALE,
       user: {
         loggedIn: false,
@@ -161,6 +187,11 @@ async function buildSiteContext(ctx: APIContext): Promise<SiteContext> {
     tagline: pick('site_tagline', env.SITE_TAGLINE, COPY_DEFAULTS.site_tagline),
     searchPlaceholder: pick('search_placeholder', env.SEARCH_PLACEHOLDER, ''),
     heroNote: pick('hero_note', env.HERO_NOTE, ''),
+    // 备案号：settings 表 → env（BEIAN_ICP / BEIAN_MPS）→ 空串（不渲染）
+    // 开关单独存（*_enabled），关闭时即使填了号码也不显示——
+    // 「留空即隐藏」不够用：备案号填好但暂时不想展示时，不该逼用户删掉重填。
+    beianIcp: isOn(entries['beian_icp_enabled']) ? firstNonEmpty(entries['beian_icp'], env.BEIAN_ICP).trim() : '',
+    beianMps: isOn(entries['beian_mps_enabled']) ? firstNonEmpty(entries['beian_mps'], env.BEIAN_MPS).trim() : '',
     locale,
     user,
     nav: [

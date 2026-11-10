@@ -114,6 +114,9 @@ export function createEnv(options = {}) {
     FOOTER_LINE: envStr('FOOTER_LINE', undefined),
     SEARCH_PLACEHOLDER: envStr('SEARCH_PLACEHOLDER', undefined),
     HERO_NOTE: envStr('HERO_NOTE', undefined),
+    // 备案号兜底（后台开关打开时才展示；日常在后台填更方便）
+    BEIAN_ICP: envStr('BEIAN_ICP', undefined),
+    BEIAN_MPS: envStr('BEIAN_MPS', undefined),
 
     // —— 认证 ——
     BLOG_ADMIN_PASSWORD: envStr('BLOG_ADMIN_PASSWORD'),

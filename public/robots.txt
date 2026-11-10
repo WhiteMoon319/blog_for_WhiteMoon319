@@ -4,4 +4,4 @@ Disallow: /admin
 Disallow: /api
 Disallow: /preview
 
-Sitemap: https://blog.whitemoon319.xyz/sitemap.xml
+Sitemap: https://www.whitemoon319.top/sitemap.xml

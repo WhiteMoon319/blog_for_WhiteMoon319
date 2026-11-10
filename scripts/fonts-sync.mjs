@@ -35,7 +35,7 @@ if (unknown.length > 0) {
   process.exit(2);
 }
 
-const from = getOpt('from', process.env.FONTS_SYNC_FROM || 'https://static.whitemoon319.xyz').replace(/\/+$/, '');
+const from = getOpt('from', process.env.FONTS_SYNC_FROM || 'https://static.whitemoon319.top').replace(/\/+$/, '');
 const prefix = getOpt('prefix', 'fonts/v2').replace(/^\/+|\/+$/g, '');
 const bucket = getOpt('bucket', 'blog-images');
 const concurrency = Number(getOpt('concurrency', '3'));

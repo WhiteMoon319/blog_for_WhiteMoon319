@@ -351,7 +351,7 @@ node scripts/fonts-upload.mjs .pai/temp/fonts-out --prefix fonts/v2 --concurrenc
 `pnpm fonts:sync` 是上面这套的"省事版"——不自己准备切片，直接从公开源抓现成细切片再传进你的桶：
 
 ```bash
-pnpm fonts:sync                                  # 默认源 https://static.whitemoon319.xyz
+pnpm fonts:sync                                  # 默认源 https://static.whitemoon319.top
 pnpm fonts:sync --from https://<你的镜像> --prefix fonts/v2   # 换源；须提供同样的 <prefix>/woff2/<file> 路径
 pnpm fonts:sync --limit 5 --dry-run              # 只处理前 5 个 / 只看会做什么
 ```

@@ -17,10 +17,23 @@ interface SiteSettings {
   search_placeholder: string;
   hero_note: string;
   site_locale: string;
+  /** 备案开关存 '0' / '1'（与后端白名单一致） */
+  beian_icp_enabled: string;
+  beian_icp: string;
+  beian_mps_enabled: string;
+  beian_mps: string;
 }
-
-const COPY_KEYS = ['site_tagline', 'footer_line', 'search_placeholder', 'hero_note', 'site_locale'] as const;
-
+const COPY_KEYS = [
+  'site_tagline',
+  'footer_line',
+  'search_placeholder',
+  'hero_note',
+  'site_locale',
+  'beian_icp_enabled',
+  'beian_icp',
+  'beian_mps_enabled',
+  'beian_mps',
+] as const;
 function emptySiteSettings(): SiteSettings {
   return {
     SITE_NAME: '',
@@ -32,6 +45,11 @@ function emptySiteSettings(): SiteSettings {
     search_placeholder: '',
     hero_note: '',
     site_locale: 'zh-CN',
+    // 备案默认关闭：选配功能，不主动打扰未备案站点
+    beian_icp_enabled: '0',
+    beian_icp: '',
+    beian_mps_enabled: '0',
+    beian_mps: '',
   };
 }
 
@@ -291,6 +309,10 @@ async function save() {
       search_placeholder: form.search_placeholder.trim(),
       hero_note: form.hero_note.trim(),
       site_locale: form.site_locale,
+      beian_icp_enabled: form.beian_icp_enabled === '1' ? '1' : '0',
+      beian_icp: form.beian_icp.trim(),
+      beian_mps_enabled: form.beian_mps_enabled === '1' ? '1' : '0',
+      beian_mps: form.beian_mps.trim(),
     });
     applyToForm(form);
     emit('notify', result.saved ? `已保存：${result.saved.join('、')}` : '无需变更');
@@ -357,6 +379,10 @@ async function saveAll(): Promise<void> {
         search_placeholder: form.search_placeholder.trim(),
         hero_note: form.hero_note.trim(),
         site_locale: form.site_locale,
+        beian_icp_enabled: form.beian_icp_enabled === '1' ? '1' : '0',
+        beian_icp: form.beian_icp.trim(),
+        beian_mps_enabled: form.beian_mps_enabled === '1' ? '1' : '0',
+        beian_mps: form.beian_mps.trim(),
         comment_review_keywords: commentAutoApprove.value.trim(),
         ai_prompt_templates: templatesTrimmed.value,
       });
@@ -530,6 +556,37 @@ async function deleteAiKey() {
           <label>首页题记位（留空不显示）</label>
           <input v-model="form.hero_note" maxlength="200" class="input" />
           <div class="hint">显示在首页首屏的一句短文案</div>
+        </div>
+        <div class="field">
+          <label class="checkbox-row">
+            <input v-model="form.beian_icp_enabled" type="checkbox" true-value="1" false-value="0" />
+            在页脚显示 ICP 备案号
+          </label>
+          <input
+            v-model="form.beian_icp"
+            maxlength="64"
+            class="input"
+            placeholder="渝ICP备2026024373号-1"
+            :disabled="form.beian_icp_enabled !== '1'"
+          />
+          <div class="hint">
+            填备案号本身，不需要写「ICP备案号：」前缀，也不会自动加「号」字。
+            关闭开关后号码仍会保留，重新打开即可恢复显示。
+          </div>
+        </div>
+        <div class="field">
+          <label class="checkbox-row">
+            <input v-model="form.beian_mps_enabled" type="checkbox" true-value="1" false-value="0" />
+            在页脚显示公安联网备案号
+          </label>
+          <input
+            v-model="form.beian_mps"
+            maxlength="64"
+            class="input"
+            placeholder="渝公网安备50022302000935号"
+            :disabled="form.beian_mps_enabled !== '1'"
+          />
+          <div class="hint">显示时自动附上国徽图标，并链到 beian.mps.gov.cn 的查询页（编号从号码里自动提取）。</div>
         </div>
         <p v-if="siteDirty" class="section-dirty">本区有未保存的修改</p>
       </div>

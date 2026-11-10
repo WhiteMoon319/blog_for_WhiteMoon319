@@ -26,6 +26,11 @@ const KEY_DEFAULTS: Record<string, string> = {
   search_placeholder: '',
   hero_note: '',
   site_locale: 'zh-CN',
+  // 备案：默认关闭，号码为空。开启后才会在页脚渲染。
+  beian_icp_enabled: '0',
+  beian_icp: '',
+  beian_mps_enabled: '0',
+  beian_mps: '',
   ai_provider: 'deepseek',
   ai_base_url: 'https://api.deepseek.com',
   ai_model: 'deepseek-v4-flash',
@@ -134,6 +139,12 @@ export async function PUT(ctx: APIContext): Promise<Response> {
         return json({ error: 'ai_base_url 仅接受 http/https URL' }, 400);
       } else if (k === 'ai_multi_summary' && v !== '0' && v !== '1') {
         return json({ error: 'ai_multi_summary 必须为 0 或 1' }, 400);
+      } else if ((k === 'beian_icp_enabled' || k === 'beian_mps_enabled') && v !== '0' && v !== '1') {
+        return json({ error: `${k} 必须为 0 或 1` }, 400);
+      } else if (k === 'beian_icp' && v.length > 64) {
+        return json({ error: 'beian_icp 最长 64 字符' }, 400);
+      } else if (k === 'beian_mps' && v.length > 64) {
+        return json({ error: 'beian_mps 最长 64 字符' }, 400);
       } else if (k === 'ai_candidate_count') {
         const n = Number(v);
         if (!Number.isInteger(n) || n < 2 || n > 5) {

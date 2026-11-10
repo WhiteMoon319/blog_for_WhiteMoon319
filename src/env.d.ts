@@ -63,6 +63,10 @@ declare global {
       EDGE_CACHE?: string;
       /** 'false' 关闭「HTTP→HTTPS 强制跳转」（e2e 用 http://e2e.test 时必须关闭） */
       HTTPS_REDIRECT?: string;
+      /** ICP 备案号；仅在后台开启「显示 ICP 备案」时生效 */
+      BEIAN_ICP?: string;
+      /** 公安联网备案号；仅在后台开启「显示公安备案」时生效 */
+      BEIAN_MPS?: string;
     }
   }
   interface Env extends Cloudflare.Env {}

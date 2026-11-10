@@ -46,7 +46,7 @@ test('传输层：协议判定认 x-forwarded-proto（边缘终结 TLS 的情形
 });
 
 test('传输层：HTTP 跳转的边界（生产+非本地+非 https 才跳）', () => {
-  const prod = { isProd: true, protocol: 'http:', hostname: 'blog.whitemoon319.xyz', forwardedProto: null };
+  const prod = { isProd: true, protocol: 'http:', hostname: 'www.whitemoon319.top', forwardedProto: null };
   assert.equal(needsHttpsRedirect(prod), true);
   // 已经是 https：不跳
   assert.equal(needsHttpsRedirect({ ...prod, protocol: 'https:' }), false);
@@ -58,7 +58,7 @@ test('传输层：HTTP 跳转的边界（生产+非本地+非 https 才跳）', 
     assert.equal(needsHttpsRedirect({ ...prod, hostname }), false, hostname);
     assert.equal(isLocalHostname(hostname), true, hostname);
   }
-  assert.equal(isLocalHostname('blog.whitemoon319.xyz'), false);
+  assert.equal(isLocalHostname('www.whitemoon319.top'), false);
   // e2e 用 http://e2e.test，必须能被开关关掉（否则所有用例都被 308 打挂）
   assert.equal(needsHttpsRedirect({ ...prod, hostname: 'e2e.test' }), true);
   assert.equal(needsHttpsRedirect({ ...prod, hostname: 'e2e.test', disabled: true }), false);

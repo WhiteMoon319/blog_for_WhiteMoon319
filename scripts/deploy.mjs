@@ -113,8 +113,9 @@ try {
 run('pnpm exec wrangler deploy', '部署 Worker');
 
 console.log(`\n${SEP}\n✅ 部署完成\n${SEP}`);
-console.log('前台：https://blog.whitemoon319.xyz');
-console.log('后台：https://blog.whitemoon319.xyz/admin/');
+const siteUrl = (process.env.SITE_URL || 'https://www.whitemoon319.top').replace(/\/+$/, '');
+console.log(`前台：${siteUrl}/`);
+console.log(`后台：${siteUrl}/admin/`);
 console.log(
   FONTS_BASE
     ? `字体切片：${FONTS_BASE}/fonts/…（构建期 FONTS_BASE，直取 CF CDN）`

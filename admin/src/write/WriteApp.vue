@@ -41,6 +41,11 @@ async function logout() {
     window.location.href = '/login/?redirect=/write/';
   }
 }
+
+/** 抽屉里的链接在 NavBar 内部也会收起；这里只兜底原生 <a> 跳转前的状态清理 */
+function closeDrawer(): void {
+  /* NavBar 监听 pointerdown 会在点击链接时自动收起抽屉，此处保留钩子以便后续扩展 */
+}
 </script>
 
 <template>
@@ -65,11 +70,35 @@ async function logout() {
         <a class="nav-ghost" href="/" target="_blank">查看前台</a>
         <button class="nav-ghost" @click="logout">退出</button>
       </template>
+      <template #drawer-actions>
+        <a v-if="authState.role === 'admin'" href="/admin/" @click="closeDrawer">后台</a>
+        <a href="/" target="_blank">查看前台</a>
+        <button type="button" class="drawer-logout" @click="logout">退出登录</button>
+      </template>
     </AdminNav>
 
     <main class="admin-main">
       <router-view @notify="notify" />
     </main>
+
+    <nav class="mob-tabbar" aria-label="写作区导航">
+      <router-link to="/" aria-label="我的文章">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M6 3h9l4 4v14H6V3Z" /><path d="M14 3v5h5M9 12h7M9 16h7" /></svg>
+        <span>我的文章</span>
+      </router-link>
+      <router-link to="/editor" aria-label="写新篇">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" /><path d="m14.8 6.4 3 3" /></svg>
+        <span>写新篇</span>
+      </router-link>
+      <router-link to="/collections" aria-label="我的文集">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h4v18H6a2 2 0 0 1-2-2V5Z" /><path d="M20 5a2 2 0 0 0-2-2h-4v18h4a2 2 0 0 0 2-2V5Z" /></svg>
+        <span>文集</span>
+      </router-link>
+      <router-link to="/media" aria-label="媒体库">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="m4 18 5-5 4 4 3-3 4 4" /></svg>
+        <span>媒体</span>
+      </router-link>
+    </nav>
   </template>
 
   <Transition name="toast">

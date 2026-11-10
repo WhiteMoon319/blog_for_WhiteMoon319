@@ -30,26 +30,37 @@ defineProps<{
 }>();
 
 const openGroup = ref<string | null>(null);
+const drawerOpen = ref(false);
+
+function closeMenus(): void {
+  openGroup.value = null;
+  drawerOpen.value = false;
+}
 
 function toggleGroup(label: string): void {
   openGroup.value = openGroup.value === label ? null : label;
 }
 
-function onDocDown(e: MouseEvent): void {
+function onDocDown(e: PointerEvent): void {
   if (!openGroup.value) return;
   if (!(e.target as HTMLElement | null)?.closest('.admin-nav')) openGroup.value = null;
 }
 
 function onEsc(e: KeyboardEvent): void {
-  if (e.key === 'Escape') openGroup.value = null;
+  if (e.key === 'Escape') closeMenus();
+}
+
+/** 抽屉里点链接（含调用方插槽内容）就收起：路由变化本身不会重置这个本地状态 */
+function onDrawerClick(e: MouseEvent): void {
+  if ((e.target as HTMLElement | null)?.closest('a')) drawerOpen.value = false;
 }
 
 onMounted(() => {
-  document.addEventListener('mousedown', onDocDown);
+  document.addEventListener('pointerdown', onDocDown);
   document.addEventListener('keydown', onEsc);
 });
 onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onDocDown);
+  document.removeEventListener('pointerdown', onDocDown);
   document.removeEventListener('keydown', onEsc);
 });
 </script>
@@ -75,7 +86,7 @@ onBeforeUnmount(() => {
         >
           {{ g.label }}<span class="caret" aria-hidden="true">▾</span>
         </button>
-        <div v-if="openGroup === g.label" class="nav-panel" @mousedown.stop>
+        <div v-if="openGroup === g.label" class="nav-panel" @pointerdown.stop>
           <router-link v-for="item in g.items" :key="item.to" :to="item.to" @click="openGroup = null">
             {{ item.text }}
           </router-link>
@@ -85,8 +96,43 @@ onBeforeUnmount(() => {
 
     <span class="spacer"></span>
 
-    <slot name="actions" />
+    <div class="nav-actions">
+      <slot name="actions" />
+    </div>
+
+    <button
+      type="button"
+      class="nav-hamburger"
+      aria-label="打开导航"
+      :aria-expanded="drawerOpen"
+      @click="drawerOpen = !drawerOpen"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" />
+      </svg>
+    </button>
   </nav>
+
+  <div v-if="drawerOpen" class="nav-drawer-mask" @click="drawerOpen = false" />
+  <aside v-if="drawerOpen" class="nav-drawer" aria-label="后台导航" @click="onDrawerClick">
+    <p class="nav-drawer-title">书斋目录</p>
+    <router-link v-for="item in flat ?? []" :key="item.to" :to="item.to" @click="closeMenus">
+      {{ item.text }}
+    </router-link>
+    <div v-for="g in groups ?? []" :key="g.label" class="nav-drawer-group">
+      <span class="nav-drawer-label">{{ g.label }}</span>
+      <router-link v-for="item in g.items" :key="item.to" :to="item.to" @click="closeMenus">
+        {{ item.text }}
+      </router-link>
+    </div>
+    <div class="nav-drawer-group">
+      <span class="nav-drawer-label">快捷操作</span>
+      <slot name="drawer-actions">
+        <router-link to="/editor" @click="closeMenus">写新篇</router-link>
+        <a href="/" target="_blank">查看前台</a>
+      </slot>
+    </div>
+  </aside>
 </template>
 
 <style scoped>

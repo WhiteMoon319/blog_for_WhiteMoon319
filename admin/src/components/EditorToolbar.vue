@@ -43,7 +43,7 @@ function menuAction(fn: () => void): void {
   fn();
 }
 
-function onToolbarDocDown(e: MouseEvent): void {
+function onToolbarDocDown(e: PointerEvent): void {
   if (!openMenu.value) return;
   if (!(e.target as HTMLElement | null)?.closest('.editor-toolbar')) openMenu.value = null;
 }
@@ -52,11 +52,11 @@ function onToolbarEsc(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  document.addEventListener('mousedown', onToolbarDocDown);
+  document.addEventListener('pointerdown', onToolbarDocDown);
   document.addEventListener('keydown', onToolbarEsc);
 });
 onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onToolbarDocDown);
+  document.removeEventListener('pointerdown', onToolbarDocDown);
   document.removeEventListener('keydown', onToolbarEsc);
 });
 

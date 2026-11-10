@@ -7,7 +7,7 @@ defineEmits<{ preset: [value: string]; toggle: [value: TableBorder]; close: [] }
 </script>
 
 <template>
-  <div class="border-menu" @mousedown.stop>
+  <div class="border-menu" @pointerdown.stop>
     <div class="border-menu-head">
       <strong>表格框线</strong>
       <button type="button" class="blk-x" title="收起" @click="$emit('close')">×</button>

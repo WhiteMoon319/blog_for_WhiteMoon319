@@ -4,8 +4,8 @@ name: CI
 # 存在的理由：原来的 CI 只在打 tag 时构建，且不跑 typecheck/test，
 # 于是 src/middleware.ts 这类没有任何测试的模块成了问题温床（两个 P0 都出在那里）。
 #
-# 本分支（Node 后端）不再需要 wrangler / D1 资源 ID / miniflare，
-# 测试直接在进程内起真实 HTTP 服务 + node:sqlite 内存库。
+# 两个运行目标都要验：Node 自托管与 Cloudflare 是同一套代码的两条产物线，
+# 只验一条等于放任另一条回归。构建与 e2e 用矩阵跑两遍。
 
 on:
   push:
@@ -21,9 +21,45 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: "verify: typecheck / build / test"
+  # 格式与类型检查与运行目标无关，只跑一次
+  lint:
+    name: "format / typecheck"
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "11.18.0"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: Typecheck
+        # 不指定主题：走默认解析（modern），顺带覆盖默认主题的类型检查
+        run: |
+          pnpm exec astro sync
+          pnpm run typecheck
+
+  # 构建与 e2e：Node 与 Cloudflare 两条产物线都必须绿
+  verify:
+    name: "verify (${{ matrix.target }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [node, cloudflare]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,26 +79,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
-        run: pnpm run format:check
-
-      - name: Typecheck
-        # 不指定主题：走默认解析（modern），顺带覆盖默认主题的类型检查
-        run: |
-          pnpm exec astro sync
-          pnpm run typecheck
-
       # 构建与测试固定用 classic：测试套件里「阅读历史」等期望是按 classic 写的
-      # （首页 #history 区块、文章页续读脚本），而默认主题 modern 目前没有这些实现。
-      # 也就是「默认主题缺功能」这个结构性缺口不能靠「碰巧跑在哪个主题」掩盖，
-      # 因此这里显式钉住，缺口另立任务。（类型检查层面已不再排除任何主题目录。）
+      # （首页 #history 区块、文章页续读脚本）。modern 已补齐这两处的实现，
+      # 但测试断言仍以 classic 为准，这里继续显式钉住主题。
       - name: Build
         env:
           BLOG_THEME: classic
+          BLOG_TARGET: ${{ matrix.target }}
         run: pnpm run build
 
       - name: Test
-        # e2e 用例跑 dist 产物（进程内起 HTTP server），因此必须在 Build 之后执行
+        # e2e 用例跑 dist 产物，因此必须在 Build 之后执行。
+        # 超时兜底：用例卡死时不要干等（此前无任何超时保护，曾挂满 44 分钟）。
+        timeout-minutes: 15
         env:
           BLOG_THEME: classic
+          BLOG_TARGET: ${{ matrix.target }}
         run: pnpm test

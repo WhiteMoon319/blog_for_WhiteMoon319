@@ -112,7 +112,11 @@ function loadModules(): Record<string, { type: 'esm'; contents: string }> {
   for (const file of ['scheduled-worker.mjs', 'entry.mjs', 'virtual_astro_middleware.mjs']) {
     modules[file] = { type: 'esm', contents: readFileSync(resolve(SERVER_DIR, file), 'utf8') };
   }
+  // 只加载 .mjs。sourcemap（.map）是 JSON，不是 ESM，塞进 modules 会让
+  // workerd 报 `Unexpected token ':'` 并让 worker 起不来——表现是测试进程
+  // 一直等不到响应而挂死（没有超时保护时表现为 CI 跑几十分钟）。
   for (const f of readdirSync(resolve(SERVER_DIR, 'chunks'))) {
+    if (!f.endsWith('.mjs')) continue;
     modules[`chunks/${f}`] = { type: 'esm', contents: readFileSync(resolve(SERVER_DIR, 'chunks', f), 'utf8') };
   }
   return modules;

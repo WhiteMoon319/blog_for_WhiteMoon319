@@ -8,7 +8,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeE2e, HAS_BUILD, type E2eClient } from './helpers/e2e.ts';
+import { makeE2e, HAS_BUILD, BUILD_TARGET, type E2eClient } from './helpers/e2e.ts';
 
 let c: E2eClient;
 
@@ -42,10 +42,17 @@ test('e2e：scheduled 触发——到点定时草稿被刊发并公开可见', a
 
   const before_ = await c.anon('/posts/sched-e2e/');
   // 全站用 Astro.redirect('/404') 表达「不存在」：未刊发的文章对外就是 302 → /404。
-  // （Cloudflare 版下 miniflare 的 dispatchFetch 会跟随这条重定向并落成 404 状态，
-  //   Node e2e 客户端对齐的是「不跟随」，因此这里按 302 + Location 断言，语义相同。）
-  assert.equal(before_.status, 302, '到点但未触发 cron 时仍不可见（302 → /404）');
-  assert.ok(String(before_.headers.get('location') ?? '').includes('/404'), '未刊发文章应指向 /404');
+  // 两个目标的客户端对重定向的处理不同：
+  // - Node 版自己发 fetch，不跟随重定向，拿到 302 和 Location；
+  // - Cloudflare 版走 miniflare 的 dispatchFetch，它会跟随这条重定向，
+  //   最终落到 404 状态上。
+  // 语义都是「不可见」，所以按目标分别断言，而不是把两边硬掰成一样。
+  if (BUILD_TARGET === 'cloudflare') {
+    assert.equal(before_.status, 404, '到点但未触发 cron 时仍不可见（跟随重定向后 404）');
+  } else {
+    assert.equal(before_.status, 302, '到点但未触发 cron 时仍不可见（302 → /404）');
+    assert.ok(String(before_.headers.get('location') ?? '').includes('/404'), '未刊发文章应指向 /404');
+  }
 
   await c.triggerScheduled();
 

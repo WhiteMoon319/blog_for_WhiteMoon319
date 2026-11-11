@@ -148,16 +148,64 @@ const adapter = nodeAdapter ?? cloudflareAdapter;
  */
 const nodeExternals = TARGET === 'node' ? ['cloudflare:workers'] : [];
 
+/** Node 内置模块：CF 目标要交给 workerd 的 nodejs_compat，不能让 rolldown 打壳 */
+const NODE_BUILTINS = [
+  'assert',
+  'buffer',
+  'crypto',
+  'events',
+  'fs',
+  'http',
+  'https',
+  'net',
+  'os',
+  'path',
+  'stream',
+  'string_decoder',
+  'tls',
+  'url',
+  'util',
+  'zlib',
+];
+
+/**
+ * 两个目标各取所需：
+ * - node 只要 cloudflare:workers（其余内置模块由 Node 运行时直接给）
+ * - cloudflare 不能把 cloudflare:workers 列进来（那边 adapter 自己认）
+ */
+const externals = TARGET === 'node' ? nodeExternals : [];
+
+/**
+ * CF 目标下把裸模块名 alias 到 node: 协议。
+ *
+ * sanitize-html / nodemailer / postcss 这些 CJS 依赖内部写的是
+ * require('path')、require('events')。只把它们列进 rollupOptions.external
+ * 不够——rolldown 对 CJS 里的 require 仍会生成 __require 调用，而 __require
+ * 在 workerd 里直接抛「Calling require for "path"」。
+ * 用 alias 把裸名指向 node:path，解析阶段就落成外部 node 模块，
+ * 由 workerd 的 nodejs_compat 提供实现。
+ */
+const builtinAlias =
+  TARGET === 'cloudflare'
+    ? NODE_BUILTINS.map((m) => ({ find: new RegExp('^' + m + '$'), replacement: 'node:' + m }))
+    : [];
+
 export default defineConfig({
   output: 'server',
   adapter,
   vite: {
     plugins: [themeResolver(), fontsBasePlugin()],
-    build: {
-      rollupOptions: {
-        external: nodeExternals,
-      },
-    },
+    // rollupOptions.external 按目标分别处理，两边都需要，但原因不同：
+    // - node：cloudflare:workers 是裸协议，不 external 会让 rolldown 在构建期
+    //   解析失败。
+    // - cloudflare：sanitize-html / nodemailer 这类 CJS 依赖里写着
+    //   require('path') / require('events')，rolldown 不内置这些 shim，产物里
+    //   会留下 __require 调用，而 workerd 没有 require，chunk 一加载就抛
+    //   「Calling require for "path" in an environment that doesn't expose
+    //   the require function」。把 node 内置模块按 node: 协议 external 后，
+    //   由 workerd 的 nodejs_compat 提供，才走得到正确实现。
+    build: { rollupOptions: { external: externals } },
+    resolve: { alias: builtinAlias },
     // 把字体外链前缀也交给服务端代码（SiteHead 用它决定 CSP 的 font-src）
     define: {
       'import.meta.env.FONTS_BASE': JSON.stringify(FONTS_BASE),

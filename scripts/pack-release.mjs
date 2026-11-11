@@ -11,8 +11,14 @@
 // 用法：
 //   node scripts/pack-release.mjs runtime <win-x64|linux-x64|macos-arm64|macos-x64>
 //       下载并组装便携运行环境到 ./runtime/（node + pnpm；Windows 额外含 MinGit）
-//   node scripts/pack-release.mjs pack <平台|plain> <版本号> <输出 zip 路径>
-//       组装发布包：仓库源码（git archive）+ dist/ 构建产物，平台不为 plain 时再并入 runtime/
+//   node scripts/pack-release.mjs pack <目标> <版本号> <输出 zip 路径> [dist 目录]
+//       组装发布包：仓库源码（git archive）+ 构建产物，平台不为 plain 时再并入 runtime/
+//
+// 目标（第一个参数）决定装哪一套产物：
+//   node        → node 产物，供自托管使用（BLOG_TARGET=node 构建出来的 dist）
+//   cloudflare  → cloudflare 产物，供 pnpm cf:deploy 使用
+//   平台名（win-x64 等）或 plain → 兼容旧调用，此时产物由第五个参数指定 dist 目录，
+//                                  缺省用 ./dist
 //
 // 关于 pnpm：pnpm 11.x 未提供 darwin-x64 的独立可执行文件，因此这里统一取 npm 包
 // pnpm@11.18.0（纯 JS，四端通用），用包内自带的 node 运行它，保证四端版本一致。
@@ -192,10 +198,14 @@ async function zipWithFflate(srcDir, topName, outFile) {
   writeFileSync(outFile, zipSync(files, { level: 9 }));
 }
 
-async function pack(target, version, outZip) {
+async function pack(target, version, outZip, distDirArg) {
   const withEnv = target !== 'plain';
   if (withEnv && !PLATFORMS[target]) throw new Error(`未知平台：${target}`);
   if (!version) throw new Error('缺少版本号');
+
+  // 产物来源。发布流程会把两套产物分别放到 dist-node / dist-cloudflare，
+  // 日常本地调用不传第四个参数，仍旧用 ./dist。
+  const distDir = resolve(ROOT, distDirArg || 'dist');
 
   const outAbs = resolve(outZip);
   const pkgName = `blog-${version}`;
@@ -209,10 +219,11 @@ async function pack(target, version, outZip) {
     run('git', ['-C', ROOT, 'archive', '--format=tar', '-o', srcTar, 'HEAD']);
     tarExtract(srcTar, pkgRoot, '');
 
-    log(`\n[2/4] 构建产物 dist/`);
-    const distSrc = join(ROOT, 'dist');
-    if (!existsSync(distSrc)) throw new Error('未找到 dist/，请先运行 pnpm run build');
-    cpSync(distSrc, join(pkgRoot, 'dist'), { recursive: true });
+    log(`\n[2/4] 构建产物 ${relative(ROOT, distDir) || 'dist'}/`);
+    if (!existsSync(distDir)) {
+      throw new Error(`未找到构建产物：${distDir}，请先运行 pnpm run build`);
+    }
+    cpSync(distDir, join(pkgRoot, 'dist'), { recursive: true });
 
     log(`\n[3/4] 便携运行环境`);
     if (withEnv) {
@@ -242,7 +253,7 @@ async function pack(target, version, outZip) {
 function usage() {
   log(`用法：
   node scripts/pack-release.mjs runtime <${Object.keys(PLATFORMS).join('|')}>
-  node scripts/pack-release.mjs pack <${Object.keys(PLATFORMS).join('|')}|plain> <版本号> <输出 zip 路径>`);
+  node scripts/pack-release.mjs pack <node|cloudflare|${Object.keys(PLATFORMS).join('|')}|plain> <版本号> <输出 zip 路径> [dist 目录]`);
 }
 
 async function main() {
@@ -250,7 +261,7 @@ async function main() {
   if (cmd === 'runtime') {
     assembleRuntime(args[0]);
   } else if (cmd === 'pack') {
-    await pack(args[0], args[1], args[2]);
+    await pack(args[0], args[1], args[2], args[3]);
   } else {
     usage();
     process.exit(1);

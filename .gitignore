@@ -1,5 +1,7 @@
 # 构建产物
 dist/
+dist-node/
+dist-cloudflare/
 .astro/
 node_modules/
 admin/node_modules/

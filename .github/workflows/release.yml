@@ -14,9 +14,15 @@ permissions:
   contents: read
 
 jobs:
+  # 两套产物分开构建。node 和 cloudflare 都写 dist/，同机连做会互相覆盖，
+  # 所以用 BLOG_DIST_OUT 各自落到 dist-node / dist-cloudflare。
   build:
-    name: build dist
+    name: build ${{ matrix.target }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [node, cloudflare]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +46,8 @@ jobs:
 
       - name: Build
         env:
+          BLOG_TARGET: ${{ matrix.target }}
+          BLOG_DIST_OUT: dist-${{ matrix.target }}
           # CI 没有真实 D1 资源 ID；给一个合法占位 UUID，避免 wrangler.jsonc 残留 ${...} 占位符
           BLOG_D1_ID: "00000000-0000-0000-0000-000000000000"
         run: pnpm run build
@@ -47,18 +55,39 @@ jobs:
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-${{ matrix.target }}
+          path: dist-${{ matrix.target }}
           if-no-files-found: error
 
   pack:
-    name: pack ${{ matrix.platform }}
+    name: pack ${{ matrix.package }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        platform: [win-x64, linux-x64, macos-arm64, macos-x64, plain]
+        include:
+          # 自托管：带便携运行环境，产物取 node 那套
+          - package: win-x64
+            runtime: win-x64
+            target: node
+          - package: linux-x64
+            runtime: linux-x64
+            target: node
+          - package: macos-arm64
+            runtime: macos-arm64
+            target: node
+          - package: macos-x64
+            runtime: macos-x64
+            target: node
+          # 自托管、自备环境：同样取 node 产物
+          - package: plain
+            runtime: ""
+            target: node
+          # Cloudflare 部署包：不带运行环境，产物取 cloudflare 那套
+          - package: cloudflare
+            runtime: ""
+            target: cloudflare
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,8 +103,8 @@ jobs:
       - name: Download dist
         uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-${{ matrix.target }}
+          path: dist-${{ matrix.target }}
 
       - name: Resolve version
         run: |
@@ -86,23 +115,25 @@ jobs:
           fi
 
       - name: Assemble portable runtime
-        if: matrix.platform != 'plain'
-        run: node scripts/pack-release.mjs runtime ${{ matrix.platform }}
+        if: matrix.runtime != ''
+        run: node scripts/pack-release.mjs runtime ${{ matrix.runtime }}
 
       - name: Pack
         run: |
-          if [[ "${{ matrix.platform }}" == "plain" ]]; then
+          if [[ "${{ matrix.package }}" == "plain" ]]; then
             OUT="blog-${VERSION}-without-env.zip"
+          elif [[ "${{ matrix.package }}" == "cloudflare" ]]; then
+            OUT="blog-${VERSION}-cloudflare.zip"
           else
-            OUT="blog-${VERSION}-with-env-${{ matrix.platform }}.zip"
+            OUT="blog-${VERSION}-with-env-${{ matrix.package }}.zip"
           fi
-          node scripts/pack-release.mjs pack ${{ matrix.platform }} "$VERSION" "$OUT"
+          node scripts/pack-release.mjs pack "${{ matrix.package }}" "$VERSION" "$OUT" "dist-${{ matrix.target }}"
           echo "OUT=$OUT" >> "$GITHUB_ENV"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: package-${{ matrix.platform }}
+          name: package-${{ matrix.package }}
           path: ${{ env.OUT }}
           if-no-files-found: error
 
@@ -146,7 +177,9 @@ jobs:
           else
             RANGE=""
           fi
+
           git-cliff --tag "$GITHUB_REF_NAME" $RANGE --strip header --github-repo WhiteMoon319/blog_for_WhiteMoon319 -o RELEASE_NOTES.md || true
+
           # 兜底：git-cliff 没产出内容时退回 git log（区间同上）
           if [[ ! -s RELEASE_NOTES.md ]]; then
             echo "## 更新内容" > RELEASE_NOTES.md
@@ -169,15 +202,18 @@ jobs:
 
           | 包 | 适用 |
           |---|---|
-          | \`blog-${VERSION}-with-env-win-x64.zip\` | **Windows**：解压后双击 \`setup.bat\`，无需自行装 Node/pnpm/git |
-          | \`blog-${VERSION}-with-env-linux-x64.zip\` | **Linux x64**：解压后 \`./setup.sh\`，内置 Node 与 pnpm（git 用系统自带的） |
-          | \`blog-${VERSION}-with-env-macos-arm64.zip\` | **macOS（Apple Silicon）**：解压后 \`./setup.sh\` |
-          | \`blog-${VERSION}-with-env-macos-x64.zip\` | **macOS（Intel）**：解压后 \`./setup.sh\` |
-          | \`blog-${VERSION}-without-env.zip\` | 只要源码与构建产物；需自备 Node ≥ 22 与 pnpm |
+          | \`blog-${VERSION}-with-env-win-x64.zip\` | **Windows 自托管**：解压后双击 \`setup.bat\`，无需自行装 Node/pnpm/git |
+          | \`blog-${VERSION}-with-env-linux-x64.zip\` | **Linux x64 自托管**：解压后 \`./setup.sh\`，内置 Node 与 pnpm（git 用系统自带的） |
+          | \`blog-${VERSION}-with-env-macos-arm64.zip\` | **macOS（Apple Silicon）自托管**：解压后 \`./setup.sh\` |
+          | \`blog-${VERSION}-with-env-macos-x64.zip\` | **macOS（Intel）自托管**：解压后 \`./setup.sh\` |
+          | \`blog-${VERSION}-without-env.zip\` | 自托管，但已自备 Node ≥ 22 与 pnpm |
+          | \`blog-${VERSION}-cloudflare.zip\` | **部署到 Cloudflare**：含 cloudflare 产物与 \`wrangler.jsonc\`，\`pnpm cf:deploy\` 上线 |
 
-          \`with-env\` 包自带便携运行环境，开箱即用；\`without-env\` 包需自行装好 Node 与 pnpm 后运行同一个部署向导。
+          \`with-env\` 包自带便携运行环境（Node + pnpm，Windows 另含 MinGit），开箱即用。
 
-          两种包都含已构建好的 \`dist/\`；走部署向导时会按你自己的配置重新构建一次。
+          每个包都只含**一个目标**的产物：自托管包内是 node 产物，cloudflare 包内是
+          cloudflare 产物。两者不能混用——node 产物里没有 worker 入口，cloudflare 产物
+          依赖 workerd 运行时。部署向导会按你选的路径用对应目标重新构建一次。
           EOF
 
       - name: Download packages

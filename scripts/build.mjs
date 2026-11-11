@@ -24,7 +24,7 @@
 //       定时任务由 server/index.mjs 的 setInterval 驱动）
 
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
@@ -77,6 +77,18 @@ step('合并后台产物', 'node scripts/merge-admin.mjs');
 if (TARGET === 'cloudflare') {
   // 把 worker/worker.ts 打包成 scheduled 入口，并把 wrangler.json 的 main 指过去
   step('打包 Worker scheduled 入口', 'node scripts/build-worker.mjs');
+}
+
+// ---- 4. 可选：把产物挪到指定目录 ----
+// 发布流程要在一台机器上连做两套（node 与 cloudflare），而两者都写 dist/，
+// 后一套会覆盖前一套。用 BLOG_DIST_OUT 指定独立目录即可并存，
+// 日常构建不设这个变量，行为完全不变。
+const distOut = envValue('BLOG_DIST_OUT');
+if (distOut) {
+  const dest = join(ROOT, distOut);
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(join(ROOT, 'dist'), dest, { recursive: true });
+  console.log(`\n[build] 产物已复制到 ${distOut}/`);
 }
 
 console.log(`\n[build] 完成（${TARGET}）`);

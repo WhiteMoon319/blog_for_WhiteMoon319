@@ -21,6 +21,30 @@ const ERR = '❌';
 const INFO = 'ℹ';
 const STEP = '🐾';
 
+/**
+ * 装依赖。发布包是 git archive 打出来的源码，不含 node_modules，
+ * 而 buildLocal 上手就要求 node_modules 存在，所以这一步必须在构建之前。
+ * 用 --frozen-lockfile 保证装出来的版本与发布时一致；有 pnpm 就用 pnpm，
+ * 没有则退回 npm（with-env 包里 pnpm 一定在，PATH 由 setup 脚本配好）。
+ */
+function installDeps(root) {
+  if (existsSync(join(root, 'node_modules'))) {
+    console.log(`  ${INFO} node_modules 已存在，跳过安装`);
+    return;
+  }
+  const hasPnpm = (() => {
+    try {
+      execSync('pnpm -v', { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const cmd = hasPnpm ? 'pnpm install --frozen-lockfile' : 'npm ci';
+  console.log(`  ${STEP} ${cmd}`);
+  execSync(cmd, { cwd: root, stdio: 'inherit' });
+}
+
 /** 本机模式：构建 → 迁移 → 前台启动 */
 export async function runLocal(ctx) {
   const { ask, askSecret, guard, root } = ctx;
@@ -30,6 +54,10 @@ export async function runLocal(ctx) {
 
   let adminPassword = await ask('管理员（admin）密码', genSecret(12));
   const sessionSecret = genSecret(32);
+
+  await guard('node-deps', '安装依赖', () => {
+    installDeps(root);
+  });
 
   await guard('node-build', '构建（本地）', () => {
     buildLocal(root, (m) => console.log(`  ${m}`));
@@ -145,7 +173,11 @@ export async function runRemote(ctx) {
     }
   }
 
-  // ---------- 5. 本地构建 ----------
+  // ---------- 5. 本地依赖与构建 ----------
+  await guard('node-deps', '安装依赖', () => {
+    installDeps(root);
+  });
+
   await guard('node-build', '本地构建', () => {
     buildLocal(root, (m) => console.log(`  ${m}`));
   });

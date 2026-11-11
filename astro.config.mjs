@@ -148,26 +148,6 @@ const adapter = nodeAdapter ?? cloudflareAdapter;
  */
 const nodeExternals = TARGET === 'node' ? ['cloudflare:workers'] : [];
 
-/** Node 内置模块：CF 目标要交给 workerd 的 nodejs_compat，不能让 rolldown 打壳 */
-const NODE_BUILTINS = [
-  'assert',
-  'buffer',
-  'crypto',
-  'events',
-  'fs',
-  'http',
-  'https',
-  'net',
-  'os',
-  'path',
-  'stream',
-  'string_decoder',
-  'tls',
-  'url',
-  'util',
-  'zlib',
-];
-
 /**
  * 两个目标各取所需：
  * - node 只要 cloudflare:workers（其余内置模块由 Node 运行时直接给）
@@ -176,36 +156,57 @@ const NODE_BUILTINS = [
 const externals = TARGET === 'node' ? nodeExternals : [];
 
 /**
- * CF 目标下把裸模块名 alias 到 node: 协议。
+ * 给用到 __require 的 chunk 注入 createRequire。
  *
- * sanitize-html / nodemailer / postcss 这些 CJS 依赖内部写的是
- * require('path')、require('events')。只把它们列进 rollupOptions.external
- * 不够——rolldown 对 CJS 里的 require 仍会生成 __require 调用，而 __require
- * 在 workerd 里直接抛「Calling require for "path"」。
- * 用 alias 把裸名指向 node:path，解析阶段就落成外部 node 模块，
- * 由 workerd 的 nodejs_compat 提供实现。
+ * sanitize-html / nodemailer / postcss 这些 CJS 依赖被内联进产物后，rolldown 把
+ * 它们内部的 require('path') 之类编译成 __require('path')。__require 的定义是
+ *
+ *   var __require = ((x) => typeof require !== "undefined" ? require : ...)(function (x) {
+ *     if (typeof require !== "undefined") return require.apply(this, arguments);
+ *     throw Error('Calling `require` for "' + x + '" ...');
+ *   });
+ *
+ * 也就是先探测模块作用域里有没有 require。workerd 的 ESM 模块没有这个绑定，
+ * 哪怕开了 nodejs_compat 也一样——那边只保证 CJS 模块能用 require。所以探测
+ * 失败，直接 throw，chunk 一加载就崩，CF 路径的 e2e 全红。
+ *
+ * 修法是在 chunk 顶部补一个模块作用域的 require。workerd 的 nodejs_compat 提供
+ * node:module，用 createRequire(import.meta.url) 就能拿到。__require 的探测此时
+ * 命中，require('path') 走 nodejs_compat 的 node:path 实现。
+ *
+ * 只加在真正含 __require 的 chunk 上，别的 chunk 不动。
  */
-const builtinAlias =
-  TARGET === 'cloudflare'
-    ? NODE_BUILTINS.map((m) => ({ find: new RegExp('^' + m + '$'), replacement: 'node:' + m }))
-    : [];
+function createRequireShim() {
+  return {
+    name: 'bwm:create-require-shim',
+    apply: 'build',
+    // 必须用 generateBundle 而不是 renderChunk：在 renderChunk 里拼上去的
+    // `const require = ...` 会被 rolldown 当成未使用变量做 DCE 删掉，
+    // 只剩一句孤零零的 createRequire() 调用，require 仍然不存在。
+    // generateBundle 拿到的是定稿字符串，改完直接写进产物。
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type !== 'chunk') continue;
+        // 注入点是 __require 的 *定义* 所在 chunk，不是调用它的 chunk。
+        // __require 在定义时就地做了 `typeof require !== "undefined"` 探测，
+        // 捕获的是那个模块的 require 绑定；给 markdown / email 注入无效，
+        // 因为报错发生在 rolldown-runtime 那侧的闭包里。
+        if (!file.code.includes('__require =')) continue;
+        file.code =
+          "import { createRequire as __bwmRequire } from 'node:module';\n" +
+          'const require = __bwmRequire(import.meta.url);\n' +
+          file.code;
+      }
+    },
+  };
+}
 
 export default defineConfig({
   output: 'server',
   adapter,
   vite: {
-    plugins: [themeResolver(), fontsBasePlugin()],
-    // rollupOptions.external 按目标分别处理，两边都需要，但原因不同：
-    // - node：cloudflare:workers 是裸协议，不 external 会让 rolldown 在构建期
-    //   解析失败。
-    // - cloudflare：sanitize-html / nodemailer 这类 CJS 依赖里写着
-    //   require('path') / require('events')，rolldown 不内置这些 shim，产物里
-    //   会留下 __require 调用，而 workerd 没有 require，chunk 一加载就抛
-    //   「Calling require for "path" in an environment that doesn't expose
-    //   the require function」。把 node 内置模块按 node: 协议 external 后，
-    //   由 workerd 的 nodejs_compat 提供，才走得到正确实现。
+    plugins: [themeResolver(), fontsBasePlugin(), createRequireShim()],
     build: { rollupOptions: { external: externals } },
-    resolve: { alias: builtinAlias },
     // 把字体外链前缀也交给服务端代码（SiteHead 用它决定 CSP 的 font-src）
     define: {
       'import.meta.env.FONTS_BASE': JSON.stringify(FONTS_BASE),

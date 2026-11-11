@@ -197,9 +197,39 @@ function createRequireShim() {
         // a file URL string, or an absolute path string」。这里只需要一个
         // 合法的绝对路径当解析基准——我们只用它解析内置模块名（path、stream
         // 之类），完全不走相对路径，所以随便填一个即可。
+        //
+        // 还要补一层 CJS interop。nodemailer 这类 CJS 依赖写的是
+        //   var EventEmitter = require('events');
+        //   class Mail extends EventEmitter { ... }
+        // 它期待 events 这个模块对象本身就是 EventEmitter 构造函数，Node 的
+        // 内置模块确实就是这个形状（函数对象，附带别的属性）。workerd 那边
+        // node:events 是标准 ESM 命名空间，导出的是 { EventEmitter, once, ... }，
+        // 直接拿来 extends 就报
+        // 「Class extends value [object Module] is not a constructor or null」。
+        // 所以这里把几个常用的内置模块按 Node 的 CJS 形状还原：
+        // 主导出抬到顶层当函数，其余命名导出挂到它身上，两种取值方式都能用。
         file.code =
           "import { createRequire as __bwmRequire } from 'node:module';\n" +
-          "const require = __bwmRequire('/worker.mjs');\n" +
+          "const __bwmRawRequire = __bwmRequire('/worker.mjs');\n" +
+          'const __bwmCjsMain = {\n' +
+          "  events: 'EventEmitter',\n" +
+          "  stream: 'Stream',\n" +
+          "  buffer: 'Buffer',\n" +
+          "  string_decoder: 'StringDecoder',\n" +
+          '};\n' +
+          'const require = (id) => {\n' +
+          '  const m = __bwmRawRequire(id);\n' +
+          "  if (m == null || typeof m !== 'object') return m;\n" +
+          "  const main = __bwmCjsMain[String(id).replace(/^node:/, '')];\n" +
+          '  let base = undefined;\n' +
+          "  if (main && typeof m[main] === 'function') base = m[main];\n" +
+          "  else if (typeof m['default'] === 'function') base = m['default'];\n" +
+          '  if (base === undefined) return m;\n' +
+          '  for (const k of Object.keys(m)) {\n' +
+          "    if (k !== 'default') base[k] = m[k];\n" +
+          '  }\n' +
+          '  return base;\n' +
+          '};\n' +
           file.code;
       }
     },

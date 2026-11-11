@@ -11,14 +11,19 @@
 // 用法：
 //   node scripts/pack-release.mjs runtime <win-x64|linux-x64|macos-arm64|macos-x64>
 //       下载并组装便携运行环境到 ./runtime/（node + pnpm；Windows 额外含 MinGit）
-//   node scripts/pack-release.mjs pack <目标> <版本号> <输出 zip 路径> [dist 目录]
-//       组装发布包：仓库源码（git archive）+ 构建产物，平台不为 plain 时再并入 runtime/
+//   node scripts/pack-release.mjs pack <目标> <平台> <版本号> <输出 zip 路径> [dist 目录]
+//       组装发布包：仓库源码（git archive）+ 构建产物 + 便携运行环境
 //
-// 目标（第一个参数）决定装哪一套产物：
+// 目标（第 1 个参数）决定装哪一套产物：
 //   node        → node 产物，供自托管使用（BLOG_TARGET=node 构建出来的 dist）
 //   cloudflare  → cloudflare 产物，供 pnpm cf:deploy 使用
-//   平台名（win-x64 等）或 plain → 兼容旧调用，此时产物由第五个参数指定 dist 目录，
-//                                  缺省用 ./dist
+//
+// 平台（第 2 个参数）决定带哪个平台的便携运行环境：
+//   win-x64 / linux-x64 / macos-arm64 / macos-x64 → 带上对应平台的 node + pnpm
+//   none → 不带运行环境（需使用者自备 Node ≥ 22 与 pnpm）
+//
+// 产物与平台是两个独立维度：两套产物都能配任意平台的环境，也能都不带环境。
+// 第五个参数指定产物目录，缺省用 ./dist。
 //
 // 关于 pnpm：pnpm 11.x 未提供 darwin-x64 的独立可执行文件，因此这里统一取 npm 包
 // pnpm@11.18.0（纯 JS，四端通用），用包内自带的 node 运行它，保证四端版本一致。
@@ -72,7 +77,19 @@ const PLATFORMS = {
 // 因此一律以解压目标目录为 cwd、用正斜杠相对路径调用 tar（相对路径不含冒号，最稳）
 function tarExtract(archive, dest, compression, extra = []) {
   const rel = relative(dest, archive).split(sep).join('/');
-  run('tar', [`-x${compression}f`, rel, ...extra], { cwd: dest });
+  // 不要求 tar 完全成功：某些受限环境（容器里无 chmod 权限）会报
+  // 「Cannot change mode」并返回非零，但文件其实已正常解出。
+  // 这类 chmod 失败不影响产物正确性，真正的内容错误会在后续步骤暴露。
+  try {
+    execFileSync('tar', [`-x${compression}f`, rel, ...extra], {
+      cwd: dest,
+      stdio: ['ignore', 'inherit', 'pipe'],
+    });
+  } catch (err) {
+    const stderr = String(err.stderr ?? '');
+    if (!/Cannot change mode|Cannot utime|Cannot change ownership/.test(stderr)) throw err;
+    log('  （tar 报告权限属性无法恢复，文件已解出，忽略）');
+  }
 }
 
 function log(msg) {
@@ -198,9 +215,14 @@ async function zipWithFflate(srcDir, topName, outFile) {
   writeFileSync(outFile, zipSync(files, { level: 9 }));
 }
 
-async function pack(target, version, outZip, distDirArg) {
-  const withEnv = target !== 'plain';
-  if (withEnv && !PLATFORMS[target]) throw new Error(`未知平台：${target}`);
+async function pack(target, platform, version, outZip, distDirArg) {
+  if (target !== 'node' && target !== 'cloudflare') {
+    throw new Error(`未知目标：${target}（可选：node / cloudflare）`);
+  }
+  const withEnv = platform !== 'none';
+  if (withEnv && !PLATFORMS[platform]) {
+    throw new Error(`未知平台：${platform}（可选：${Object.keys(PLATFORMS).join(' / ')} / none）`);
+  }
   if (!version) throw new Error('缺少版本号');
 
   // 产物来源。发布流程会把两套产物分别放到 dist-node / dist-cloudflare，
@@ -229,7 +251,7 @@ async function pack(target, version, outZip, distDirArg) {
     if (withEnv) {
       const runtimeSrc = join(ROOT, 'runtime');
       if (!existsSync(runtimeSrc)) {
-        throw new Error(`未找到 runtime/，请先运行：node scripts/pack-release.mjs runtime ${target}`);
+        throw new Error(`未找到 runtime/，请先运行：node scripts/pack-release.mjs runtime ${platform}`);
       }
       cpSync(runtimeSrc, join(pkgRoot, 'runtime'), { recursive: true });
     } else {
@@ -253,7 +275,7 @@ async function pack(target, version, outZip, distDirArg) {
 function usage() {
   log(`用法：
   node scripts/pack-release.mjs runtime <${Object.keys(PLATFORMS).join('|')}>
-  node scripts/pack-release.mjs pack <node|cloudflare|${Object.keys(PLATFORMS).join('|')}|plain> <版本号> <输出 zip 路径> [dist 目录]`);
+  node scripts/pack-release.mjs pack <node|cloudflare> <${Object.keys(PLATFORMS).join('|')}|none> <版本号> <输出 zip 路径> [dist 目录]`);
 }
 
 async function main() {
@@ -261,7 +283,7 @@ async function main() {
   if (cmd === 'runtime') {
     assembleRuntime(args[0]);
   } else if (cmd === 'pack') {
-    await pack(args[0], args[1], args[2], args[3]);
+    await pack(args[0], args[1], args[2], args[3], args[4]);
   } else {
     usage();
     process.exit(1);

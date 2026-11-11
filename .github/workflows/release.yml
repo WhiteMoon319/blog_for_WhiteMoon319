@@ -59,35 +59,19 @@ jobs:
           path: dist-${{ matrix.target }}
           if-no-files-found: error
 
+  # 产物（node / cloudflare）与平台（四个平台 / 无环境）是两个独立维度，
+  # 所以两组都要覆盖：node × {4 平台 + none}、cloudflare × {4 平台 + none}。
+  # 自托管用户要平台环境；cloudflare 用户多用于本地构建后再 wrangler 部署，
+  # 同样需要能在自己的机器上跑 pnpm，所以也给平台包。
   pack:
-    name: pack ${{ matrix.package }}
+    name: pack ${{ matrix.target }}-${{ matrix.platform }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # 自托管：带便携运行环境，产物取 node 那套
-          - package: win-x64
-            runtime: win-x64
-            target: node
-          - package: linux-x64
-            runtime: linux-x64
-            target: node
-          - package: macos-arm64
-            runtime: macos-arm64
-            target: node
-          - package: macos-x64
-            runtime: macos-x64
-            target: node
-          # 自托管、自备环境：同样取 node 产物
-          - package: plain
-            runtime: ""
-            target: node
-          # Cloudflare 部署包：不带运行环境，产物取 cloudflare 那套
-          - package: cloudflare
-            runtime: ""
-            target: cloudflare
+        target: [node, cloudflare]
+        platform: [win-x64, linux-x64, macos-arm64, macos-x64, none]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,25 +99,23 @@ jobs:
           fi
 
       - name: Assemble portable runtime
-        if: matrix.runtime != ''
-        run: node scripts/pack-release.mjs runtime ${{ matrix.runtime }}
+        if: matrix.platform != 'none'
+        run: node scripts/pack-release.mjs runtime ${{ matrix.platform }}
 
       - name: Pack
         run: |
-          if [[ "${{ matrix.package }}" == "plain" ]]; then
-            OUT="blog-${VERSION}-without-env.zip"
-          elif [[ "${{ matrix.package }}" == "cloudflare" ]]; then
-            OUT="blog-${VERSION}-cloudflare.zip"
+          if [[ "${{ matrix.platform }}" == "none" ]]; then
+            OUT="blog-${VERSION}-${{ matrix.target }}-without-env.zip"
           else
-            OUT="blog-${VERSION}-with-env-${{ matrix.package }}.zip"
+            OUT="blog-${VERSION}-${{ matrix.target }}-with-env-${{ matrix.platform }}.zip"
           fi
-          node scripts/pack-release.mjs pack "${{ matrix.package }}" "$VERSION" "$OUT" "dist-${{ matrix.target }}"
+          node scripts/pack-release.mjs pack "${{ matrix.target }}" "${{ matrix.platform }}" "$VERSION" "$OUT" "dist-${{ matrix.target }}"
           echo "OUT=$OUT" >> "$GITHUB_ENV"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: package-${{ matrix.package }}
+          name: package-${{ matrix.target }}-${{ matrix.platform }}
           path: ${{ env.OUT }}
           if-no-files-found: error
 
@@ -200,20 +182,33 @@ jobs:
 
           ### 下载哪个包
 
-          | 包 | 适用 |
+          包名格式：\`blog-<版本>-<目标>-<环境>.zip\`。
+
+          **目标**决定用途：
+
+          | 目标 | 用于 |
           |---|---|
-          | \`blog-${VERSION}-with-env-win-x64.zip\` | **Windows 自托管**：解压后双击 \`setup.bat\`，无需自行装 Node/pnpm/git |
-          | \`blog-${VERSION}-with-env-linux-x64.zip\` | **Linux x64 自托管**：解压后 \`./setup.sh\`，内置 Node 与 pnpm（git 用系统自带的） |
-          | \`blog-${VERSION}-with-env-macos-arm64.zip\` | **macOS（Apple Silicon）自托管**：解压后 \`./setup.sh\` |
-          | \`blog-${VERSION}-with-env-macos-x64.zip\` | **macOS（Intel）自托管**：解压后 \`./setup.sh\` |
-          | \`blog-${VERSION}-without-env.zip\` | 自托管，但已自备 Node ≥ 22 与 pnpm |
-          | \`blog-${VERSION}-cloudflare.zip\` | **部署到 Cloudflare**：含 cloudflare 产物与 \`wrangler.jsonc\`，\`pnpm cf:deploy\` 上线 |
+          | \`node\` | 自托管（自己的机器或 VPS），\`./setup.sh\` 或 \`setup.bat\` 起步 |
+          | \`cloudflare\` | 部署到 Cloudflare Workers，\`pnpm cf:deploy\` |
 
-          \`with-env\` 包自带便携运行环境（Node + pnpm，Windows 另含 MinGit），开箱即用。
+          **环境**决定是否自带便携运行时：
 
-          每个包都只含**一个目标**的产物：自托管包内是 node 产物，cloudflare 包内是
-          cloudflare 产物。两者不能混用——node 产物里没有 worker 入口，cloudflare 产物
-          依赖 workerd 运行时。部署向导会按你选的路径用对应目标重新构建一次。
+          | 环境 | 说明 |
+          |---|---|
+          | \`with-env-win-x64\` | Windows，解压后可跑向导，无需自行装 Node/pnpm/git |
+          | \`with-env-linux-x64\` | Linux x64，内置 Node 与 pnpm（git 用系统自带的） |
+          | \`with-env-macos-arm64\` | macOS Apple Silicon |
+          | \`with-env-macos-x64\` | macOS Intel |
+          | \`without-env\` | 不含运行时，需自备 Node ≥ 22 与 pnpm |
+
+          两个维度可以自由组合，例如：
+
+          - \`blog-${VERSION}-node-with-env-win-x64.zip\` → Windows 上自托管
+          - \`blog-${VERSION}-cloudflare-with-env-macos-arm64.zip\` → Mac 上构建并部署到 Cloudflare
+          - \`blog-${VERSION}-cloudflare-without-env.zip\` → 已有 Node 环境，只需产物与源码
+
+          每个包只含**一个目标**的产物，不混装。node 产物里没有 worker 入口，
+          cloudflare 产物依赖 workerd 运行时，两者不能互换。
           EOF
 
       - name: Download packages

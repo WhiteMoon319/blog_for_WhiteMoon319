@@ -192,9 +192,14 @@ function createRequireShim() {
         // 捕获的是那个模块的 require 绑定；给 markdown / email 注入无效，
         // 因为报错发生在 rolldown-runtime 那侧的闭包里。
         if (!file.code.includes('__require =')) continue;
+        // 不能传 import.meta.url：workerd 里它是 undefined，
+        // createRequire 会抛「The argument 'path' must be a file URL object,
+        // a file URL string, or an absolute path string」。这里只需要一个
+        // 合法的绝对路径当解析基准——我们只用它解析内置模块名（path、stream
+        // 之类），完全不走相对路径，所以随便填一个即可。
         file.code =
           "import { createRequire as __bwmRequire } from 'node:module';\n" +
-          'const require = __bwmRequire(import.meta.url);\n' +
+          "const require = __bwmRequire('/worker.mjs');\n" +
           file.code;
       }
     },

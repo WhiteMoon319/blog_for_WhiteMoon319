@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api
-Disallow: /preview
-
-Sitemap: https://www.whitemoon319.top/sitemap.xml
